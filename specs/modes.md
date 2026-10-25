@@ -1,0 +1,9 @@
+# Spec: Modes (v1)
+- **Interview:** conversation to `specs/*.md`, one spec per file; emits JSON Schema/OpenAPI where applicable.
+- **Forward:** specs to code + tests (core loop).
+- **Reverse:** code (and running system) to specs + characterization tests; specs aligned to standards (OpenAPI, JSON Schema, EBNF grammars, example-based conformance cases).
+- **Brownfield:** spec delta to change; reverse first if specs are missing.
+- **Test-hardening:** strengthen tests (mutation/property tests, coverage as gate).
+- **Clean-room:** rebuild from the spec bundle only; the builder never sees the source (context firewall).
+- Each mode has its own tuned loop prompt in `prompts/`.
+- Every objective must define its tests; the harness refuses to start loops without them.

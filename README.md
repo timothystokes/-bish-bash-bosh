@@ -1,7 +1,10 @@
 # ticked-hodgepodge
 
-Model-agnostic agentic software delivery harness (draft requirements).
+Model-agnostic agentic software delivery harness (loop engineering, Ralph-style).
 
+**Starting a session? Read `AGENTS.md`, then `plan.md` (it names the next best action), then `specs/`.** Background design is in `docs/PLAN.md`. This repo holds the harness only; delivery work always lives in a separate target repo.
+
+## Original requirements (draft)
 ## Goal
 Deliver software both forward (specs → code) and in reverse (code → specs).
 
