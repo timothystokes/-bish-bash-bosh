@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P0-4: Adapter: Copilot CLI (non-interactive) per `specs/adapters.md`, tests first using `adapterContract` with a fake-agent fixture.**
-Why: P1-1 (`hodge step`) needs at least one real adapter, and P0-3 contract suite is ready; P1-2 gate is now done so adapters are the main unblocker.
+**P1-1: `hodge step`: one idempotent iteration (repo gate, agent call via adapter, scoped tests, commit, run record, JSON status).**
+Why: P0-3, P0-4 (a real adapter) and P0-8 are done, so the core loop step is unblocked; P0-5..P0-7 can follow later and are not on the critical path.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -12,7 +12,7 @@ Why: P1-1 (`hodge step`) needs at least one real adapter, and P0-3 contract suit
 | P0-1 | Scaffold repo + test/type-check wheel (`npm test`, `npm run check`) | done | |
 | P0-2 | Config schema (JSON Schema): roles -> adapter + model, budgets, target repo, allowed paths | done | P0-1 |
 | P0-3 | Adapter interface + contract test suite (`specs/adapters.md`) | done | P0-2 |
-| P0-4 | Adapter: Copilot CLI (non-interactive) | todo | P0-3 |
+| P0-4 | Adapter: Copilot CLI (non-interactive) | done | P0-3 |
 | P0-5 | Adapter: Claude Code | todo | P0-3 |
 | P0-6 | Adapter: Codex | todo | P0-3 |
 | P0-7 | Adapter: generic OpenAI-compatible HTTP | todo | P0-3 |
@@ -42,3 +42,4 @@ Phase 2 spec modes (interview, forward, spec-lint); Phase 3 control + TUI + secr
 - P0-3 done: `src/adapter.js` (typedefs, `validateAdapterResult`, scripted `createFakeAdapter`) and reusable `adapterContract(name, makeAdapter)` in `test/helpers/adapter-contract.js` (success, failure-not-throw, over-limit => non-zero exit, relative changedFiles). 17 tests pass, check clean. Request shape: `{prompt, cwd, limits}`; adapters expose `run(req)`. Sign: real adapters must call `adapterContract` with a fake-agent fixture (no network); over-limit usage is reported via non-zero exitStatus.
 - P0-8 done: `src/run-record.js` (`validateRunRecord`, `iterationDir`, `writeIterationRecord`), 7 new tests (24 total pass, check clean). Writes `runs/<id>/iterations/NNN/{prompt,transcript,diff,test.json,usage.json,record.json}` atomically (temp dir + rename), never overwrites, rejects unsafe runId/iteration. Statuses: ok|failed|gated|over-budget. Sign: validate before touching disk so failures leave no partial records.
 - P1-2 done: `src/repo-gate.js` (`checkRepoGate`, `normalizeRepoId`, `harnessIdentity`), 6 new tests (30 total pass, check clean). Refuses by normalized remote URL (ssh/https/scp, case, .git) and by real path equal to/inside the hodgepodge root (symlinks resolved). Not yet wired into the CLI (no `hodge step` yet): P1-1 must call it first. Sign: the gate takes an injectable identity so tests never depend on this checkout's remotes.
+- P0-4 done: `src/adapters/copilot.js` (`createCopilotAdapter`, `buildCopilotArgs`, `parseCopilotOutput`), fake agent `test/fixtures/fake-copilot.js`, `test/copilot-adapter.test.js` runs `adapterContract` plus args/parse/timeout/missing-binary tests (38 pass, check clean). changedFiles come from a before/after file-hash snapshot (no git needed); wall-clock limit => SIGKILL, exit 124; spawn failure => exit 127. Assumption: usage parsed from `assistant.usage` JSONL events (inputTokens/outputTokens/cost); verify against real `--output-format json` output when first run live. Sign: adapters take injectable `command`/`prefixArgs`/`env` so tests use a fake binary, never the network.
