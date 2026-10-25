@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P1-8b: build the Dockerfile (`docker build`) now that a Docker daemon appears to be running, and smoke `hodge --help` inside the image.**
-Why: last unblocked task and the only unverified Phase 1 artifact; Phase 2 should not start on an unbuilt container. Still pending (CLIs not installed): P0-5b Claude Code and P0-6b Codex live checks. If the daemon is down again, break down Phase 2 instead.
+**P2-1: spec-lint (`hodge spec-lint <dir>`): pure, deterministic checker that `specs/*.md` files are one-decision-per-file, titled `# Spec: ...`, non-empty, and that every spec is mapped in `tests/PLAN.md`.**
+Why: first unblocked Phase 2 task; it needs no agent or Docker, builds on the existing test-plan gate, and the rest of Phase 2 (templates, interview, forward) depends on it. Still pending: P1-8b (needs a running Docker daemon), P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -34,8 +34,18 @@ Why: last unblocked task and the only unverified Phase 1 artifact; Phase 2 shoul
 | P1-8 | Live Copilot smoke; fix usage parsing | done | P1-7 |
 | P1-8b | Build the Dockerfile where a Docker daemon runs (none in the last session) | todo | P1-7 |
 
+## Phase 2: Spec modes
+| ID | Task | Status | Depends on |
+|---|---|---|---|
+| P2-1 | Spec-lint: structure checks on `specs/*.md` + mapping in `tests/PLAN.md`; `hodge spec-lint` CLI | todo | P1-3 |
+| P2-2 | Spec and test-plan templates (`templates/spec.md`, `templates/tests-PLAN.md`) that pass spec-lint | todo | P2-1 |
+| P2-3 | Mode prompts: `prompts/forward.md` (loop prompt used by `buildPrompt`, selected by config `mode`) | todo | P1-1 |
+| P2-4 | Interview mode: `hodge interview` runs the interview adapter role, writes `specs/*.md` + `tests/PLAN.md`, refuses to finish unless spec-lint passes | todo | P2-1, P2-2 |
+| P2-5 | Forward mode gate: refuse to start loops without objective tests (spec-lint + test-plan gate wired into `hodge run`) | todo | P2-1, P1-3 |
+| P2-6 | Phase 2 exit: throwaway objective goes interview -> specs -> test plan -> forward loops -> green (scripted adapter) | todo | P2-4, P2-5, P2-3 |
+
 ## Later phases (not yet broken down)
-Phase 2 spec modes (interview, forward, spec-lint); Phase 3 control + TUI + secret-scanning proxy; Phase 4 reverse/brownfield/harden/clean-room; Phase 5 AWS (CDK, Step Functions driver, Fargate Spot). See `docs/PLAN.md`. Break each down into a table like the above when the previous phase is `done`.
+Phase 3 control + TUI + secret-scanning proxy; Phase 4 reverse/brownfield/harden/clean-room; Phase 5 AWS (CDK, Step Functions driver, Fargate Spot). See `docs/PLAN.md`. Break each down into a table like the above when the previous phase is `done`.
 
 ## Deferred
 - Promotion out of the sandbox (expected to align with a traditional CD pipeline).
@@ -59,3 +69,4 @@ Phase 2 spec modes (interview, forward, spec-lint); Phase 3 control + TUI + secr
 - P0-5 done: `src/adapters/claude-code.js` (`createClaudeCodeAdapter`, `buildClaudeArgs`, `parseClaudeOutput`), fake `test/fixtures/fake-claude.js`, `test/claude-code-adapter.test.js` (10 new, 107 total pass, check clean; tests failed first); registered as `claude-code` in `defaultRegistry`. Extracted shared `src/adapters/process.js` (`runProcessAgent`: spawn, wall-clock kill, hash snapshot) and refactored the Copilot adapter onto it (its tests unchanged and green). Output shape (`claude -p --output-format json`: `result`, `total_cost_usd`, `usage.input_tokens/output_tokens`) is from documentation, NOT verified live: `claude` is not installed here (split to P0-5b). Sign: process adapters share `runProcessAgent`; only args/parsing are per-vendor.
 - P0-6 done: `src/adapters/codex.js` (`createCodexAdapter`, `buildCodexArgs`, `parseCodexOutput`), fake `test/fixtures/fake-codex.js`, `test/codex-adapter.test.js` (117 total pass, check clean; tests failed first); registered as `codex` in `defaultRegistry`, reuses `runProcessAgent`. Runs `codex exec --json --dangerously-bypass-approvals-and-sandbox [--model m] <prompt>`; transcript = `agent_message` items, tokens = sum of `turn.completed` input+output (cache excluded). Shape is from documentation, NOT verified live: `codex` not installed (split to P0-6b). Cost is read from an optional `usage.cost_usd` (real Codex reports none, so cost budget is not enforced for it; the contract test needs cost to round-trip). Sign: adapters built without the CLI installed must log an unverified-shape follow-up task.
 - P0-7 done: `src/adapters/openai-http.js` (`createOpenAiHttpAdapter`, `parseFileBlocks`), `test/openai-http-adapter.test.js` runs `adapterContract` against a local fake HTTP server plus auth/model, path-escape, timeout (124), unreachable (127) tests (127 total pass, check clean). Registered as `openai-http`; endpoint/key come from env `HODGE_HTTP_BASE_URL` / `HODGE_HTTP_API_KEY` (key never in config). The model has no tools, so it returns whole files as `<<<FILE path>>>...<<<END>>>` blocks (protocol sent as system message) which the adapter writes; paths outside cwd are rejected (exit 1). HTTP error => exit 2. Cost read from optional `usage.cost`. Sign: tool-less adapters need an explicit file protocol and must confine writes to cwd. Docker client + daemon seem available now (-> P1-8b).
+- Session (P1-8b attempt): Docker client present but daemon not running (`docker.sock` missing), so the build was not attempted; P1-8b stays todo. Broke Phase 2 down into P2-1..P2-6 and set P2-1 as next. Sign: check `docker info` for a reachable daemon, not just the client.
