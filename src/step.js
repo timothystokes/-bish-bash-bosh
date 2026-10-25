@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateConfig } from './config.js';
+import { checkBudgetGate } from './budget-gate.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { writeIterationRecord } from './run-record.js';
 
@@ -76,7 +77,7 @@ function nextIteration(dir, /** @type {string} */ runId) {
 export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], identity }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
-  const cfg = /** @type {{targetRepo: string, budgets: {maxTokens: number, maxCostUsd: number, maxWallClockSeconds: number}}} */ (config);
+  const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets}} */ (config);
 
   const self = identity ?? harnessIdentity();
   const gated = (/** @type {string} */ reason) => ({ sha: null, iteration: 0, cost: 0, status: /** @type {const} */ ('gated'), reason });
@@ -88,14 +89,23 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     return gated('working tree is not clean');
   }
 
+  const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
+  if (!budget.ok) {
+    return { sha: null, iteration: 0, cost: 0, status: 'over-budget', reason: budget.reason };
+  }
+
   const iteration = nextIteration(repoDir, runId);
   const prompt = buildPrompt(repoDir);
-  const { maxTokens, maxCostUsd, maxWallClockSeconds } = cfg.budgets;
+  const maxTokens = budget.remaining.tokens;
+  const maxCostUsd = budget.remaining.cost;
+  const maxWallClockSeconds = Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds);
+  const started = Date.now();
   const result = await adapter.run({
     prompt,
     cwd: repoDir,
     limits: { maxTokens, maxCostUsd, maxWallClockSeconds },
   });
+  const seconds = (Date.now() - started) / 1000;
 
   git(repoDir, 'add', '-A');
   const diff = git(repoDir, 'diff', '--cached');
@@ -122,10 +132,11 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
 
   writeIterationRecord(repoDir, runId, iteration, {
     status,
-    usage: result.usage,
+    usage: { ...result.usage, seconds },
     changedFiles: result.changedFiles,
     gates: [
       { name: 'repo', ok: true },
+      { name: 'budget', ok: true },
       { name: 'tests', ok: status === 'ok', detail: status === 'ok' ? undefined : status },
     ],
     prompt,

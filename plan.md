@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P1-5: budget gate (per-run tokens/cost/wall-clock/iterations, summed from run records; refuse the step when exhausted).**
-Why: `runStep` only enforces per-step limits; the driver (`hodge run`, P1-6) must not start until a run-wide cap exists, otherwise an unattended loop can overspend.
+**P1-4: type gate, anti-stub gate, scope gate (harness-enforced checks on the agent's diff before commit; record each in `gates`).**
+Why: the budget gate is in, so the remaining gates inside `runStep` are what stop an unattended loop committing junk; the driver (P1-6) should wrap a fully gated step.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -26,7 +26,7 @@ Why: `runStep` only enforces per-step limits; the driver (`hodge run`, P1-6) mus
 | P1-2 | Repo gate (refuse target == hodgepodge) | done | P0-2 |
 | P1-3 | Test-plan gate (plan exists, tests red first) | todo | P1-1 |
 | P1-4 | Type gate, anti-stub gate, scope gate | todo | P1-1 |
-| P1-5 | Budget gate (tokens/cost/time/iterations) | todo | P1-1 |
+| P1-5 | Budget gate (tokens/cost/time/iterations) | done | P1-1 |
 | P1-6 | Local driver (`hodge run`) + Dockerfile for per-run container | todo | P1-1 |
 | P1-7 | Toy objective end-to-end unattended, red to green | todo | P1-2..P1-6 |
 
@@ -46,3 +46,4 @@ Phase 2 spec modes (interview, forward, spec-lint); Phase 3 control + TUI + secr
 - P0-4 done: `src/adapters/copilot.js` (`createCopilotAdapter`, `buildCopilotArgs`, `parseCopilotOutput`), fake agent `test/fixtures/fake-copilot.js`, `test/copilot-adapter.test.js` runs `adapterContract` plus args/parse/timeout/missing-binary tests (38 pass, check clean). changedFiles come from a before/after file-hash snapshot (no git needed); wall-clock limit => SIGKILL, exit 124; spawn failure => exit 127. Assumption: usage parsed from `assistant.usage` JSONL events (inputTokens/outputTokens/cost); verify against real `--output-format json` output when first run live. Sign: adapters take injectable `command`/`prefixArgs`/`env` so tests use a fake binary, never the network.
 - P1-1 done: `src/step.js` (`runStep`, `buildPrompt`), `test/step.test.js` (10 new, 48 total pass, check clean; tests failed first). Flow: validate config -> repo gate on targetRepo and repoDir -> clean-tree check -> fixed prompt stack (loop prompt + specs index + plan.md) -> adapter -> scoped test command (injectable, default `npm test`) -> on failure/over-budget `git reset --hard` + clean (diff kept in the record) -> write record -> commit -> `{sha, iteration, cost, status}`. Gated steps return sha null and touch nothing. Iteration number = max existing + 1. Not yet done: CLI wiring (P1-1b), per-gate detail beyond repo/tests (P1-3..P1-5), per-run (not per-step) budget accounting. Sign: a step must start from a clean tree; discard agent work on failure but always commit the record.
 - P1-1b done: `hodge step --config <file> [--repo <dir>] [--run-id <id>]` in `src/cli.js` (`main` now async, injectable deps; `parseStepArgs`), `src/adapters/index.js` (`resolveAdapter`, `defaultRegistry` maps opaque adapter ids to factories; only entry today is the Copilot adapter). `test/cli-step.test.js` 9 new (57 total pass, check clean; tests failed first). Exit codes: 0 ok, 1 step failed/gated/over-budget, 2 usage/config/adapter errors. JSON printed to stdout. Learned: bin/hodge needs top-level await on `main`. Sign: new adapters (P0-5..7) register in `defaultRegistry` only; CLI logic stays vendor-free. Untracked `loop.sh` (owner's scratch, references missing `lap.sh`) left uncommitted. AGENTS.md checklist gained step 5 (re-evaluate checklist/plan and next action).
+- P1-5 done: `src/budget-gate.js` (`sumRunUsage`, `checkBudgetGate`), 9 new tests (66 total pass, check clean; tests failed first). `runStep` sums `runs/<id>/iterations/*/usage.json`, refuses with `{status:'over-budget', sha:null, reason}` and writes nothing when iterations/tokens/cost/wall-clock is exhausted, and passes the adapter the remaining run budget as limits (wall-clock also capped per step). usage.json now carries optional `seconds` (measured around the adapter call); records gain a `budget` gate entry. Budgets in config are therefore run-wide. Sign: budget accounting reads only run records, so a restarted driver cannot lose it.

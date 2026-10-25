@@ -157,3 +157,39 @@ test('invalid config is rejected', async () => {
     /invalid config/,
   );
 });
+
+test('step refuses and writes nothing once the run budget is exhausted', async () => {
+  const dir = makeRepo();
+  const cfg = config('git@example.com:o/target.git');
+  cfg.budgets.maxIterations = 1;
+  const first = await runStep({ config: cfg, repoDir: dir, runId: 'rb', adapter: adapter(), testCommand: pass, identity: self });
+  assert.equal(first.status, 'ok');
+  const head = git(dir, 'rev-parse', 'HEAD');
+  let called = false;
+  const second = await runStep({
+    config: cfg, repoDir: dir, runId: 'rb', testCommand: pass, identity: self,
+    adapter: { run: async () => { called = true; throw new Error('must not run'); } },
+  });
+  assert.equal(second.status, 'over-budget');
+  assert.equal(second.sha, null);
+  assert.match(String(second.reason), /iteration/);
+  assert.equal(called, false);
+  assert.equal(git(dir, 'rev-parse', 'HEAD'), head);
+});
+
+test('step caps adapter limits to the remaining run budget and records wall-clock seconds', async () => {
+  const dir = makeRepo();
+  const cfg = config('git@example.com:o/target.git');
+  await runStep({ config: cfg, repoDir: dir, runId: 'rc', adapter: adapter({ usage: { tokens: 400, cost: 0.25 } }), testCommand: pass, identity: self });
+  /** @type {any} */
+  let seen;
+  await runStep({
+    config: cfg, repoDir: dir, runId: 'rc', testCommand: pass, identity: self,
+    adapter: { run: async (req) => { seen = req.limits; return { exitStatus: 0, transcript: '', usage: { tokens: 0, cost: 0 }, changedFiles: [] }; } },
+  });
+  assert.equal(seen.maxTokens, 600);
+  assert.equal(seen.maxCostUsd, 0.75);
+  assert.ok(seen.maxWallClockSeconds <= 60);
+  const u = JSON.parse(readFileSync(join(dir, 'runs/rc/iterations/001/usage.json'), 'utf8'));
+  assert.equal(typeof u.seconds, 'number');
+});
