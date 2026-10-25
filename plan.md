@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P2-4: interview mode: `hodge interview` runs the interview adapter role, writes `specs/*.md` + `tests/PLAN.md` from `templates/`, and refuses to finish unless spec-lint passes.**
-Why: unblocked, last prerequisite (with P2-5, now done) for the P2-6 phase exit. Still pending: P1-8b (needs a running Docker daemon; Dockerfile also copies `prompts/`), P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
+**P2-6: Phase 2 exit: a throwaway objective goes interview -> specs -> test plan -> forward loops -> green (scripted adapter), as an e2e test through the real CLI.**
+Why: unblocked, all prerequisites (P2-3, P2-4, P2-5) done; closes Phase 2. Still pending: P1-8b (needs a running Docker daemon; Dockerfile now also copies `prompts/` and `templates/`), P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed). After P2-6, break down Phase 3.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -40,7 +40,7 @@ Why: unblocked, last prerequisite (with P2-5, now done) for the P2-6 phase exit.
 | P2-1 | Spec-lint: structure checks on `specs/*.md` + mapping in `tests/PLAN.md`; `hodge spec-lint` CLI | done | P1-3 |
 | P2-2 | Spec and test-plan templates (`templates/spec.md`, `templates/tests-PLAN.md`) that pass spec-lint | done | P2-1 |
 | P2-3 | Mode prompts: `prompts/forward.md` (loop prompt used by `buildPrompt`, selected by config `mode`) | done | P1-1 |
-| P2-4 | Interview mode: `hodge interview` runs the interview adapter role, writes `specs/*.md` + `tests/PLAN.md`, refuses to finish unless spec-lint passes | todo | P2-1, P2-2 |
+| P2-4 | Interview mode: `hodge interview` runs the interview adapter role, writes `specs/*.md` + `tests/PLAN.md`, refuses to finish unless spec-lint passes | done | P2-1, P2-2 |
 | P2-5 | Forward mode gate: refuse to start loops without objective tests (spec-lint + test-plan gate wired into `hodge run`) | done | P2-1, P1-3 |
 | P2-6 | Phase 2 exit: throwaway objective goes interview -> specs -> test plan -> forward loops -> green (scripted adapter) | todo | P2-4, P2-5, P2-3 |
 
@@ -74,3 +74,4 @@ Phase 3 control + TUI + secret-scanning proxy; Phase 4 reverse/brownfield/harden
 - P2-2 done: `templates/spec.md` (sections: Purpose, Requirements, Examples, Out of scope) and `templates/tests-PLAN.md` (table mapping `specs/example.md` -> `tests/example.test.js`), `test/templates.test.js` (3 new, 143 total pass, check clean; tests failed first). The test instantiates both into a temp target (spec as `specs/example.md`) and asserts `lintSpecs` is clean, so templates cannot drift from the linter. Interview mode (P2-4) should emit from these. Sign: templates are tested by instantiation through the real linter.
 - P2-3 done: `prompts/forward.md` (moved out of `step.js`), `src/prompts.js` (`MODES`, `loadModePrompt`: rejects unknown modes and modes with no prompt file), `buildPrompt(repoDir, mode='forward')`, optional config key `mode` (enum of the six spec modes, default forward) passed by `runStep`; `test/prompts.test.js` (5 new, 148 total pass, check clean; tests failed first). Dockerfile now copies `prompts/` (not built; P1-8b). Only `forward` has a prompt so far; other modes error until written. Sign: any runtime file read by src must be added to the Dockerfile COPY list.
 - P2-5 done: `runLoop` with `requireTestPlan` now runs `lintSpecs` before any step and returns `{status:'gated', steps:[], reason:'spec-lint failed: ...'}` without calling the agent; the per-step test-plan gate (tests/PLAN.md, red-first) already ran. 150 tests pass, check clean (new test failed first). Learned: the e2e toy spec lacked the `# Spec:` title, so it was fixed. `requireTestPlan` remains opt-in config (default off) so existing configs keep working. Sign: gates that wrap a loop belong in `runLoop` so no driver can bypass them.
+- P2-4 done: `src/interview.js` (`runInterview`, `buildInterviewPrompt`), `prompts/interview.md`, `hodge interview --config <f> --objective <text> [--repo] [--run-id]` (uses role `interview`, error exit 2 if absent), `test/interview.test.js` (8 new, 158 total pass, check clean; tests failed first). Gates: empty objective, repo gate, clean tree, budget. Writes allowed only under `specs/` and `tests/` (interview authors the red tests the plan maps to); agent failure, out-of-scope writes or spec-lint problems discard the work and commit a failed record under `runs/<id>/interview/`. Limitation: interview usage is not counted in run-wide budget (sumRunUsage reads only iterations). `prompts.test` now uses `reverse` as the unwritten mode; Dockerfile copies `templates/`. Sign: gate acceptance on the harness's own lint, never the agent's claim; any runtime file read by src goes in the Dockerfile.

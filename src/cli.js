@@ -5,6 +5,7 @@ import { resolveAdapter, defaultRegistry } from './adapters/index.js';
 import { runStep } from './step.js';
 import { runLoop } from './driver.js';
 import { lintSpecs } from './spec-lint.js';
+import { runInterview } from './interview.js';
 
 /** @returns {string} */
 export function helpText() {
@@ -15,6 +16,7 @@ export function helpText() {
     '  hodge [--help]',
     '  hodge step --config <file> [--repo <dir>] [--run-id <id>]',
     '  hodge run  --config <file> [--repo <dir>] [--run-id <id>]',
+    '  hodge interview --config <file> --objective <text> [--repo <dir>] [--run-id <id>]',
     '  hodge spec-lint [--repo <dir>]',
     '',
     'Commands:',
@@ -22,6 +24,8 @@ export function helpText() {
     '         (--repo defaults to ., --run-id defaults to "default")',
     '  run    loop steps until the plan is done or a step fails/gates/runs out of budget;',
     '         prints JSON {status, steps, reason?}; exit 0 only when done',
+    '  interview  run the `interview` role to write specs/*.md + tests/PLAN.md; commits only if spec-lint passes;',
+    '         prints JSON {status, sha, reason?}; exit 0 only when ok',
     '  spec-lint  check specs/*.md structure and tests/PLAN.md mapping; prints JSON {ok, problems};',
     '         exit 0 only when clean',
     '',
@@ -30,20 +34,29 @@ export function helpText() {
 
 /**
  * @param {string[]} args
- * @returns {{ok: true, config: string, repo: string, runId: string} | {ok: false, error: string}}
+ * @param {{objective?: boolean}} [opts] interview also takes (and requires) --objective
+ * @returns {{ok: true, config: string, repo: string, runId: string, objective?: string} | {ok: false, error: string}}
  */
-export function parseStepArgs(args) {
+export function parseStepArgs(args, opts = {}) {
+  const flags = ['--config', '--repo', '--run-id', ...(opts.objective ? ['--objective'] : [])];
   /** @type {Record<string, string | undefined>} */
   const v = { '--repo': '.', '--run-id': 'default' };
   for (let i = 0; i < args.length; i += 2) {
     const flag = args[i];
-    if (!['--config', '--repo', '--run-id'].includes(flag)) return { ok: false, error: `unknown argument '${flag}'` };
+    if (!flags.includes(flag)) return { ok: false, error: `unknown argument '${flag}'` };
     const val = args[i + 1];
     if (val === undefined || val.startsWith('--')) return { ok: false, error: `${flag} requires a value` };
     v[flag] = val;
   }
   if (!v['--config']) return { ok: false, error: '--config <file> is required' };
-  return { ok: true, config: v['--config'], repo: /** @type {string} */ (v['--repo']), runId: /** @type {string} */ (v['--run-id']) };
+  if (opts.objective && !v['--objective']) return { ok: false, error: '--objective <text> is required' };
+  return {
+    ok: true,
+    config: v['--config'],
+    repo: /** @type {string} */ (v['--repo']),
+    runId: /** @type {string} */ (v['--run-id']),
+    ...(opts.objective ? { objective: v['--objective'] } : {}),
+  };
 }
 
 /**
@@ -79,12 +92,12 @@ export async function main(argv, deps = {}) {
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
   }
-  if (cmd !== 'step' && cmd !== 'run') {
+  if (cmd !== 'step' && cmd !== 'run' && cmd !== 'interview') {
     err(`hodge: unknown command '${argv[0]}'\n\n${helpText()}`);
     return 2;
   }
 
-  const parsed = parseStepArgs(argv.slice(1));
+  const parsed = parseStepArgs(argv.slice(1), { objective: cmd === 'interview' });
   if (!parsed.ok) {
     err(`hodge ${cmd}: ${parsed.error}\n`);
     return 2;
@@ -103,7 +116,19 @@ export async function main(argv, deps = {}) {
     return 2;
   }
   try {
-    const adapter = resolveAdapter(config, 'build', deps.registry ?? defaultRegistry);
+    const adapter = resolveAdapter(config, cmd === 'interview' ? 'interview' : 'build', deps.registry ?? defaultRegistry);
+    if (cmd === 'interview') {
+      const res = await runInterview({
+        config,
+        repoDir: resolve(parsed.repo),
+        runId: parsed.runId,
+        adapter,
+        objective: parsed.objective ?? '',
+        identity: deps.identity,
+      });
+      out(`${JSON.stringify(res)}\n`);
+      return res.status === 'ok' ? 0 : 1;
+    }
     const run = cmd === 'run' ? runLoop : runStep;
     const res = await run({
       config,

@@ -9,3 +9,4 @@
 - Every objective must define its tests; the harness refuses to start loops without them.
 - Mode is selected by optional config key `mode` (default `forward`); a mode with no prompt file fails loudly.
 - With config `requireTestPlan: true`, `hodge run` runs spec-lint before the first step and gates (no agent call) on any problem; each step then also applies the test-plan gate.
+- `hodge interview --config <f> --objective <text>` runs the `interview` role (config must define it) with `prompts/interview.md` + both templates. It may only write under `specs/` and `tests/`; on agent failure, out-of-scope writes or any spec-lint problem the work is discarded (status `failed`). Records go to `runs/<id>/interview/` (not counted in run budget). Exit 0 only when ok.
