@@ -7,3 +7,4 @@
 - History limit (~25,000 events): run N iterations per execution, then start a successor execution with SHA and totals.
 - Artifacts to S3, secrets from Secrets Manager. Spot interruption is tolerable: resume from the last commit.
 - Local/cloud parity: the same container image and `hodge step` run in both.
+- State machine is built by the pure `buildStateMachine(config)` (`src/state-machine.js`). Execution input is `{runId, executionIterations: 0}`; `$.pointers` is `{sha, iteration, cost, status, paused, stop}`, re-read each loop by a light lambda. Decide order: stop, pause (wait + re-read), done, gated/over-budget (fail), budget, per-execution cap (successor).
