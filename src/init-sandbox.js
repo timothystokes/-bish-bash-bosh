@@ -80,6 +80,15 @@ function copyTree(from, to) {
 }
 
 /**
+ * Add the objective kit to an existing target: nothing already there (plan.md, package.json, specs) is touched.
+ * @param {string} repo
+ */
+export function addObjectiveKit(repo) {
+  copyTree(join(templates, 'objective'), join(repo, 'objective'));
+  rmSync(join(repo, 'objective', 'plan.md'));
+}
+
+/**
  * The objective kit (phases, interview protocol, readiness signals, brief, open questions) goes to
  * `objective/`; the starter plan.md goes to the repo root. Nothing here is specific to a solution:
  * the objective itself is gathered later by `hodge objective`.

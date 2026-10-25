@@ -24,7 +24,7 @@ npx hodge init --dir ~/sandboxes/demo --adapter copilot --model <model-id>
 cd ~/sandboxes/demo
 hodge run          # or ./hodge run if hodge is not on your PATH
 hodge step
-hodge interview    # asks for the objective itself
+hodge interview    # asks for the objective, then interviews you question by question until specs are ready
 hodge reverse
 ```
 

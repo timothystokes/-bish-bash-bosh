@@ -7,10 +7,10 @@ import { runLoop } from './driver.js';
 import { lintSpecs } from './spec-lint.js';
 import { checkReadiness, hasObjectiveKit } from './readiness.js';
 import { createInterface } from 'node:readline';
-import { runInterview } from './interview.js';
+import { execFileSync } from 'node:child_process';
 import { runObjective } from './objective.js';
 import { runReverse } from './reverse.js';
-import { initSandbox } from './init-sandbox.js';
+import { initSandbox, addObjectiveKit } from './init-sandbox.js';
 import { exportBundle } from './clean-room.js';
 import { createLocalStatusSource, readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
@@ -139,6 +139,17 @@ function repoFor(repo, dir) {
  */
 export function readlineOptions(input) {
   return /** @type {{isTTY?: boolean}} */ (input).isTTY ? { input, output: process.stdout, terminal: true } : { input };
+}
+
+/**
+ * Undo terminal modes a child process may have left on: kitty keyboard protocol, modifyOtherKeys, bracketed paste;
+ * and put the tty back into raw mode so readline sees Enter.
+ * @param {NodeJS.ReadableStream & {setRawMode?: (b: boolean) => unknown}} input
+ */
+function resetTty(input) {
+  process.stdout.write('\x1b[<u\x1b[>4;0m\x1b[?2004l');
+  input.setRawMode?.(false);
+  input.resume();
 }
 
 /**
@@ -444,27 +455,51 @@ export async function main(argv, deps = {}) {
   try {
     const adapter = resolveAdapter(config, cmd === 'interview' || cmd === 'objective' || cmd === 'reverse' ? (cmd === 'objective' ? 'interview' : cmd) : 'build', deps.registry ?? defaultRegistry);
     if (cmd === 'objective' || cmd === 'interview') {
-      const rl = createInterface(readlineOptions(deps.input ?? process.stdin));
-      const lines = rl[Symbol.asyncIterator]();
+      // The agent runs silently for minutes; say so, or a submitted answer looks like a dead prompt.
+      const inner = adapter;
+      const announced = {
+        run: async (/** @type {Parameters<typeof inner.run>[0]} */ req) => {
+          err('\nAnswer received. Running the interview agent; this can take several minutes (nothing prints until it finishes)...\n');
+          const res = await inner.run(req);
+          err('Agent finished; checking its work.\n');
+          return res;
+        },
+      };
+      const input = deps.input ?? process.stdin;
+      const tty = /** @type {{isTTY?: boolean}} */ (input).isTTY === true;
+      // Piped input must keep one reader (a second one would lose buffered lines); a tty gets a fresh reader per
+      // question so tty state left by the agent child (cooked mode, keyboard protocols) cannot break Enter.
+      const shared = tty ? undefined : createInterface(readlineOptions(input));
+      const sharedLines = shared?.[Symbol.asyncIterator]();
       /** @type {(prompt: string) => Promise<string | null>} */
       const ask = async (prompt) => {
         out(prompt);
-        const next = await lines.next();
-        return next.done ? null : next.value;
+        if (sharedLines) {
+          const next = await sharedLines.next();
+          return next.done ? null : next.value;
+        }
+        resetTty(input);
+        const rl = createInterface(readlineOptions(input));
+        try {
+          for await (const line of rl) return line;
+          return null;
+        } finally {
+          rl.close();
+        }
       };
+      const rl = { close: () => shared?.close() };
       try {
-        // The objective is never a flag: it is captured here, as the first answer of the interview.
-        if (cmd === 'interview' && !hasObjectiveKit(repo)) {
-          const objective = ((await ask('Describe the objective in a sentence or two: what should exist when this is done, and why?\n> ')) ?? '').trim();
-          const res = await runInterview({ config, repoDir: repo, runId: parsed.runId, adapter, objective, identity: deps.identity });
-          out(`${JSON.stringify(res)}\n`);
-          return res.status === 'ok' ? 0 : 1;
+        // Interviewing is a conversation, never a single shot: a target without the kit gets it first.
+        if (!hasObjectiveKit(repo)) {
+          addObjectiveKit(repo);
+          execFileSync('git', ['-C', repo, 'add', '-A']);
+          execFileSync('git', ['-C', repo, '-c', 'commit.gpgsign=false', '-c', 'user.name=hodge', '-c', 'user.email=hodge@localhost', 'commit', '-q', '-m', 'hodge interview: add objective kit']);
         }
         const res = await runObjective({
           config,
           repoDir: repo,
           runId: parsed.runId,
-          adapter,
+          adapter: announced,
           ask,
           say: out,
           identity: deps.identity,

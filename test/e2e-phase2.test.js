@@ -67,7 +67,8 @@ test('phase 2 exit: objective goes interview -> specs -> test plan -> forward lo
     transcript: 'wrote specs and tests',
     usage: { tokens: 10, cost: 0.01 },
     writes: {
-      'specs/add.md': '# Spec: add(a, b) returns the sum\n\n## Purpose\nAdd two numbers.\n',
+      'specs/add.md':
+        '# Spec: add(a, b) returns the sum\n\n## Purpose\nAdd two numbers.\n\n## Requirements\n- `add` must return the sum of two finite numbers.\n- `add` must return the other operand when one operand is 0.\n- `add` must throw a TypeError when an operand is not a number.\n\n## Examples\n- `add(2, 3)` -> `5`\n- `add(\'a\', 1)` -> throws TypeError\n\n## Out of scope\n- Big numbers.\n',
       'tests/PLAN.md': '- specs/add.md -> tests/add.test.js: sum of two numbers\n',
       'tests/add.test.js':
         "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { add } from '../src/add.js';\ntest('add', () => assert.equal(add(2, 3), 5));\n",
