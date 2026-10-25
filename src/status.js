@@ -8,6 +8,7 @@ import { sumRunUsage } from './budget-gate.js';
  * @typedef {{
  *   totals(runId: string): RunTotals,
  *   lastStatus(runId: string): string | null,
+ *   tail(runId: string, lines: number): string[],
  * }} StatusSource
  * @typedef {{
  *   runId: string,
@@ -20,6 +21,21 @@ import { sumRunUsage } from './budget-gate.js';
  */
 
 /**
+ * @param {string} repoDir
+ * @param {string} runId
+ * @returns {string | null} directory of the newest complete iteration record
+ */
+function lastIteration(repoDir, runId) {
+  const base = join(repoDir, 'runs', runId, 'iterations');
+  if (!existsSync(base)) return null;
+  const last = readdirSync(base)
+    .filter((n) => /^\d+$/.test(n) && existsSync(join(base, n, 'record.json')))
+    .sort()
+    .pop();
+  return last ? join(base, last) : null;
+}
+
+/**
  * Status source backed by local run files (`runs/<id>/iterations/NNN`).
  * Other sources (e.g. cloud execution history) implement the same interface.
  * @param {string} repoDir
@@ -29,13 +45,13 @@ export function createLocalStatusSource(repoDir) {
   return {
     totals: (runId) => sumRunUsage(repoDir, runId),
     lastStatus(runId) {
-      const base = join(repoDir, 'runs', runId, 'iterations');
-      if (!existsSync(base)) return null;
-      const last = readdirSync(base)
-        .filter((n) => /^\d+$/.test(n) && existsSync(join(base, n, 'record.json')))
-        .sort()
-        .pop();
-      return last ? JSON.parse(readFileSync(join(base, last, 'record.json'), 'utf8')).status : null;
+      const last = lastIteration(repoDir, runId);
+      return last ? JSON.parse(readFileSync(join(last, 'record.json'), 'utf8')).status : null;
+    },
+    tail(runId, lines) {
+      const last = lastIteration(repoDir, runId);
+      if (!last || !existsSync(join(last, 'transcript'))) return [];
+      return readFileSync(join(last, 'transcript'), 'utf8').replace(/\n$/, '').split('\n').slice(-lines);
     },
   };
 }

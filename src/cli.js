@@ -8,6 +8,7 @@ import { lintSpecs } from './spec-lint.js';
 import { runInterview } from './interview.js';
 import { createLocalStatusSource, readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
+import { runTui } from './tui.js';
 
 /** @returns {string} */
 export function helpText() {
@@ -20,6 +21,7 @@ export function helpText() {
     '  hodge run  --config <file> [--repo <dir>] [--run-id <id>]',
     '  hodge interview --config <file> --objective <text> [--repo <dir>] [--run-id <id>]',
     '  hodge status --config <file> [--repo <dir>] [--run-id <id>] [--control <control.json>]',
+    '  hodge tui --config <file> --control <control.json> [--repo <dir>] [--run-id <id>]',
     '  hodge spec-lint [--repo <dir>]',
     '  hodge control --file <control.json> pause|resume|stop|steer <note...>',
     '',
@@ -31,6 +33,7 @@ export function helpText() {
     '  interview  run the `interview` role to write specs/*.md + tests/PLAN.md; commits only if spec-lint passes;',
     '         prints JSON {status, sha, reason?}; exit 0 only when ok',
     '  status  print JSON run status: iterations, tokens, cost, seconds vs budgets (and control state with --control)',
+    '  tui    live terminal view: log tail, cost meter vs budget; keys p pause, r resume, s steer, x stop (confirmed), q quit',
     '  spec-lint  check specs/*.md structure and tests/PLAN.md mapping; prints JSON {ok, problems};',
     '         exit 0 only when clean',
     '  control  write pause/resume/stop/steer to a control file read by `hodge run --control`; prints JSON {ok}',
@@ -71,6 +74,7 @@ export function parseStepArgs(args, opts = {}) {
  *   registry?: import('./adapters/index.js').AdapterRegistry,
  *   testCommand?: string[],
  *   identity?: import('./repo-gate.js').HarnessIdentity,
+ *   input?: NodeJS.ReadableStream & {setRawMode?: (b: boolean) => unknown},
  *   stdout?: (s: string) => void,
  *   stderr?: (s: string) => void,
  * }} CliDeps
@@ -118,14 +122,18 @@ export async function main(argv, deps = {}) {
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
   }
-  if (cmd !== 'step' && cmd !== 'run' && cmd !== 'interview' && cmd !== 'status') {
+  if (cmd !== 'step' && cmd !== 'run' && cmd !== 'interview' && cmd !== 'status' && cmd !== 'tui') {
     err(`hodge: unknown command '${argv[0]}'\n\n${helpText()}`);
     return 2;
   }
 
-  const parsed = parseStepArgs(argv.slice(1), { objective: cmd === 'interview', control: cmd === 'run' || cmd === 'status' });
+  const parsed = parseStepArgs(argv.slice(1), { objective: cmd === 'interview', control: cmd === 'run' || cmd === 'status' || cmd === 'tui' });
   if (!parsed.ok) {
     err(`hodge ${cmd}: ${parsed.error}\n`);
+    return 2;
+  }
+  if (cmd === 'tui' && !parsed.control) {
+    err('hodge tui: --control <control.json> is required\n');
     return 2;
   }
   /** @type {unknown} */
@@ -140,6 +148,17 @@ export async function main(argv, deps = {}) {
   if (!v.ok) {
     err(`hodge ${cmd}: invalid config: ${v.errors.join('; ')}\n`);
     return 2;
+  }
+  if (cmd === 'tui') {
+    await runTui({
+      source: createLocalStatusSource(resolve(parsed.repo)),
+      runId: parsed.runId,
+      budgets: /** @type {any} */ (config).budgets,
+      controlFile: resolve(/** @type {string} */ (parsed.control)),
+      input: deps.input ?? process.stdin,
+      output: { write: out },
+    });
+    return 0;
   }
   if (cmd === 'status') {
     const status = readRunStatus(createLocalStatusSource(resolve(parsed.repo)), parsed.runId, /** @type {any} */ (config).budgets);
