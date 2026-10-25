@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { validateConfig } from './config.js';
 import { checkAntiStubGate, checkScopeGate, checkTypeGate } from './diff-gates.js';
 import { checkBudgetGate } from './budget-gate.js';
+import { checkTestPlanGate } from './test-plan-gate.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { writeIterationRecord } from './run-record.js';
 
@@ -72,11 +73,12 @@ function nextIteration(dir, /** @type {string} */ runId) {
  *   adapter: Adapter,
  *   testCommand?: string[],
  *   typeCommand?: string[],
+ *   requireTestPlan?: boolean,
  *   identity?: HarnessIdentity,
  * }} opts
  * @returns {Promise<StepResult>}
  */
-export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], typeCommand, identity }) {
+export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], typeCommand, requireTestPlan = false, identity }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
   const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets, allowedPaths: string[]}} */ (config);
@@ -97,6 +99,10 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   }
 
   const iteration = nextIteration(repoDir, runId);
+  if (requireTestPlan) {
+    const plan = checkTestPlanGate(repoDir, { testCommand, requireRed: iteration === 1 });
+    if (!plan.ok) return gated(plan.reason ?? 'test-plan gate failed');
+  }
   const prompt = buildPrompt(repoDir);
   const maxTokens = budget.remaining.tokens;
   const maxCostUsd = budget.remaining.cost;
@@ -119,6 +125,8 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   const overBudget = result.usage.tokens > maxTokens || result.usage.cost > maxCostUsd;
   /** @type {{name: string, ok: boolean, detail?: string}[]} */
   const gates = [{ name: 'repo', ok: true }, { name: 'budget', ok: true }];
+  if (requireTestPlan) gates.push({ name: 'test-plan', ok: true });
+  const preGates = gates.length;
   /** @param {string} name @param {import('./diff-gates.js').GateCheck} c */
   const record = (name, c) => {
     gates.push({ name, ok: c.ok, detail: c.ok ? c.detail : c.reason });
@@ -155,7 +163,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     status,
     usage: { ...result.usage, seconds },
     changedFiles: result.changedFiles,
-    gates: status === 'ok' || gates.length > 2 ? gates : [...gates, { name: 'tests', ok: false, detail: status }],
+    gates: status === 'ok' || gates.length > preGates ? gates : [...gates, { name: 'tests', ok: false, detail: status }],
     prompt,
     transcript: result.transcript,
     diff,

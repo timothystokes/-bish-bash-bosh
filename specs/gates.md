@@ -1,6 +1,6 @@
 # Spec: Gates (back-pressure, harness-enforced)
 - Repo gate: refuse if target repo is hodgepodge.
-- Test-plan gate: each objective needs `tests/PLAN.md` mapping specs to tests; tests must exist and **fail first** before build loops start. Agent-written tests alone do not satisfy the gate.
+- Test-plan gate: each objective needs `tests/PLAN.md` mapping specs to tests; tests must exist and **fail first** before build loops start. Agent-written tests alone do not satisfy the gate. Implemented in `src/test-plan-gate.js` (`checkTestPlanGate`): each line of PLAN.md names a `specs/*.md` and `tests/*` path; every spec must be mapped, mapped tests must exist, and the suite must be red before iteration 1 of a run. `runStep` option `requireTestPlan` gates (no writes) on failure.
 - Type gate (`src/diff-gates.js` `checkTypeGate`): runs `tsc` in the target when it has a `tsconfig.json` (skipped otherwise; command injectable via `typeCommand`).
 - Anti-stub gate (`checkAntiStubGate`): rejects TODO/FIXME/stub/placeholder/"not implemented" markers and empty function bodies on added lines of the diff (markdown files are not scanned).
 - Scope gate (`checkScopeGate`): staged changes must sit inside config `allowedPaths` (directory-boundary match, `..` rejected); `plan.md` is always allowed.
