@@ -10,6 +10,7 @@ import { writeIterationRecord } from './run-record.js';
 import { loadModePrompt } from './prompts.js';
 import { checkBrownfieldGate } from './brownfield-gate.js';
 import { checkHardeningGate } from './hardening-gate.js';
+import { checkCleanRoomGate } from './clean-room.js';
 
 /**
  * @typedef {import('./adapter.js').Adapter} Adapter
@@ -94,6 +95,11 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   if (cfg.mode === 'brownfield') {
     const bf = checkBrownfieldGate(repoDir);
     if (!bf.ok) return gated(bf.reason ?? 'brownfield gate failed');
+  }
+
+  if (cfg.mode === 'clean-room') {
+    const cr = checkCleanRoomGate(repoDir);
+    if (!cr.ok) return gated(cr.reason ?? 'clean-room firewall failed');
   }
 
   const hardening = cfg.mode === 'test-hardening';

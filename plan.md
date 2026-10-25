@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P4-4: Clean-room mode: builder repo gets specs + tests only, never the source (context firewall, tested).**
-Why: P4-3 is done; P4-4 is the next unblocked Phase 4 task and P4-5 (exit round trip) depends on it. Still pending: P1-8b (Docker daemon not running) which blocks P3-5; P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed). Sign: reverse/interview/clean-room steps now share a shape; extract a common helper if P4-4 repeats it.
+**P4-5: Phase 4 exit: round trip on a small project: code -> specs -> clean-room rebuild -> conformance suite passes (scripted adapter).**
+Why: P4-1..P4-4 are done; P4-5 is the last Phase 4 task and closes the phase. Still pending: P1-8b (Docker daemon not running) which blocks P3-5; P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed). Sign: drive the round trip through the CLI (`reverse`, `clean-room`, `run`), as in the earlier e2e tests.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -63,7 +63,7 @@ Why: P4-3 is done; P4-4 is the next unblocked Phase 4 task and P4-5 (exit round 
 | P4-1 | Reverse mode: `prompts/reverse.md` + `hodge reverse` (writes only specs/ and tests/, spec-lint + green characterization tests required) | done | P2-4 |
 | P4-2 | Brownfield mode: `prompts/brownfield.md`; refuses to run without specs (points at reverse) | done | P4-1 |
 | P4-3 | Test-hardening mode: `prompts/test-hardening.md` + coverage/mutation gate (command injectable via config `hardenCommand`) | done | P1-4 |
-| P4-4 | Clean-room mode: builder repo gets specs + tests only, never the source (context firewall, tested) | todo | P2-3, P4-1 |
+| P4-4 | Clean-room mode: builder repo gets specs + tests only, never the source (context firewall, tested) | done | P2-3, P4-1 |
 | P4-5 | Phase 4 exit: round trip on a small project: code -> specs -> clean-room rebuild -> conformance suite passes (scripted adapter) | todo | P4-1..P4-4 |
 
 ## Later phases (not yet broken down)
@@ -109,3 +109,4 @@ Phase 5 AWS (CDK, Step Functions driver, Fargate Spot). See `docs/PLAN.md`. Brea
 - P4-1 done: `prompts/reverse.md`, `src/reverse.js` (`runReverse`, `buildReversePrompt`), `hodge reverse` in `src/cli.js`, `test/reverse.test.js` (8 new, 214 total pass, check clean; failed first on missing module). Accepts only if agent exit 0, only specs/ + tests/ changed, spec-lint passes, and injectable test command is green; else hard-reset. `test/prompts.test.js` now uses `brownfield` as the unwritten-mode example. Sign: the reverse/interview steps share a shape; if P4-3/P4-4 add a third, extract a common helper.
 - P4-2 done: `prompts/brownfield.md`, `src/brownfield-gate.js` (`checkBrownfieldGate`), wired into `runStep` so `step` and `run` are gated pre-agent in `mode: brownfield` without specs (message points at `hodge reverse`); `test/brownfield.test.js` (6 new, 220 total pass, check clean; failed first on missing module). `test/prompts.test.js` unwritten-mode example is now `test-hardening`. Learned: `allowedPaths` entries are prefixes like `src/`. Sign: when P4-3 lands, move its example in prompts.test.js to `clean-room`; prompt filename equals the mode name.
 - P4-3 done: `prompts/test-hardening.md`, `src/hardening-gate.js` (`checkHardeningGate`), config key `hardenCommand`, wired into `runStep` (gated pre-agent without a command; `tests-only` scope gate; `hardening` gate after tests/types), `test/hardening.test.js` (8 new, 228 total pass, check clean; failed first on missing module). `test/prompts.test.js` unwritten-mode example is now `clean-room`. Prompt file is `test-hardening.md` (filename = mode name). Sign: gate commands are config-injected arrays, never hard-coded tools.
+- P4-4 done: `src/clean-room.js` (`exportBundle`, `checkCleanRoomGate`), `prompts/clean-room.md`, `hodge clean-room --source --repo` in `src/cli.js`, firewall gate wired into `runStep` for `mode: clean-room`, `test/clean-room.test.js` (10 new, 238 total pass, check clean; failed first on missing module). All six mode prompts now exist, so the 'unwritten mode' assertion in `test/prompts.test.js` was removed. Firewall = only specs/ + tests/ in the builder's root commit; shared helper for reverse/interview not extracted (clean-room has a different shape). Sign: the firewall is enforced by construction (export copies an allow-list) and re-checked by the gate every step.

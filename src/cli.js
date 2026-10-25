@@ -7,6 +7,7 @@ import { runLoop } from './driver.js';
 import { lintSpecs } from './spec-lint.js';
 import { runInterview } from './interview.js';
 import { runReverse } from './reverse.js';
+import { exportBundle } from './clean-room.js';
 import { createLocalStatusSource, readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
 import { runTui } from './tui.js';
@@ -23,6 +24,7 @@ export function helpText() {
     '  hodge run  --config <file> [--repo <dir>] [--run-id <id>]',
     '  hodge interview --config <file> --objective <text> [--repo <dir>] [--run-id <id>]',
     '  hodge reverse --config <file> [--repo <dir>] [--run-id <id>]',
+    '  hodge clean-room --source <dir> --repo <builder-dir>',
     '  hodge status --config <file> [--repo <dir>] [--run-id <id>] [--control <control.json>]',
     '  hodge tui --config <file> --control <control.json> [--repo <dir>] [--run-id <id>]',
     '  hodge proxy --upstream <url> [--audit <file>] [--meter <file>] [--port <n>]',
@@ -38,6 +40,8 @@ export function helpText() {
     '         prints JSON {status, sha, reason?}; exit 0 only when ok',
     '  reverse  run the `reverse` role to write specs/ + characterization tests from existing code; commits only if only specs/tests changed,',
     '         spec-lint passes and the test suite is green; prints JSON {status, sha, reason?}; exit 0 only when ok',
+    '  clean-room  export only specs/ + tests/ from --source into a fresh git repo at --repo (the builder never sees source); prints JSON {ok, sha, files};',
+    '         exit 0 only when ok. Then run `hodge run` there with config mode clean-room (firewall gate checks the bundle first)',
     '  status  print JSON run status: iterations, tokens, cost, seconds vs budgets (and control state with --control)',
     '  tui    live terminal view: log tail, cost meter vs budget; keys p pause, r resume, s steer, x stop (confirmed), q quit',
     '  proxy  secret-redacting, usage-metering proxy in front of a model endpoint; prints JSON {port} then serves until SIGINT/SIGTERM',
@@ -108,6 +112,30 @@ export async function main(argv, deps = {}) {
       return 2;
     }
     const res = lintSpecs(resolve(rest[1] ?? '.'));
+    out(`${JSON.stringify(res)}\n`);
+    return res.ok ? 0 : 1;
+  }
+  if (cmd === 'clean-room') {
+    const rest = argv.slice(1);
+    /** @type {Record<string, string | undefined>} */
+    const v = {};
+    for (let i = 0; i < rest.length; i += 2) {
+      const val = rest[i + 1];
+      if (!['--source', '--repo'].includes(rest[i])) {
+        err(`hodge clean-room: unknown argument '${rest[i]}'\n`);
+        return 2;
+      }
+      if (val === undefined || val.startsWith('--')) {
+        err(`hodge clean-room: ${rest[i]} requires a value\n`);
+        return 2;
+      }
+      v[rest[i]] = val;
+    }
+    if (!v['--source'] || !v['--repo']) {
+      err('hodge clean-room: --source and --repo are required\n');
+      return 2;
+    }
+    const res = exportBundle({ sourceDir: v['--source'], builderDir: v['--repo'] });
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
   }
