@@ -22,9 +22,10 @@ const readIfExists = (p) => (existsSync(p) ? readFileSync(p, 'utf8') : '');
  * Fixed per-iteration context stack: loop prompt + specs index + plan.md.
  * @param {string} repoDir
  * @param {string} [mode]
+ * @param {string} [steer] operator note for this iteration only
  * @returns {string}
  */
-export function buildPrompt(repoDir, mode = 'forward') {
+export function buildPrompt(repoDir, mode = 'forward', steer) {
   const specsDir = join(repoDir, 'specs');
   const specs = existsSync(specsDir)
     ? readdirSync(specsDir).filter((f) => f.endsWith('.md')).sort()
@@ -39,6 +40,7 @@ export function buildPrompt(repoDir, mode = 'forward') {
     index.join('\n'),
     '## plan.md',
     readIfExists(join(repoDir, 'plan.md')),
+    ...(steer ? ['## Steer note', steer] : []),
   ].join('\n\n');
 }
 
@@ -67,11 +69,12 @@ function nextIteration(dir, /** @type {string} */ runId) {
  *   testCommand?: string[],
  *   typeCommand?: string[],
  *   requireTestPlan?: boolean,
+ *   steer?: string,
  *   identity?: HarnessIdentity,
  * }} opts
  * @returns {Promise<StepResult>}
  */
-export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], typeCommand, requireTestPlan = false, identity }) {
+export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], typeCommand, requireTestPlan = false, steer, identity }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
   const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets, allowedPaths: string[], mode?: string}} */ (config);
@@ -96,7 +99,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     const plan = checkTestPlanGate(repoDir, { testCommand, requireRed: iteration === 1 });
     if (!plan.ok) return gated(plan.reason ?? 'test-plan gate failed');
   }
-  const prompt = buildPrompt(repoDir, cfg.mode);
+  const prompt = buildPrompt(repoDir, cfg.mode, steer);
   const maxTokens = budget.remaining.tokens;
   const maxCostUsd = budget.remaining.cost;
   const maxWallClockSeconds = Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds);
