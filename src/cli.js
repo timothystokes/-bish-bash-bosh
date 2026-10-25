@@ -6,6 +6,7 @@ import { runStep } from './step.js';
 import { runLoop } from './driver.js';
 import { lintSpecs } from './spec-lint.js';
 import { runInterview } from './interview.js';
+import { runReverse } from './reverse.js';
 import { createLocalStatusSource, readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
 import { runTui } from './tui.js';
@@ -21,6 +22,7 @@ export function helpText() {
     '  hodge step --config <file> [--repo <dir>] [--run-id <id>]',
     '  hodge run  --config <file> [--repo <dir>] [--run-id <id>]',
     '  hodge interview --config <file> --objective <text> [--repo <dir>] [--run-id <id>]',
+    '  hodge reverse --config <file> [--repo <dir>] [--run-id <id>]',
     '  hodge status --config <file> [--repo <dir>] [--run-id <id>] [--control <control.json>]',
     '  hodge tui --config <file> --control <control.json> [--repo <dir>] [--run-id <id>]',
     '  hodge proxy --upstream <url> [--audit <file>] [--meter <file>] [--port <n>]',
@@ -34,6 +36,8 @@ export function helpText() {
     '         prints JSON {status, steps, reason?}; exit 0 only when done',
     '  interview  run the `interview` role to write specs/*.md + tests/PLAN.md; commits only if spec-lint passes;',
     '         prints JSON {status, sha, reason?}; exit 0 only when ok',
+    '  reverse  run the `reverse` role to write specs/ + characterization tests from existing code; commits only if only specs/tests changed,',
+    '         spec-lint passes and the test suite is green; prints JSON {status, sha, reason?}; exit 0 only when ok',
     '  status  print JSON run status: iterations, tokens, cost, seconds vs budgets (and control state with --control)',
     '  tui    live terminal view: log tail, cost meter vs budget; keys p pause, r resume, s steer, x stop (confirmed), q quit',
     '  proxy  secret-redacting, usage-metering proxy in front of a model endpoint; prints JSON {port} then serves until SIGINT/SIGTERM',
@@ -178,7 +182,7 @@ export async function main(argv, deps = {}) {
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
   }
-  if (cmd !== 'step' && cmd !== 'run' && cmd !== 'interview' && cmd !== 'status' && cmd !== 'tui') {
+  if (cmd !== 'step' && cmd !== 'run' && cmd !== 'interview' && cmd !== 'reverse' && cmd !== 'status' && cmd !== 'tui') {
     err(`hodge: unknown command '${argv[0]}'\n\n${helpText()}`);
     return 2;
   }
@@ -223,7 +227,7 @@ export async function main(argv, deps = {}) {
     return 0;
   }
   try {
-    const adapter = resolveAdapter(config, cmd === 'interview' ? 'interview' : 'build', deps.registry ?? defaultRegistry);
+    const adapter = resolveAdapter(config, cmd === 'interview' || cmd === 'reverse' ? cmd : 'build', deps.registry ?? defaultRegistry);
     if (cmd === 'interview') {
       const res = await runInterview({
         config,
@@ -231,6 +235,18 @@ export async function main(argv, deps = {}) {
         runId: parsed.runId,
         adapter,
         objective: parsed.objective ?? '',
+        identity: deps.identity,
+      });
+      out(`${JSON.stringify(res)}\n`);
+      return res.status === 'ok' ? 0 : 1;
+    }
+    if (cmd === 'reverse') {
+      const res = await runReverse({
+        config,
+        repoDir: resolve(parsed.repo),
+        runId: parsed.runId,
+        adapter,
+        testCommand: deps.testCommand,
         identity: deps.identity,
       });
       out(`${JSON.stringify(res)}\n`);

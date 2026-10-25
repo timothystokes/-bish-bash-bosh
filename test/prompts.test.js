@@ -26,7 +26,7 @@ test('forward prompt carries the loop rules', () => {
 test('unknown or unwritten modes are rejected', () => {
   assert.throws(() => loadModePrompt('nonsense'), /unknown mode/i);
   assert.throws(() => loadModePrompt('../forward'), /unknown mode/i);
-  assert.throws(() => loadModePrompt('reverse'), /no prompt/i);
+  assert.throws(() => loadModePrompt('brownfield'), /no prompt/i);
 });
 
 test('buildPrompt defaults to forward and uses the selected mode prompt', () => {

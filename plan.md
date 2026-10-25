@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P4-1: Reverse-mode prompt `prompts/reverse.md` (code -> specs + characterization tests) and `hodge reverse --config <f> [--repo]` that runs the `reverse` role, may write only under `specs/` and `tests/`, and accepts only if spec-lint passes and the characterization suite is green against the unchanged source (model on `src/interview.js`).**
-Why: Phase 3 is done except P3-5 (blocked on a Docker daemon), so the next unblocked work is Phase 4; reverse is the first leg of the round trip. Still pending: P1-8b (Docker daemon still not running: `docker ps` fails) which blocks P3-5; P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
+**P4-2: Brownfield mode: `prompts/brownfield.md`; the loop refuses to run in `mode: brownfield` without specs (gate message points at `hodge reverse`).**
+Why: P4-1 is done, so P4-2 is unblocked and is the next step toward the Phase 4 round trip. Still pending: P1-8b (Docker daemon not running) which blocks P3-5; P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -60,7 +60,7 @@ Why: Phase 3 is done except P3-5 (blocked on a Docker daemon), so the next unblo
 ## Phase 4: Reverse, brownfield, harden, clean-room
 | ID | Task | Status | Depends on |
 |---|---|---|---|
-| P4-1 | Reverse mode: `prompts/reverse.md` + `hodge reverse` (writes only specs/ and tests/, spec-lint + green characterization tests required) | todo | P2-4 |
+| P4-1 | Reverse mode: `prompts/reverse.md` + `hodge reverse` (writes only specs/ and tests/, spec-lint + green characterization tests required) | done | P2-4 |
 | P4-2 | Brownfield mode: `prompts/brownfield.md`; refuses to run without specs (points at reverse) | todo | P4-1 |
 | P4-3 | Test-hardening mode: `prompts/harden.md` + coverage/mutation gate (command injectable) | todo | P1-4 |
 | P4-4 | Clean-room mode: builder repo gets specs + tests only, never the source (context firewall, tested) | todo | P2-3, P4-1 |
@@ -106,3 +106,4 @@ Phase 5 AWS (CDK, Step Functions driver, Fargate Spot). See `docs/PLAN.md`. Brea
 - P3-7 done: `src/secret-proxy.js` options `meterFile` + `rates {inputPerMTok, outputPerMTok}` meter each response with a token `usage` (OpenAI `prompt/completion/total_tokens` or Anthropic `input/output_tokens`) as JSONL `{time, tokens, cost}`; `readProxyUsage(file)` -> `{tokens, cost, requests}`; unwritable meter file => 502, response not returned. `sumRunUsage` now also adds `runs/<runId>/interview/record.json` usage (no iteration count) so interview spend counts against the run-wide budget (4 new tests, 201 pass, check clean; tests failed first). Streaming/unparseable responses are not metered; proxy meter is a separate source from adapter-reported usage (not summed into the gate, to avoid double counting). Sign: any new usage source must say whether it is additive to or a cross-check of the adapter totals.
 - P3-7b done: `hodge proxy --upstream <url> [--audit <f>] [--meter <f>] [--port <n>]` in `src/cli.js` prints `{port}` JSON then serves until SIGINT/SIGTERM (or `deps.signal` abort in tests), exit 0; bad/missing args, bad URL or port, or listen failure => exit 2. `test/cli-proxy.test.js` (3 new, 204 pass, check clean; tests failed first, hanging on the unknown command). Binds 127.0.0.1 only; no `--rates` flag yet (cost metered as 0). Sign: long-running CLI commands need an injectable stop signal so tests can end them.
 - P3-8 done: `test/e2e-phase3.test.js` (2 new, 206 total pass, check clean; new file so it failed first by not existing; one test-authoring slip fixed: scripted writes must stay inside `allowedPaths`). Test 1: `hodge control pause` + `steer` before `hodge run --control`, no iteration while paused, `resume` starts it, steer appears in prompt 1 only and is consumed, `hodge control stop` issued mid-iteration 2 ends the run `stopped` (exit 1) with a clean tree. Test 2: real `bin/hodge proxy` subprocess redacts an AWS key before upstream, audit log has no secret value, meter records 42 tokens, SIGTERM exits 0. Container kill-switch (P3-5) not asserted (no Docker daemon). Phase 3 done except P3-5; Phase 4 broken down into P4-1..P4-5. Sign: e2e tests drive control through the CLI (`main`), and subprocess only where signals/ports matter.
+- P4-1 done: `prompts/reverse.md`, `src/reverse.js` (`runReverse`, `buildReversePrompt`), `hodge reverse` in `src/cli.js`, `test/reverse.test.js` (8 new, 214 total pass, check clean; failed first on missing module). Accepts only if agent exit 0, only specs/ + tests/ changed, spec-lint passes, and injectable test command is green; else hard-reset. `test/prompts.test.js` now uses `brownfield` as the unwritten-mode example. Sign: the reverse/interview steps share a shape; if P4-3/P4-4 add a third, extract a common helper.
