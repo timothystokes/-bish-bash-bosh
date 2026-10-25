@@ -16,7 +16,7 @@ Hodgepodge is a **model-agnostic harness for delivering software with loop-engin
 - Hodgepodge never hosts delivery work. Delivery happens in a separate target repo (see `specs/repos.md`).
 - No model or vendor names in harness logic; they live in config only (see `specs/adapters.md`).
 - Vanilla JavaScript with JSDoc, checked with `tsc --checkJs`; tests use `node:test`.
-- Do not push unless the user explicitly says to. Commit locally with the Copilot co-author trailer.
+- Commit and push at the end of every session (see checklist). Outside that checklist, don't push unless the user says to. Include the Copilot co-author trailer in commits.
 - Do not watch or poll CI after pushing.
 - Keep `plan.md` truthful: update task status and the "Next best action" at the end of every session.
 - When something goes wrong, tune the prompts/specs/gates ("add a sign"); don't just retry.
@@ -26,7 +26,7 @@ Hodgepodge is a **model-agnostic harness for delivering software with loop-engin
 2. Rewrite the **">>> Next best action"** section in `plan.md`: the single most valuable next task, with a one-line "why", chosen from unblocked tasks (break down the next phase first if none remain).
 3. Append a line to the "Session log" in `plan.md`: what was done, what was learned, any new "signs" added.
 4. Update any `specs/*.md` or `AGENTS.md` rules that changed.
-5. Commit locally (with the co-author trailer). Do not push unless the user says to.
+5. Commit (with the co-author trailer) and push to `main`. Do not watch or poll CI afterwards.
 
 ## Out of scope for planning
 Punk (a functional language) is a later validation project, to be run once a harness version exists. Do not plan around it.
