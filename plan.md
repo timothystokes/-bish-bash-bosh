@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P2-6: Phase 2 exit: a throwaway objective goes interview -> specs -> test plan -> forward loops -> green (scripted adapter), as an e2e test through the real CLI.**
-Why: unblocked, all prerequisites (P2-3, P2-4, P2-5) done; closes Phase 2. Still pending: P1-8b (needs a running Docker daemon; Dockerfile now also copies `prompts/` and `templates/`), P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed). After P2-6, break down Phase 3.
+**P3-1: Control channel: `control.json` (pause, resume, steer note, stop) read by `runLoop` between iterations; steer note injected into the next prompt stack.**
+Why: unblocked, the core of Phase 3 control (`specs/control-and-safety.md`); the TUI (P3-2) and kill switch build on it. Still pending: P1-8b (needs a running Docker daemon; Dockerfile copies `prompts/` and `templates/`), P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -42,10 +42,22 @@ Why: unblocked, all prerequisites (P2-3, P2-4, P2-5) done; closes Phase 2. Still
 | P2-3 | Mode prompts: `prompts/forward.md` (loop prompt used by `buildPrompt`, selected by config `mode`) | done | P1-1 |
 | P2-4 | Interview mode: `hodge interview` runs the interview adapter role, writes `specs/*.md` + `tests/PLAN.md`, refuses to finish unless spec-lint passes | done | P2-1, P2-2 |
 | P2-5 | Forward mode gate: refuse to start loops without objective tests (spec-lint + test-plan gate wired into `hodge run`) | done | P2-1, P1-3 |
-| P2-6 | Phase 2 exit: throwaway objective goes interview -> specs -> test plan -> forward loops -> green (scripted adapter) | todo | P2-4, P2-5, P2-3 |
+| P2-6 | Phase 2 exit: throwaway objective goes interview -> specs -> test plan -> forward loops -> green (scripted adapter) | done | P2-4, P2-5, P2-3 |
+
+## Phase 3: Control + visibility
+| ID | Task | Status | Depends on |
+|---|---|---|---|
+| P3-1 | Control channel: `control.json` (pause, resume, steer, stop) read between iterations; steer note injected into next prompt | todo | P1-6 |
+| P3-2 | `hodge control` CLI to write control.json (pause/resume/steer/stop) | todo | P3-1 |
+| P3-3 | Status source abstraction (local run files) + `hodge status` JSON: iterations, tokens, cost vs budget | todo | P1-5 |
+| P3-4 | Terminal TUI: live log tail, cost meter vs budget, pause/resume/steer/stop keys | todo | P3-2, P3-3 |
+| P3-5 | Kill switch: terminate the run container | todo | P3-1, P1-8b |
+| P3-6 | Secret-scanning proxy: regex rules, `[REDACTED:rule-id]`, nothing forwarded half-inspected, audit log | todo | P0-3 |
+| P3-7 | Usage metering via proxy; count interview usage in run-wide budget | todo | P3-6 |
+| P3-8 | Phase 3 exit: e2e pause/steer/stop and redaction with scripted adapter | todo | P3-1..P3-7 |
 
 ## Later phases (not yet broken down)
-Phase 3 control + TUI + secret-scanning proxy; Phase 4 reverse/brownfield/harden/clean-room; Phase 5 AWS (CDK, Step Functions driver, Fargate Spot). See `docs/PLAN.md`. Break each down into a table like the above when the previous phase is `done`.
+Phase 4 reverse/brownfield/harden/clean-room; Phase 5 AWS (CDK, Step Functions driver, Fargate Spot). See `docs/PLAN.md`. Break each down into a table like the above when the previous phase is `done`.
 
 ## Deferred
 - Promotion out of the sandbox (expected to align with a traditional CD pipeline).
@@ -75,3 +87,4 @@ Phase 3 control + TUI + secret-scanning proxy; Phase 4 reverse/brownfield/harden
 - P2-3 done: `prompts/forward.md` (moved out of `step.js`), `src/prompts.js` (`MODES`, `loadModePrompt`: rejects unknown modes and modes with no prompt file), `buildPrompt(repoDir, mode='forward')`, optional config key `mode` (enum of the six spec modes, default forward) passed by `runStep`; `test/prompts.test.js` (5 new, 148 total pass, check clean; tests failed first). Dockerfile now copies `prompts/` (not built; P1-8b). Only `forward` has a prompt so far; other modes error until written. Sign: any runtime file read by src must be added to the Dockerfile COPY list.
 - P2-5 done: `runLoop` with `requireTestPlan` now runs `lintSpecs` before any step and returns `{status:'gated', steps:[], reason:'spec-lint failed: ...'}` without calling the agent; the per-step test-plan gate (tests/PLAN.md, red-first) already ran. 150 tests pass, check clean (new test failed first). Learned: the e2e toy spec lacked the `# Spec:` title, so it was fixed. `requireTestPlan` remains opt-in config (default off) so existing configs keep working. Sign: gates that wrap a loop belong in `runLoop` so no driver can bypass them.
 - P2-4 done: `src/interview.js` (`runInterview`, `buildInterviewPrompt`), `prompts/interview.md`, `hodge interview --config <f> --objective <text> [--repo] [--run-id]` (uses role `interview`, error exit 2 if absent), `test/interview.test.js` (8 new, 158 total pass, check clean; tests failed first). Gates: empty objective, repo gate, clean tree, budget. Writes allowed only under `specs/` and `tests/` (interview authors the red tests the plan maps to); agent failure, out-of-scope writes or spec-lint problems discard the work and commit a failed record under `runs/<id>/interview/`. Limitation: interview usage is not counted in run-wide budget (sumRunUsage reads only iterations). `prompts.test` now uses `reverse` as the unwritten mode; Dockerfile copies `templates/`. Sign: gate acceptance on the harness's own lint, never the agent's claim; any runtime file read by src goes in the Dockerfile.
+- P2-6 done: `test/e2e-phase2.test.js` (1 new, 159 total pass, check clean): empty target -> `hodge interview` (scripted adapter writes spec, `tests/PLAN.md`, red test; spec-lint passes) -> plan.md added by the orchestrator (interview may not write it) -> `hodge run` with `requireTestPlan` goes green, clean tree, record committed. Test passed on first run (no harness change needed; it did not exist before). Phase 2 done; Phase 3 broken down into P3-1..P3-8. Sign: plan.md is authored outside interview; an e2e must add it between modes.
