@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P3-8: Phase 3 exit e2e with the scripted adapter: pause/steer/stop via `hodge control` + `hodge run --control`, and redaction/metering through `hodge proxy` (subprocess). Leave the container kill-switch assertion out (P3-5) and note it.**
-Why: all Phase 3 pieces except P3-5 are now runnable from the CLI, so the exit e2e can be written. Still pending: P1-8b (needs a running Docker daemon; Dockerfile copies `prompts/` and `templates/`) which blocks P3-5; P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
+**P4-1: Reverse-mode prompt `prompts/reverse.md` (code -> specs + characterization tests) and `hodge reverse --config <f> [--repo]` that runs the `reverse` role, may write only under `specs/` and `tests/`, and accepts only if spec-lint passes and the characterization suite is green against the unchanged source (model on `src/interview.js`).**
+Why: Phase 3 is done except P3-5 (blocked on a Docker daemon), so the next unblocked work is Phase 4; reverse is the first leg of the round trip. Still pending: P1-8b (Docker daemon still not running: `docker ps` fails) which blocks P3-5; P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -55,10 +55,19 @@ Why: all Phase 3 pieces except P3-5 are now runnable from the CLI, so the exit e
 | P3-6 | Secret-scanning proxy: regex rules, `[REDACTED:rule-id]`, nothing forwarded half-inspected, audit log | done | P0-3 |
 | P3-7 | Usage metering via proxy; count interview usage in run-wide budget | done | P3-6 |
 | P3-7b | `hodge proxy` CLI wiring the secret/metering proxy (audit + meter files) | done | P3-7 |
-| P3-8 | Phase 3 exit: e2e pause/steer/stop and redaction with scripted adapter | todo | P3-1..P3-7b |
+| P3-8 | Phase 3 exit: e2e pause/steer/stop and redaction with scripted adapter (container kill-switch assertion left out, see P3-5) | done | P3-1..P3-7b |
+
+## Phase 4: Reverse, brownfield, harden, clean-room
+| ID | Task | Status | Depends on |
+|---|---|---|---|
+| P4-1 | Reverse mode: `prompts/reverse.md` + `hodge reverse` (writes only specs/ and tests/, spec-lint + green characterization tests required) | todo | P2-4 |
+| P4-2 | Brownfield mode: `prompts/brownfield.md`; refuses to run without specs (points at reverse) | todo | P4-1 |
+| P4-3 | Test-hardening mode: `prompts/harden.md` + coverage/mutation gate (command injectable) | todo | P1-4 |
+| P4-4 | Clean-room mode: builder repo gets specs + tests only, never the source (context firewall, tested) | todo | P2-3, P4-1 |
+| P4-5 | Phase 4 exit: round trip on a small project: code -> specs -> clean-room rebuild -> conformance suite passes (scripted adapter) | todo | P4-1..P4-4 |
 
 ## Later phases (not yet broken down)
-Phase 4 reverse/brownfield/harden/clean-room; Phase 5 AWS (CDK, Step Functions driver, Fargate Spot). See `docs/PLAN.md`. Break each down into a table like the above when the previous phase is `done`.
+Phase 5 AWS (CDK, Step Functions driver, Fargate Spot). See `docs/PLAN.md`. Break each down into a table like the above when the previous phase is `done`.
 
 ## Deferred
 - Promotion out of the sandbox (expected to align with a traditional CD pipeline).
@@ -96,3 +105,4 @@ Phase 4 reverse/brownfield/harden/clean-room; Phase 5 AWS (CDK, Step Functions d
 - P3-6 done: `src/secret-proxy.js` (`DEFAULT_RULES`, `redactSecrets(text, rules)` -> `{text, findings}`, `createSecretProxy({upstream, rules?, auditFile?, maxBodyBytes?})` -> `{listen, close}`), `test/secret-proxy.test.js` (9 new, 197 total pass, check clean; tests failed first on missing module). Requests and responses are buffered whole and redacted; over-limit body, upstream error, or unwritable audit log => blocked (413/502), nothing forwarded; audit JSONL holds rule ids and counts, never values. Streaming responses are buffered (no incremental pass-through). Not wired into the CLI yet. Sign: a security filter must fail closed, and its audit log must never contain the secret.
 - P3-7 done: `src/secret-proxy.js` options `meterFile` + `rates {inputPerMTok, outputPerMTok}` meter each response with a token `usage` (OpenAI `prompt/completion/total_tokens` or Anthropic `input/output_tokens`) as JSONL `{time, tokens, cost}`; `readProxyUsage(file)` -> `{tokens, cost, requests}`; unwritable meter file => 502, response not returned. `sumRunUsage` now also adds `runs/<runId>/interview/record.json` usage (no iteration count) so interview spend counts against the run-wide budget (4 new tests, 201 pass, check clean; tests failed first). Streaming/unparseable responses are not metered; proxy meter is a separate source from adapter-reported usage (not summed into the gate, to avoid double counting). Sign: any new usage source must say whether it is additive to or a cross-check of the adapter totals.
 - P3-7b done: `hodge proxy --upstream <url> [--audit <f>] [--meter <f>] [--port <n>]` in `src/cli.js` prints `{port}` JSON then serves until SIGINT/SIGTERM (or `deps.signal` abort in tests), exit 0; bad/missing args, bad URL or port, or listen failure => exit 2. `test/cli-proxy.test.js` (3 new, 204 pass, check clean; tests failed first, hanging on the unknown command). Binds 127.0.0.1 only; no `--rates` flag yet (cost metered as 0). Sign: long-running CLI commands need an injectable stop signal so tests can end them.
+- P3-8 done: `test/e2e-phase3.test.js` (2 new, 206 total pass, check clean; new file so it failed first by not existing; one test-authoring slip fixed: scripted writes must stay inside `allowedPaths`). Test 1: `hodge control pause` + `steer` before `hodge run --control`, no iteration while paused, `resume` starts it, steer appears in prompt 1 only and is consumed, `hodge control stop` issued mid-iteration 2 ends the run `stopped` (exit 1) with a clean tree. Test 2: real `bin/hodge proxy` subprocess redacts an AWS key before upstream, audit log has no secret value, meter records 42 tokens, SIGTERM exits 0. Container kill-switch (P3-5) not asserted (no Docker daemon). Phase 3 done except P3-5; Phase 4 broken down into P4-1..P4-5. Sign: e2e tests drive control through the CLI (`main`), and subprocess only where signals/ports matter.
