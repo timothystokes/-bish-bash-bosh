@@ -132,6 +132,16 @@ function repoFor(repo, dir) {
  */
 
 /**
+ * On a real terminal, readline must own the tty (raw mode, \r as Enter); otherwise a previous child
+ * process can leave the tty in a state where Enter never submits the line.
+ * @param {NodeJS.ReadableStream} input
+ * @returns {import('node:readline').ReadLineOptions}
+ */
+export function readlineOptions(input) {
+  return /** @type {{isTTY?: boolean}} */ (input).isTTY ? { input, output: process.stdout, terminal: true } : { input };
+}
+
+/**
  * @param {string[]} argv
  * @param {CliDeps} [deps]
  * @returns {Promise<number>} exit code
@@ -434,7 +444,7 @@ export async function main(argv, deps = {}) {
   try {
     const adapter = resolveAdapter(config, cmd === 'interview' || cmd === 'objective' || cmd === 'reverse' ? (cmd === 'objective' ? 'interview' : cmd) : 'build', deps.registry ?? defaultRegistry);
     if (cmd === 'objective' || cmd === 'interview') {
-      const rl = createInterface({ input: deps.input ?? process.stdin });
+      const rl = createInterface(readlineOptions(deps.input ?? process.stdin));
       const lines = rl[Symbol.asyncIterator]();
       /** @type {(prompt: string) => Promise<string | null>} */
       const ask = async (prompt) => {

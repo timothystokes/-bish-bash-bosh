@@ -167,3 +167,11 @@ test('hodge interview usage errors exit 2', async () => {
   err.length = 0;
   assert.equal(await main(['step', '--dir', sandboxOf(cfgPath), '--objective', 'x'], { stdout: () => {}, stderr: e }), 2);
 });
+
+test('readlineOptions: a TTY input gets terminal mode so Enter submits; piped input stays plain', async () => {
+  const { readlineOptions } = await import('../src/cli.js');
+  const tty = Object.assign(new Readable({ read() {} }), { isTTY: true });
+  assert.equal(readlineOptions(tty).terminal, true);
+  assert.ok(readlineOptions(tty).output);
+  assert.equal(readlineOptions(Readable.from([])).terminal, undefined);
+});
