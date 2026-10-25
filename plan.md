@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P4-5: Phase 4 exit: round trip on a small project: code -> specs -> clean-room rebuild -> conformance suite passes (scripted adapter).**
-Why: P4-1..P4-4 are done; P4-5 is the last Phase 4 task and closes the phase. Still pending: P1-8b (Docker daemon not running) which blocks P3-5; P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed). Sign: drive the round trip through the CLI (`reverse`, `clean-room`, `run`), as in the earlier e2e tests.
+**P5-1: Pure state-machine definition (ASL) builder: `buildStateMachine(config)` returns Amazon States Language JSON looping `hodge step` via Fargate `RunTask.sync`, with budget/pause/stop Choice states and successor-execution handoff; unit-tested as plain JSON (no AWS, no CDK install).**
+Why: Phase 4 is done; Phase 5 is now broken down and P5-1 is the first unblocked task needing no Docker daemon or AWS account. Still pending: P1-8b (Docker daemon not running) blocks P3-5; P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed). Sign: keep infra logic as pure, testable JS; CDK wiring comes after the ASL is proven (`specs/cloud-driver.md`).
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -64,10 +64,19 @@ Why: P4-1..P4-4 are done; P4-5 is the last Phase 4 task and closes the phase. St
 | P4-2 | Brownfield mode: `prompts/brownfield.md`; refuses to run without specs (points at reverse) | done | P4-1 |
 | P4-3 | Test-hardening mode: `prompts/test-hardening.md` + coverage/mutation gate (command injectable via config `hardenCommand`) | done | P1-4 |
 | P4-4 | Clean-room mode: builder repo gets specs + tests only, never the source (context firewall, tested) | done | P2-3, P4-1 |
-| P4-5 | Phase 4 exit: round trip on a small project: code -> specs -> clean-room rebuild -> conformance suite passes (scripted adapter) | todo | P4-1..P4-4 |
+| P4-5 | Phase 4 exit: round trip on a small project: code -> specs -> clean-room rebuild -> conformance suite passes (scripted adapter) | done | P4-1..P4-4 |
 
-## Later phases (not yet broken down)
-Phase 5 AWS (CDK, Step Functions driver, Fargate Spot). See `docs/PLAN.md`. Break each down into a table like the above when the previous phase is `done`.
+## Phase 5: Cloud (AWS)
+| ID | Task | Status | Depends on |
+|---|---|---|---|
+| P5-1 | Pure ASL builder `buildStateMachine(config)`: Fargate Spot `RunTask.sync` per `hodge step`, Choice states for budget/pause/stop, successor execution after N iterations; unit-tested as JSON | todo | P3-1 |
+| P5-2 | Execution-context rebuild from git + run records (pointers only: sha, iteration, cost, status, flags) | todo | P5-1 |
+| P5-3 | CDK stack (ECR, cluster, task definition, state machine, S3 artifacts bucket, Secrets Manager refs), snapshot-tested | todo | P5-1 |
+| P5-4 | Cloud kill switch: observer calls `StopExecution`; verify `.sync` stops the ECS task | todo | P5-3 |
+| P5-5 | Artifact sync to S3 + promotion review via PR | todo | P5-3 |
+| P5-6 | Phase 5 exit: toy objective runs in AWS end to end (needs AWS account + Docker) | todo | P5-1..P5-5, P1-8b |
+
+Later phases: none yet. See `docs/PLAN.md`.
 
 ## Deferred
 - Promotion out of the sandbox (expected to align with a traditional CD pipeline).
@@ -110,3 +119,4 @@ Phase 5 AWS (CDK, Step Functions driver, Fargate Spot). See `docs/PLAN.md`. Brea
 - P4-2 done: `prompts/brownfield.md`, `src/brownfield-gate.js` (`checkBrownfieldGate`), wired into `runStep` so `step` and `run` are gated pre-agent in `mode: brownfield` without specs (message points at `hodge reverse`); `test/brownfield.test.js` (6 new, 220 total pass, check clean; failed first on missing module). `test/prompts.test.js` unwritten-mode example is now `test-hardening`. Learned: `allowedPaths` entries are prefixes like `src/`. Sign: when P4-3 lands, move its example in prompts.test.js to `clean-room`; prompt filename equals the mode name.
 - P4-3 done: `prompts/test-hardening.md`, `src/hardening-gate.js` (`checkHardeningGate`), config key `hardenCommand`, wired into `runStep` (gated pre-agent without a command; `tests-only` scope gate; `hardening` gate after tests/types), `test/hardening.test.js` (8 new, 228 total pass, check clean; failed first on missing module). `test/prompts.test.js` unwritten-mode example is now `clean-room`. Prompt file is `test-hardening.md` (filename = mode name). Sign: gate commands are config-injected arrays, never hard-coded tools.
 - P4-4 done: `src/clean-room.js` (`exportBundle`, `checkCleanRoomGate`), `prompts/clean-room.md`, `hodge clean-room --source --repo` in `src/cli.js`, firewall gate wired into `runStep` for `mode: clean-room`, `test/clean-room.test.js` (10 new, 238 total pass, check clean; failed first on missing module). All six mode prompts now exist, so the 'unwritten mode' assertion in `test/prompts.test.js` was removed. Firewall = only specs/ + tests/ in the builder's root commit; shared helper for reverse/interview not extracted (clean-room has a different shape). Sign: the firewall is enforced by construction (export copies an allow-list) and re-checked by the gate every step.
+- P4-5 done: `test/e2e-phase4.test.js` (1 new, 239 total pass, check clean; failed first by not existing). Drives `hodge reverse` (specs + green characterization test), `hodge clean-room` (builder repo has only specs/tests, no src), then `hodge run` in clean-room mode, and the exported tests pass unchanged against the rebuild. Learned: `run` needs the builder to write a fully ticked `plan.md` to finish, and `package.json` must be in `allowedPaths` for the builder to add it. Phase 4 done; Phase 5 broken down into P5-1..P5-6. Sign: e2e tests keep driving through `main` with scripted adapters.
