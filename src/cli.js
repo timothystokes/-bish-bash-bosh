@@ -6,7 +6,8 @@ import { runStep } from './step.js';
 import { runLoop } from './driver.js';
 import { lintSpecs } from './spec-lint.js';
 import { runInterview } from './interview.js';
-import { writeControl } from './control.js';
+import { createLocalStatusSource, readRunStatus } from './status.js';
+import { readControl, writeControl } from './control.js';
 
 /** @returns {string} */
 export function helpText() {
@@ -18,6 +19,7 @@ export function helpText() {
     '  hodge step --config <file> [--repo <dir>] [--run-id <id>]',
     '  hodge run  --config <file> [--repo <dir>] [--run-id <id>]',
     '  hodge interview --config <file> --objective <text> [--repo <dir>] [--run-id <id>]',
+    '  hodge status --config <file> [--repo <dir>] [--run-id <id>] [--control <control.json>]',
     '  hodge spec-lint [--repo <dir>]',
     '  hodge control --file <control.json> pause|resume|stop|steer <note...>',
     '',
@@ -28,6 +30,7 @@ export function helpText() {
     '         prints JSON {status, steps, reason?}; exit 0 only when done',
     '  interview  run the `interview` role to write specs/*.md + tests/PLAN.md; commits only if spec-lint passes;',
     '         prints JSON {status, sha, reason?}; exit 0 only when ok',
+    '  status  print JSON run status: iterations, tokens, cost, seconds vs budgets (and control state with --control)',
     '  spec-lint  check specs/*.md structure and tests/PLAN.md mapping; prints JSON {ok, problems};',
     '         exit 0 only when clean',
     '  control  write pause/resume/stop/steer to a control file read by `hodge run --control`; prints JSON {ok}',
@@ -115,12 +118,12 @@ export async function main(argv, deps = {}) {
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
   }
-  if (cmd !== 'step' && cmd !== 'run' && cmd !== 'interview') {
+  if (cmd !== 'step' && cmd !== 'run' && cmd !== 'interview' && cmd !== 'status') {
     err(`hodge: unknown command '${argv[0]}'\n\n${helpText()}`);
     return 2;
   }
 
-  const parsed = parseStepArgs(argv.slice(1), { objective: cmd === 'interview', control: cmd === 'run' });
+  const parsed = parseStepArgs(argv.slice(1), { objective: cmd === 'interview', control: cmd === 'run' || cmd === 'status' });
   if (!parsed.ok) {
     err(`hodge ${cmd}: ${parsed.error}\n`);
     return 2;
@@ -137,6 +140,12 @@ export async function main(argv, deps = {}) {
   if (!v.ok) {
     err(`hodge ${cmd}: invalid config: ${v.errors.join('; ')}\n`);
     return 2;
+  }
+  if (cmd === 'status') {
+    const status = readRunStatus(createLocalStatusSource(resolve(parsed.repo)), parsed.runId, /** @type {any} */ (config).budgets);
+    const control = parsed.control ? readControl(resolve(parsed.control)) : undefined;
+    out(`${JSON.stringify(control ? { ...status, control } : status)}\n`);
+    return 0;
   }
   try {
     const adapter = resolveAdapter(config, cmd === 'interview' ? 'interview' : 'build', deps.registry ?? defaultRegistry);
