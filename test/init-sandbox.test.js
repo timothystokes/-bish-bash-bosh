@@ -86,7 +86,7 @@ async function run(args) {
   const outs = [];
   /** @type {string[]} */
   const errs = [];
-  const code = await main(args, { settingsFile: join(mkdtempSync(join(tmpdir(), 'init-settings-')), 's.json'), stdout: (s) => outs.push(s), stderr: (s) => errs.push(s) });
+  const code = await main(args, { stdout: (s) => outs.push(s), stderr: (s) => errs.push(s) });
   return { code, out: outs.join(''), err: errs.join('') };
 }
 

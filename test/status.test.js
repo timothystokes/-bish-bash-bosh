@@ -59,7 +59,7 @@ test('hodge status prints JSON and includes control state', async () => {
 
 test('hodge status requires --config', async () => {
   let e = '';
-  const code = await main(['status'], { settingsFile: '/nonexistent/settings.json', stdout: () => {}, stderr: (/** @type {string} */ s) => (e += s) });
+  const code = await main(['status'], { stdout: () => {}, stderr: (/** @type {string} */ s) => (e += s) });
   assert.equal(code, 2);
   assert.match(e, /config/);
 });

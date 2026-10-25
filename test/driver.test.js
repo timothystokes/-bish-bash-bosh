@@ -136,7 +136,7 @@ test('hodge run prints loop JSON, exit 0 when done, 1 otherwise', async () => {
 
 test('hodge run reports usage errors with exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
-  const code = await main(['run'], { settingsFile: '/nonexistent/settings.json', stdout: () => {}, stderr: (s) => { err.push(s); } });
+  const code = await main(['run'], { stdout: () => {}, stderr: (s) => { err.push(s); } });
   assert.equal(code, 2);
   assert.match(err.join(''), /hodge run: --config/);
 });
