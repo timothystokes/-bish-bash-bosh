@@ -1,4 +1,5 @@
 # Spec: Cloud driver (AWS)
+- **Status: future goal.** The current main goal is the Docker-based local implementation (`specs/loop.md`). This spec describes the later scaled-out solution; it is not a current requirement.
 - Infrastructure as code: **AWS CDK**.
 - AWS Step Functions loops over `hodge step`; each iteration is one Fargate Spot task (`RunTask.sync`) with a fresh context. Lambda is not used for iterations (15-minute cap, no persistent workspace); only for light steps (gate/budget checks).
 - Git and run records are the source of truth. Execution context holds pointers only: commit SHA, iteration, cumulative cost, last status, pause/stop flag; it must be rebuildable from git.

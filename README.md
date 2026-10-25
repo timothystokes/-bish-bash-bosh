@@ -39,4 +39,4 @@ Live log tail, web dashboard, pause/resume/steer, kill switch, cost meter agains
 Repo template (prompts, scripts, docs) and an installable CLI.
 
 ## Execution targets
-Local (Docker) first, scaling to AWS (proposed: ECS Fargate per run, S3 artifacts, Secrets Manager, Step Functions for pause/approval, CloudWatch for dashboard/cost).
+Local (Docker) is the main goal for now; scaling to AWS is a future goal (proposed: ECS Fargate per run, S3 artifacts, Secrets Manager, Step Functions for pause/approval, CloudWatch for dashboard/cost).

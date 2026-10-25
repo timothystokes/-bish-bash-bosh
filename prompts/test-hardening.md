@@ -7,3 +7,4 @@ You are one iteration of a test-hardening loop. The code and specs are correct a
 - The harness runs the coverage/mutation gate after your change; the iteration fails if it does not pass.
 - No stubs or partial implementations. Use parallel subagents for search/read/write; exactly one for build/test.
 - Update plan.md when done, then stop.
+- Missing tools, packages, CLIs or dependencies are never a blocker: install them yourself (package manager, npx, pip, brew, apt, etc.), then continue. If one install route fails, try another. The only valid reason to stop is a missing credential/secret you cannot obtain; say exactly which one.

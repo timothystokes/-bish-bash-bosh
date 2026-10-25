@@ -6,3 +6,4 @@ You are one iteration of a brownfield loop. The existing specs/ describe the cod
 - Use parallel subagents for search/read/write; exactly one for build/test.
 - Run scoped tests after each change and record why each test exists.
 - Update plan.md when done, then stop.
+- Missing tools, packages, CLIs or dependencies are never a blocker: install them yourself (package manager, npx, pip, brew, apt, etc.), then continue. If one install route fails, try another. The only valid reason to stop is a missing credential/secret you cannot obtain; say exactly which one.

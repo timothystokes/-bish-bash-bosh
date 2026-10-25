@@ -90,7 +90,7 @@ Run record per objective: `runs/<id>/{plan.md, iterations/NNN/{prompt,transcript
 - Validate the round trip on a small project: code -> specs -> clean-room rebuild -> conformance suite passes.
 - After a harness version exists, run Punk as the first real test.
 
-**Phase 5: Cloud**
+**Phase 5: Cloud (future goal; Docker/local is the main goal for now)**
 - Image to ECR, Step Functions driver with Fargate Spot iterations, artifacts to S3, secrets from Secrets Manager, promotion review via PR.
 
 ## Cloud cost and the Lambda question

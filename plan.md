@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P0-5b (live-verify Claude Code output shape) once `claude` is installed; otherwise P0-6b (Codex) or P5-4b/P5-6 once an AWS account and `aws` CLI exist. No unblocked buildable task remains: first check which CLI/credential is available, and if none, ask the owner to provide one.**
-Why: P1-8c is done; every remaining task needs an external CLI or account the harness cannot supply. Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`) and a mounted fixture file lacks the exec bit, so wrap it in a `sh` script. Keep infra logic pure with injected clients; pointer shape is the contract in `specs/cloud-driver.md`.
+**P0-5b (live-verify Claude Code output shape): install `claude` yourself (e.g. `npm i -g @anthropic-ai/claude-code`) and verify; then P0-6b (Codex, install `codex`), then the Docker follow-ups P3-5b, P1-9, P1-10. Stop only if a credential is missing, and name it. Docker (local) is the main target; Phase 5 (AWS) is a future goal, do not pick P5-* tasks.**
+Why: P0-5b/P0-6b only need a CLI install, which the agent can do; the AWS tasks are deferred. Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`) and a mounted fixture file lacks the exec bit, so wrap it in a `sh` script. Keep infra logic pure with injected clients; pointer shape is the contract in `specs/cloud-driver.md`.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -67,7 +67,16 @@ Why: P1-8c is done; every remaining task needs an external CLI or account the ha
 | P4-4 | Clean-room mode: builder repo gets specs + tests only, never the source (context firewall, tested) | done | P2-3, P4-1 |
 | P4-5 | Phase 4 exit: round trip on a small project: code -> specs -> clean-room rebuild -> conformance suite passes (scripted adapter) | done | P4-1..P4-4 |
 
-## Phase 5: Cloud (AWS)
+## Docker follow-ups (current focus)
+| ID | Task | Status | Depends on |
+|---|---|---|---|
+| P3-5b | Wire `stopContainer` to a CLI command (`hodge kill`) so the Docker run can be stopped from the observer | todo | P3-5 |
+| P1-9 | Silence the harmless `fatal: not a git repository` stderr line in the container (identity probe of `/opt/hodgepodge`) | todo | P1-8b |
+| P1-10 | Derived Docker image with agent CLIs (`copilot`, `claude`, `codex`) installed, smoke-tested in the container | todo | P1-8b, P0-5b, P0-6b |
+
+## Phase 5: Cloud (AWS) — FUTURE GOAL, not the current focus
+The main goal for now is the Docker-based local implementation. Do not pick P5-* tasks as the next best action until the owner promotes this phase.
+
 | ID | Task | Status | Depends on |
 |---|---|---|---|
 | P5-1 | Pure ASL builder `buildStateMachine(config)`: Fargate Spot `RunTask.sync` per `hodge step`, Choice states for budget/pause/stop, successor execution after N iterations; unit-tested as JSON | done | P3-1 |
@@ -162,3 +171,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (blocked check, twenty-seventh): `claude`, `codex`, `aws` still not on PATH and no AWS credentials; only `gh` and `copilot` present. No code changes. Next best action unchanged; awaits the owner installing a CLI or providing AWS credentials. Sign: don't retry until the owner reports a tool installed.
 - Session (blocked check, twenty-eighth): `claude`, `codex`, `aws` still not on PATH and no AWS credentials; only `gh` present. No code changes. Next best action unchanged; awaits the owner installing a CLI or providing AWS credentials. Sign: don't retry until the owner reports a tool installed.
 - Session (blocked check, twenty-ninth): `claude`, `codex`, `aws` still not on PATH and no AWS credentials; only `gh` and `copilot` present. No code changes. Next best action unchanged; awaits the owner installing a CLI or providing AWS credentials. Sign: don't retry until the owner reports a tool installed.
+- Session (re-plan): AWS/Phase 5 deferred as a future goal; Docker is the main goal. Added Docker follow-ups P3-5b, P1-9, P1-10; next best action is P0-5b (install `claude` and verify). Sign: missing tools are never a blocker, install them; only missing credentials block.

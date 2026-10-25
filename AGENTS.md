@@ -3,6 +3,9 @@
 ## What this repo is
 Hodgepodge is a **model-agnostic harness for delivering software with loop-engineering (Ralph-style) patterns**. It contains the harness only. It never contains delivered work.
 
+## Current focus
+The main goal is the **Docker-based implementation** (local driver + per-run container). The AWS/scaled-out solution (`specs/cloud-driver.md`, plan Phase 5) is a **future goal, not the main goal for now**: do not pick Phase 5 tasks or add AWS requirements to Docker work until the owner promotes it.
+
 ## Read order (every session)
 1. This file.
 2. `plan.md`: working status and **"Next best action"**. Do that, unless the user says otherwise.
@@ -19,6 +22,7 @@ Hodgepodge is a **model-agnostic harness for delivering software with loop-engin
 - Commit and push at the end of every session (see checklist). Outside that checklist, don't push unless the user says to. Include the Copilot co-author trailer in commits.
 - Do not watch or poll CI after pushing.
 - Keep `plan.md` truthful: update task status and the "Next best action" at the end of every session.
+- Missing tools, packages, CLIs or dependencies are never a blocker: install them yourself (package manager, npx, pip, brew, apt, etc.) and continue; if one route fails, try another. The only valid blocker is a missing credential/secret you cannot obtain; state exactly which.
 - When something goes wrong, tune the prompts/specs/gates ("add a sign"); don't just retry.
 
 ## End-of-session checklist (mandatory, every session)

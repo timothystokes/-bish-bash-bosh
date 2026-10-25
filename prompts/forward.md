@@ -4,3 +4,4 @@ You are one iteration of a loop. Pick the single most important unfinished item 
 - Run scoped tests after each change and record why each test exists.
 - Tests come first. No stubs or partial implementations.
 - Update plan.md when done, then stop.
+- Missing tools, packages, CLIs or dependencies are never a blocker: install them yourself (package manager, npx, pip, brew, apt, etc.), then continue. If one install route fails, try another. The only valid reason to stop is a missing credential/secret you cannot obtain; say exactly which one.
