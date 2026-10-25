@@ -10,3 +10,4 @@
 - CLI: `hodge step --config <file> [--repo <dir>] [--run-id <id>]` prints the step JSON to stdout; exit 0 ok, 1 failed/gated/over-budget, 2 usage/config/adapter error. The `build` role's adapter id is resolved via `src/adapters/index.js` (`defaultRegistry`).
 - `hodge run` (`src/driver.js` `runLoop`): same flags as `step`; loops `runStep` until the target `plan.md` is done (>=1 checkbox, none unchecked) or a step is failed/gated/over-budget (stops, no retry). Prints `{status, steps, reason?}`; exit 0 only when `done`. Config `requireTestPlan: true` enables the test-plan gate for `step` and `run`.
 - `Dockerfile`: per-run container (target repo mounted at `/work`, config at `/config/hodge.json`); agent CLIs go in a derived image.
+- End-to-end proof: `test/e2e-toy.test.js` runs a toy target red to green through `hodge run` with a fake agent binary. Targets' test scripts must use a glob, not a directory, with `node --test`.
