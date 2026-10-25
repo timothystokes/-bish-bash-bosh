@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P1-2: Repo gate (refuse target == hodgepodge) per `specs/repos.md` and `specs/gates.md`, tests first.**
-Why: it only depends on P0-2, is small, and enforces the core "hodgepodge never hosts delivery work" rule before any loop code exists; P0-4..P0-7 adapters and P1-1 (`hodge step`) follow.
+**P0-4: Adapter: Copilot CLI (non-interactive) per `specs/adapters.md`, tests first using `adapterContract` with a fake-agent fixture.**
+Why: P1-1 (`hodge step`) needs at least one real adapter, and P0-3 contract suite is ready; P1-2 gate is now done so adapters are the main unblocker.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -22,7 +22,7 @@ Why: it only depends on P0-2, is small, and enforces the core "hodgepodge never 
 | ID | Task | Status | Depends on |
 |---|---|---|---|
 | P1-1 | `hodge step`: one idempotent iteration (stack allocation, agent call, scoped tests, commit, JSON status) | todo | P0-3, P0-8 |
-| P1-2 | Repo gate (refuse target == hodgepodge) | todo | P0-2 |
+| P1-2 | Repo gate (refuse target == hodgepodge) | done | P0-2 |
 | P1-3 | Test-plan gate (plan exists, tests red first) | todo | P1-1 |
 | P1-4 | Type gate, anti-stub gate, scope gate | todo | P1-1 |
 | P1-5 | Budget gate (tokens/cost/time/iterations) | todo | P1-1 |
@@ -41,3 +41,4 @@ Phase 2 spec modes (interview, forward, spec-lint); Phase 3 control + TUI + secr
 - P0-2 done: `src/config.schema.json` (draft-07) + `validateConfig` in `src/config.js` via ajv (devDependency); 11 tests pass, check clean. Config keys: targetRepo, roles (must include `build`; each adapter+model opaque strings), budgets (maxTokens, maxCostUsd, maxWallClockSeconds, maxIterations), allowedPaths. Unknown keys rejected. Sign: adapter/model ids stay opaque strings, never enums, to keep vendors out of logic.
 - P0-3 done: `src/adapter.js` (typedefs, `validateAdapterResult`, scripted `createFakeAdapter`) and reusable `adapterContract(name, makeAdapter)` in `test/helpers/adapter-contract.js` (success, failure-not-throw, over-limit => non-zero exit, relative changedFiles). 17 tests pass, check clean. Request shape: `{prompt, cwd, limits}`; adapters expose `run(req)`. Sign: real adapters must call `adapterContract` with a fake-agent fixture (no network); over-limit usage is reported via non-zero exitStatus.
 - P0-8 done: `src/run-record.js` (`validateRunRecord`, `iterationDir`, `writeIterationRecord`), 7 new tests (24 total pass, check clean). Writes `runs/<id>/iterations/NNN/{prompt,transcript,diff,test.json,usage.json,record.json}` atomically (temp dir + rename), never overwrites, rejects unsafe runId/iteration. Statuses: ok|failed|gated|over-budget. Sign: validate before touching disk so failures leave no partial records.
+- P1-2 done: `src/repo-gate.js` (`checkRepoGate`, `normalizeRepoId`, `harnessIdentity`), 6 new tests (30 total pass, check clean). Refuses by normalized remote URL (ssh/https/scp, case, .git) and by real path equal to/inside the hodgepodge root (symlinks resolved). Not yet wired into the CLI (no `hodge step` yet): P1-1 must call it first. Sign: the gate takes an injectable identity so tests never depend on this checkout's remotes.
