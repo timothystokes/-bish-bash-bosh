@@ -1,9 +1,10 @@
 # Spec: Gates (back-pressure, harness-enforced)
 - Repo gate: refuse if target repo is hodgepodge.
 - Test-plan gate: each objective needs `tests/PLAN.md` mapping specs to tests; tests must exist and **fail first** before build loops start. Agent-written tests alone do not satisfy the gate.
-- Type gate: `tsc --checkJs` passes.
-- Anti-stub gate: reject TODO/stub/"not implemented"/empty bodies in the diff.
-- Scope gate: changes confined to the objective's allowed paths.
+- Type gate (`src/diff-gates.js` `checkTypeGate`): runs `tsc` in the target when it has a `tsconfig.json` (skipped otherwise; command injectable via `typeCommand`).
+- Anti-stub gate (`checkAntiStubGate`): rejects TODO/FIXME/stub/placeholder/"not implemented" markers and empty function bodies on added lines of the diff (markdown files are not scanned).
+- Scope gate (`checkScopeGate`): staged changes must sit inside config `allowedPaths` (directory-boundary match, `..` rejected); `plan.md` is always allowed.
+- In `runStep` the scope and anti-stub gates run before tests; any failure => `failed`, work reverted. `record.json` gates, in order: repo, budget, scope, anti-stub, tests, types.
 - Budget gate (`src/budget-gate.js`): tokens, cost, wall-clock and iteration caps per run, summed from run records (`usage.json`, incl. `seconds`). `runStep` refuses (`over-budget`, no sha, nothing written) when any cap is exhausted and gives the adapter only the remaining budget as limits.
 - Fast-wheel rule: scoped tests per iteration; full suite on a schedule.
 - Spec-lint (Phase 2): detect duplicate/contradictory definitions before forward loops.

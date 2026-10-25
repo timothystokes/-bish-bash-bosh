@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateConfig } from './config.js';
+import { checkAntiStubGate, checkScopeGate, checkTypeGate } from './diff-gates.js';
 import { checkBudgetGate } from './budget-gate.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { writeIterationRecord } from './run-record.js';
@@ -70,14 +71,15 @@ function nextIteration(dir, /** @type {string} */ runId) {
  *   runId: string,
  *   adapter: Adapter,
  *   testCommand?: string[],
+ *   typeCommand?: string[],
  *   identity?: HarnessIdentity,
  * }} opts
  * @returns {Promise<StepResult>}
  */
-export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], identity }) {
+export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], typeCommand, identity }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
-  const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets}} */ (config);
+  const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets, allowedPaths: string[]}} */ (config);
 
   const self = identity ?? harnessIdentity();
   const gated = (/** @type {string} */ reason) => ({ sha: null, iteration: 0, cost: 0, status: /** @type {const} */ ('gated'), reason });
@@ -115,13 +117,32 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   /** @type {unknown} */
   let test = { skipped: true };
   const overBudget = result.usage.tokens > maxTokens || result.usage.cost > maxCostUsd;
+  /** @type {{name: string, ok: boolean, detail?: string}[]} */
+  const gates = [{ name: 'repo', ok: true }, { name: 'budget', ok: true }];
+  /** @param {string} name @param {import('./diff-gates.js').GateCheck} c */
+  const record = (name, c) => {
+    gates.push({ name, ok: c.ok, detail: c.ok ? c.detail : c.reason });
+    return c.ok;
+  };
   if (result.exitStatus !== 0) {
     status = overBudget ? 'over-budget' : 'failed';
   } else {
-    const [cmd, ...args] = testCommand;
-    const t = spawnSync(cmd, args, { cwd: repoDir, encoding: 'utf8' });
-    test = { exitStatus: t.status ?? 1, output: `${t.stdout ?? ''}${t.stderr ?? ''}` };
-    if (t.status !== 0) status = 'failed';
+    const staged = git(repoDir, 'diff', '--cached', '--name-only').split('\n').filter(Boolean);
+    const diffOk = [
+      record('scope', checkScopeGate(staged, cfg.allowedPaths)),
+      record('anti-stub', checkAntiStubGate(diff)),
+    ].every(Boolean);
+    if (!diffOk) {
+      status = 'failed';
+    } else {
+      const [cmd, ...args] = testCommand;
+      const t = spawnSync(cmd, args, { cwd: repoDir, encoding: 'utf8' });
+      test = { exitStatus: t.status ?? 1, output: `${t.stdout ?? ''}${t.stderr ?? ''}` };
+      const testsOk = t.status === 0;
+      gates.push({ name: 'tests', ok: testsOk, detail: testsOk ? undefined : 'failed' });
+      const typesOk = record('types', checkTypeGate(repoDir, typeCommand));
+      if (!testsOk || !typesOk) status = 'failed';
+    }
   }
 
   if (status !== 'ok') {
@@ -134,11 +155,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     status,
     usage: { ...result.usage, seconds },
     changedFiles: result.changedFiles,
-    gates: [
-      { name: 'repo', ok: true },
-      { name: 'budget', ok: true },
-      { name: 'tests', ok: status === 'ok', detail: status === 'ok' ? undefined : status },
-    ],
+    gates: status === 'ok' || gates.length > 2 ? gates : [...gates, { name: 'tests', ok: false, detail: status }],
     prompt,
     transcript: result.transcript,
     diff,
