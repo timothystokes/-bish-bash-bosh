@@ -1,6 +1,7 @@
 import { createClaudeCodeAdapter } from './claude-code.js';
 import { createCodexAdapter } from './codex.js';
 import { createCopilotAdapter } from './copilot.js';
+import { createOpenAiHttpAdapter } from './openai-http.js';
 
 /**
  * @typedef {(opts: {model: string}) => import('../adapter.js').Adapter} AdapterFactory
@@ -12,6 +13,12 @@ export const defaultRegistry = {
   copilot: ({ model }) => createCopilotAdapter({ model }),
   'claude-code': ({ model }) => createClaudeCodeAdapter({ model }),
   codex: ({ model }) => createCodexAdapter({ model }),
+  'openai-http': ({ model }) =>
+    createOpenAiHttpAdapter({
+      model,
+      baseUrl: process.env['HODGE_HTTP_BASE_URL'],
+      apiKeyEnv: 'HODGE_HTTP_API_KEY',
+    }),
 };
 
 /**

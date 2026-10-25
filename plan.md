@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P0-7: generic OpenAI-compatible HTTP adapter (`src/adapters/openai-http.js`), via `adapterContract` with a local fake HTTP server, registered in `defaultRegistry`.**
-Why: last unblocked Phase 0 adapter; it is a different shape (HTTP, no process runner), so it exercises the adapter interface from a new angle. Pending live checks: Claude Code parser (P0-5b) and Codex parser (P0-6b) once those CLIs are installed.
+**P1-8b: build the Dockerfile (`docker build`) now that a Docker daemon appears to be running, and smoke `hodge --help` inside the image.**
+Why: last unblocked task and the only unverified Phase 1 artifact; Phase 2 should not start on an unbuilt container. Still pending (CLIs not installed): P0-5b Claude Code and P0-6b Codex live checks. If the daemon is down again, break down Phase 2 instead.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -17,7 +17,7 @@ Why: last unblocked Phase 0 adapter; it is a different shape (HTTP, no process r
 | P0-5b | Live-verify Claude Code output shape (`claude` not installed in P0-5 session) | todo | P0-5 |
 | P0-6 | Adapter: Codex | done | P0-3 |
 | P0-6b | Live-verify Codex `exec --json` output shape (`codex` not installed in P0-6 session) | todo | P0-6 |
-| P0-7 | Adapter: generic OpenAI-compatible HTTP | todo | P0-3 |
+| P0-7 | Adapter: generic OpenAI-compatible HTTP | done | P0-3 |
 | P0-8 | Run-record format + writer (`specs/loop.md`) | done | P0-1 |
 
 ## Phase 1: Loop + gates
@@ -58,3 +58,4 @@ Phase 2 spec modes (interview, forward, spec-lint); Phase 3 control + TUI + secr
 - P1-8 done: live Copilot run (`copilot -p ... --output-format json --allow-all --no-ask-user`) works through `createCopilotAdapter` (exit 0, changedFiles correct). Learned: real output has NO `assistant.usage` events; usage is cumulative in `session.usage_checkpoint` -> `data.accountingSnapshot.modelMetrics[model].usage.{inputTokens,outputTokens}`, plus a final `result` event with `usage.premiumRequests`. Parser now reads the last checkpoint (tokens = input+output, cache excluded; `assistant.usage` kept for the fake agent). Cost is 0 for Copilot (no USD figure, only premium requests/nanoAiu), so `maxCostUsd` is not enforced for it; token budget is. 97 tests pass, check clean (new test failed first). Docker build NOT done: daemon not running (split to P1-8b). Sign: verify event shapes against a live run before writing a parser; `timeout` is absent on macOS.
 - P0-5 done: `src/adapters/claude-code.js` (`createClaudeCodeAdapter`, `buildClaudeArgs`, `parseClaudeOutput`), fake `test/fixtures/fake-claude.js`, `test/claude-code-adapter.test.js` (10 new, 107 total pass, check clean; tests failed first); registered as `claude-code` in `defaultRegistry`. Extracted shared `src/adapters/process.js` (`runProcessAgent`: spawn, wall-clock kill, hash snapshot) and refactored the Copilot adapter onto it (its tests unchanged and green). Output shape (`claude -p --output-format json`: `result`, `total_cost_usd`, `usage.input_tokens/output_tokens`) is from documentation, NOT verified live: `claude` is not installed here (split to P0-5b). Sign: process adapters share `runProcessAgent`; only args/parsing are per-vendor.
 - P0-6 done: `src/adapters/codex.js` (`createCodexAdapter`, `buildCodexArgs`, `parseCodexOutput`), fake `test/fixtures/fake-codex.js`, `test/codex-adapter.test.js` (117 total pass, check clean; tests failed first); registered as `codex` in `defaultRegistry`, reuses `runProcessAgent`. Runs `codex exec --json --dangerously-bypass-approvals-and-sandbox [--model m] <prompt>`; transcript = `agent_message` items, tokens = sum of `turn.completed` input+output (cache excluded). Shape is from documentation, NOT verified live: `codex` not installed (split to P0-6b). Cost is read from an optional `usage.cost_usd` (real Codex reports none, so cost budget is not enforced for it; the contract test needs cost to round-trip). Sign: adapters built without the CLI installed must log an unverified-shape follow-up task.
+- P0-7 done: `src/adapters/openai-http.js` (`createOpenAiHttpAdapter`, `parseFileBlocks`), `test/openai-http-adapter.test.js` runs `adapterContract` against a local fake HTTP server plus auth/model, path-escape, timeout (124), unreachable (127) tests (127 total pass, check clean). Registered as `openai-http`; endpoint/key come from env `HODGE_HTTP_BASE_URL` / `HODGE_HTTP_API_KEY` (key never in config). The model has no tools, so it returns whole files as `<<<FILE path>>>...<<<END>>>` blocks (protocol sent as system message) which the adapter writes; paths outside cwd are rejected (exit 1). HTTP error => exit 2. Cost read from optional `usage.cost`. Sign: tool-less adapters need an explicit file protocol and must confine writes to cwd. Docker client + daemon seem available now (-> P1-8b).
