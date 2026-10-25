@@ -9,6 +9,7 @@ import { runInterview } from './interview.js';
 import { createLocalStatusSource, readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
 import { runTui } from './tui.js';
+import { createSecretProxy } from './secret-proxy.js';
 
 /** @returns {string} */
 export function helpText() {
@@ -22,6 +23,7 @@ export function helpText() {
     '  hodge interview --config <file> --objective <text> [--repo <dir>] [--run-id <id>]',
     '  hodge status --config <file> [--repo <dir>] [--run-id <id>] [--control <control.json>]',
     '  hodge tui --config <file> --control <control.json> [--repo <dir>] [--run-id <id>]',
+    '  hodge proxy --upstream <url> [--audit <file>] [--meter <file>] [--port <n>]',
     '  hodge spec-lint [--repo <dir>]',
     '  hodge control --file <control.json> pause|resume|stop|steer <note...>',
     '',
@@ -34,6 +36,7 @@ export function helpText() {
     '         prints JSON {status, sha, reason?}; exit 0 only when ok',
     '  status  print JSON run status: iterations, tokens, cost, seconds vs budgets (and control state with --control)',
     '  tui    live terminal view: log tail, cost meter vs budget; keys p pause, r resume, s steer, x stop (confirmed), q quit',
+    '  proxy  secret-redacting, usage-metering proxy in front of a model endpoint; prints JSON {port} then serves until SIGINT/SIGTERM',
     '  spec-lint  check specs/*.md structure and tests/PLAN.md mapping; prints JSON {ok, problems};',
     '         exit 0 only when clean',
     '  control  write pause/resume/stop/steer to a control file read by `hodge run --control`; prints JSON {ok}',
@@ -74,6 +77,7 @@ export function parseStepArgs(args, opts = {}) {
  *   registry?: import('./adapters/index.js').AdapterRegistry,
  *   testCommand?: string[],
  *   identity?: import('./repo-gate.js').HarnessIdentity,
+ *   signal?: AbortSignal,
  *   input?: NodeJS.ReadableStream & {setRawMode?: (b: boolean) => unknown},
  *   stdout?: (s: string) => void,
  *   stderr?: (s: string) => void,
@@ -102,6 +106,58 @@ export async function main(argv, deps = {}) {
     const res = lintSpecs(resolve(rest[1] ?? '.'));
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
+  }
+  if (cmd === 'proxy') {
+    const rest = argv.slice(1);
+    /** @type {Record<string, string | undefined>} */
+    const v = {};
+    for (let i = 0; i < rest.length; i += 2) {
+      const val = rest[i + 1];
+      if (!['--upstream', '--audit', '--meter', '--port'].includes(rest[i])) {
+        err(`hodge proxy: unknown argument '${rest[i]}'\n`);
+        return 2;
+      }
+      if (val === undefined || val.startsWith('--')) {
+        err(`hodge proxy: ${rest[i]} requires a value\n`);
+        return 2;
+      }
+      v[rest[i]] = val;
+    }
+    if (!v['--upstream']) {
+      err('hodge proxy: --upstream <url> is required\n');
+      return 2;
+    }
+    if (!URL.canParse(v['--upstream'])) {
+      err(`hodge proxy: invalid --upstream '${v['--upstream']}'\n`);
+      return 2;
+    }
+    const port = v['--port'] === undefined ? 0 : Number(v['--port']);
+    if (!Number.isInteger(port) || port < 0 || port > 65535) {
+      err(`hodge proxy: invalid --port '${v['--port']}'\n`);
+      return 2;
+    }
+    const proxy = createSecretProxy({
+      upstream: v['--upstream'],
+      ...(v['--audit'] ? { auditFile: resolve(v['--audit']) } : {}),
+      ...(v['--meter'] ? { meterFile: resolve(v['--meter']) } : {}),
+    });
+    const stopped = new Promise((r) => {
+      const stop = () => r(undefined);
+      if (deps.signal) deps.signal.aborted ? stop() : deps.signal.addEventListener('abort', stop, { once: true });
+      else {
+        process.once('SIGINT', stop);
+        process.once('SIGTERM', stop);
+      }
+    });
+    try {
+      out(`${JSON.stringify({ port: await proxy.listen(port) })}\n`);
+    } catch (e) {
+      err(`hodge proxy: ${/** @type {Error} */ (e).message}\n`);
+      return 2;
+    }
+    await stopped;
+    await proxy.close();
+    return 0;
   }
   if (cmd === 'control') {
     const rest = argv.slice(1);
