@@ -6,6 +6,7 @@ import { runStep } from './step.js';
 import { runLoop } from './driver.js';
 import { lintSpecs } from './spec-lint.js';
 import { runInterview } from './interview.js';
+import { writeControl } from './control.js';
 
 /** @returns {string} */
 export function helpText() {
@@ -18,27 +19,29 @@ export function helpText() {
     '  hodge run  --config <file> [--repo <dir>] [--run-id <id>]',
     '  hodge interview --config <file> --objective <text> [--repo <dir>] [--run-id <id>]',
     '  hodge spec-lint [--repo <dir>]',
+    '  hodge control --file <control.json> pause|resume|stop|steer <note...>',
     '',
     'Commands:',
     '  step   run one loop iteration; prints JSON {sha, iteration, cost, status}',
     '         (--repo defaults to ., --run-id defaults to "default")',
-    '  run    loop steps until the plan is done or a step fails/gates/runs out of budget;',
+    '  run    loop steps until the plan is done or a step fails/gates/runs out of budget (--control <file> honours control.json);',
     '         prints JSON {status, steps, reason?}; exit 0 only when done',
     '  interview  run the `interview` role to write specs/*.md + tests/PLAN.md; commits only if spec-lint passes;',
     '         prints JSON {status, sha, reason?}; exit 0 only when ok',
     '  spec-lint  check specs/*.md structure and tests/PLAN.md mapping; prints JSON {ok, problems};',
     '         exit 0 only when clean',
+    '  control  write pause/resume/stop/steer to a control file read by `hodge run --control`; prints JSON {ok}',
     '',
   ].join('\n');
 }
 
 /**
  * @param {string[]} args
- * @param {{objective?: boolean}} [opts] interview also takes (and requires) --objective
- * @returns {{ok: true, config: string, repo: string, runId: string, objective?: string} | {ok: false, error: string}}
+ * @param {{objective?: boolean, control?: boolean}} [opts] interview also takes (and requires) --objective; run takes --control
+ * @returns {{ok: true, config: string, repo: string, runId: string, objective?: string, control?: string} | {ok: false, error: string}}
  */
 export function parseStepArgs(args, opts = {}) {
-  const flags = ['--config', '--repo', '--run-id', ...(opts.objective ? ['--objective'] : [])];
+  const flags = ['--config', '--repo', '--run-id', ...(opts.objective ? ['--objective'] : []), ...(opts.control ? ['--control'] : [])];
   /** @type {Record<string, string | undefined>} */
   const v = { '--repo': '.', '--run-id': 'default' };
   for (let i = 0; i < args.length; i += 2) {
@@ -56,6 +59,7 @@ export function parseStepArgs(args, opts = {}) {
     repo: /** @type {string} */ (v['--repo']),
     runId: /** @type {string} */ (v['--run-id']),
     ...(opts.objective ? { objective: v['--objective'] } : {}),
+    ...(v['--control'] ? { control: v['--control'] } : {}),
   };
 }
 
@@ -92,12 +96,31 @@ export async function main(argv, deps = {}) {
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
   }
+  if (cmd === 'control') {
+    const rest = argv.slice(1);
+    if (rest[0] !== '--file' || !rest[1] || rest[1].startsWith('--')) {
+      err('hodge control: --file <control.json> is required\n');
+      return 2;
+    }
+    const [action, ...note] = rest.slice(2);
+    /** @type {Record<string, {paused?: boolean, stop?: boolean, steer?: string}>} */
+    const updates = { pause: { paused: true }, resume: { paused: false }, stop: { stop: true } };
+    const text = note.join(' ').trim();
+    const update = action === 'steer' ? (text ? { steer: text } : undefined) : updates[action ?? ''];
+    if (!update || (action !== 'steer' && note.length > 0)) {
+      err(`hodge control: expected pause, resume, stop, or steer <note>${action ? ` (got '${action}')` : ''}\n`);
+      return 2;
+    }
+    const res = writeControl(resolve(rest[1]), update);
+    out(`${JSON.stringify(res)}\n`);
+    return res.ok ? 0 : 1;
+  }
   if (cmd !== 'step' && cmd !== 'run' && cmd !== 'interview') {
     err(`hodge: unknown command '${argv[0]}'\n\n${helpText()}`);
     return 2;
   }
 
-  const parsed = parseStepArgs(argv.slice(1), { objective: cmd === 'interview' });
+  const parsed = parseStepArgs(argv.slice(1), { objective: cmd === 'interview', control: cmd === 'run' });
   if (!parsed.ok) {
     err(`hodge ${cmd}: ${parsed.error}\n`);
     return 2;
@@ -137,6 +160,7 @@ export async function main(argv, deps = {}) {
       adapter,
       testCommand: deps.testCommand,
       identity: deps.identity,
+      ...(cmd === 'run' && parsed.control ? { controlFile: resolve(parsed.control) } : {}),
       requireTestPlan: /** @type {{requireTestPlan?: boolean}} */ (config).requireTestPlan === true,
     });
     out(`${JSON.stringify(res)}\n`);

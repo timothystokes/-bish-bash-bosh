@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P3-2: `hodge control` CLI (pause/resume/steer/stop write `control.json` atomically) and a `--control <file>` flag on `hodge run` that passes `controlFile` to `runLoop`.**
-Why: unblocked; P3-1 made the driver honour control.json but nothing can write it or enable it from the CLI yet; the TUI (P3-4) builds on it. Still pending: P1-8b (needs a running Docker daemon; Dockerfile copies `prompts/` and `templates/`), P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
+**P3-3: status source abstraction (local run files) + `hodge status` JSON: iterations, tokens, cost vs budget.**
+Why: unblocked; the TUI (P3-4) needs both it and the now-done P3-2, and `hodge status` is useful on its own. Still pending: P1-8b (needs a running Docker daemon; Dockerfile copies `prompts/` and `templates/`), P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -48,7 +48,7 @@ Why: unblocked; P3-1 made the driver honour control.json but nothing can write i
 | ID | Task | Status | Depends on |
 |---|---|---|---|
 | P3-1 | Control channel: `control.json` (pause, resume, steer, stop) read between iterations; steer note injected into next prompt | done | P1-6 |
-| P3-2 | `hodge control` CLI to write control.json (pause/resume/steer/stop) | todo | P3-1 |
+| P3-2 | `hodge control` CLI to write control.json (pause/resume/steer/stop) | done | P3-1 |
 | P3-3 | Status source abstraction (local run files) + `hodge status` JSON: iterations, tokens, cost vs budget | todo | P1-5 |
 | P3-4 | Terminal TUI: live log tail, cost meter vs budget, pause/resume/steer/stop keys | todo | P3-2, P3-3 |
 | P3-5 | Kill switch: terminate the run container | todo | P3-1, P1-8b |
@@ -89,3 +89,4 @@ Phase 4 reverse/brownfield/harden/clean-room; Phase 5 AWS (CDK, Step Functions d
 - P2-4 done: `src/interview.js` (`runInterview`, `buildInterviewPrompt`), `prompts/interview.md`, `hodge interview --config <f> --objective <text> [--repo] [--run-id]` (uses role `interview`, error exit 2 if absent), `test/interview.test.js` (8 new, 158 total pass, check clean; tests failed first). Gates: empty objective, repo gate, clean tree, budget. Writes allowed only under `specs/` and `tests/` (interview authors the red tests the plan maps to); agent failure, out-of-scope writes or spec-lint problems discard the work and commit a failed record under `runs/<id>/interview/`. Limitation: interview usage is not counted in run-wide budget (sumRunUsage reads only iterations). `prompts.test` now uses `reverse` as the unwritten mode; Dockerfile copies `templates/`. Sign: gate acceptance on the harness's own lint, never the agent's claim; any runtime file read by src goes in the Dockerfile.
 - P2-6 done: `test/e2e-phase2.test.js` (1 new, 159 total pass, check clean): empty target -> `hodge interview` (scripted adapter writes spec, `tests/PLAN.md`, red test; spec-lint passes) -> plan.md added by the orchestrator (interview may not write it) -> `hodge run` with `requireTestPlan` goes green, clean tree, record committed. Test passed on first run (no harness change needed; it did not exist before). Phase 2 done; Phase 3 broken down into P3-1..P3-8. Sign: plan.md is authored outside interview; an e2e must add it between modes.
 - P3-1 done: `src/control.js` (`readControl`, `consumeSteer`), `runLoop` option `controlFile` (+ injectable `sleep`/`pollMs`) and `runStep` option `steer` (`buildPrompt(repo, mode, steer)` appends `## Steer note`), `test/control.test.js` (12 new, 171 total pass, check clean; tests failed first). Format `{paused?, stop?, steer?}`; read before each iteration: stop -> `{status:'stopped'}`, paused -> poll until resumed (stop wins), steer used for one iteration then removed (only if unchanged). Missing file = running; malformed file fails closed (stop). The file lives outside the target repo so the clean-tree gate is unaffected. Not wired to CLI yet (P3-2); stop is only seen between iterations (kill switch is P3-5). Sign: operator control inputs fail closed; control state stays out of the target working tree.
+- P3-2 done: `writeControl` in `src/control.js` (merge + atomic tmp/rename; refuses a malformed file so a fail-closed stop is never silently cleared), `hodge control --file <f> pause|resume|stop|steer <note...>` (prints `{ok}`, exit 2 on bad usage), `hodge run --control <file>` passes `controlFile` to `runLoop` (176 pass, check clean; 4 of the 6 new tests failed first, the bad-usage test passed already as unknown-command handling). Sign: operator tooling must never clear a fail-closed state implicitly.

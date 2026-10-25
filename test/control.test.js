@@ -170,3 +170,29 @@ test('without controlFile behaviour is unchanged and no file is created', async 
   assert.equal(res.steps.filter((x) => x.status === 'ok').length, 1);
   assert.equal(existsSync(join(dir, 'control.json')), false);
 });
+
+test('writeControl merges updates atomically and preserves other keys', async () => {
+  const { writeControl } = await import('../src/control.js');
+  const { mkdtempSync, readFileSync, existsSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const f = join(mkdtempSync(join(tmpdir(), 'hodge-wc-')), 'control.json');
+  assert.deepEqual(writeControl(f, { paused: true }), { ok: true });
+  assert.deepEqual(writeControl(f, { steer: 'focus' }), { ok: true });
+  assert.deepEqual(JSON.parse(readFileSync(f, 'utf8')), { paused: true, steer: 'focus' });
+  assert.deepEqual(writeControl(f, { paused: false }), { ok: true });
+  assert.deepEqual(JSON.parse(readFileSync(f, 'utf8')), { paused: false, steer: 'focus' });
+  assert.equal(existsSync(`${f}.tmp`), false);
+});
+
+test('writeControl refuses to overwrite a malformed control file', async () => {
+  const { writeControl } = await import('../src/control.js');
+  const { mkdtempSync, writeFileSync, readFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const f = join(mkdtempSync(join(tmpdir(), 'hodge-wc-')), 'control.json');
+  writeFileSync(f, '{nope');
+  const r = writeControl(f, { paused: false });
+  assert.equal(r.ok, false);
+  assert.equal(readFileSync(f, 'utf8'), '{nope');
+});

@@ -129,3 +129,48 @@ test('hodge step reports unknown adapter with exit 2', async () => {
   assert.equal(code, 2);
   assert.match(err.join(''), /unknown adapter 'nope'/);
 });
+
+test('hodge control writes pause/resume/steer/stop to the control file', async () => {
+  const { readFileSync } = await import('node:fs');
+  const f = join(mkdtempSync(join(tmpdir(), 'hodge-ctl-')), 'control.json');
+  const run = async (/** @type {string[]} */ ...a) => {
+    const o = /** @type {string[]} */ ([]);
+    const e = /** @type {string[]} */ ([]);
+    const code = await main(['control', '--file', f, ...a], { stdout: capture(o), stderr: capture(e) });
+    return { code, o: o.join(''), e: e.join('') };
+  };
+  assert.equal((await run('pause')).code, 0);
+  assert.deepEqual(JSON.parse(readFileSync(f, 'utf8')), { paused: true });
+  assert.equal((await run('steer', 'try', 'X')).code, 0);
+  assert.deepEqual(JSON.parse(readFileSync(f, 'utf8')), { paused: true, steer: 'try X' });
+  assert.equal((await run('resume')).code, 0);
+  assert.equal(JSON.parse(readFileSync(f, 'utf8')).paused, false);
+  const s = await run('stop');
+  assert.equal(s.code, 0);
+  assert.equal(JSON.parse(readFileSync(f, 'utf8')).stop, true);
+  assert.deepEqual(JSON.parse(s.o), { ok: true });
+});
+
+test('hodge control rejects bad usage', async () => {
+  const e = /** @type {string[]} */ ([]);
+  assert.equal(await main(['control', 'pause'], { stderr: capture(e) }), 2);
+  assert.equal(await main(['control', '--file', '/tmp/x.json', 'bogus'], { stderr: capture(e) }), 2);
+  assert.equal(await main(['control', '--file', '/tmp/x.json', 'steer'], { stderr: capture(e) }), 2);
+  assert.equal(await main(['control', '--file', '/tmp/x.json'], { stderr: capture(e) }), 2);
+});
+
+test('hodge run --control passes the control file so a stop is honoured', async () => {
+  const dir = makeRepo();
+  const f = join(mkdtempSync(join(tmpdir(), 'hodge-ctl-')), 'control.json');
+  writeFileSync(f, JSON.stringify({ stop: true }));
+  const cfgFile = join(dir, '..', `cfg-${Date.now()}.json`);
+  writeFileSync(cfgFile, JSON.stringify(cfg('fake')));
+  const o = /** @type {string[]} */ ([]);
+  const code = await main(['run', '--config', cfgFile, '--repo', dir, '--control', f], {
+    registry: { fake: () => createFakeAdapter({ exitStatus: 0, transcript: '', usage: { tokens: 0, cost: 0 }, writes: {} }) },
+    stdout: capture(o),
+    stderr: capture([]),
+  });
+  assert.equal(code, 1);
+  assert.equal(JSON.parse(o.join('')).status, 'stopped');
+});

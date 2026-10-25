@@ -55,3 +55,21 @@ export function consumeSteer(file, note) {
   writeFileSync(tmp, JSON.stringify(c));
   renameSync(tmp, file);
 }
+
+/**
+ * Merges `update` into the control file with an atomic write (tmp + rename).
+ * Refuses a malformed existing file: it is already a stop and must not be silently cleared.
+ * @param {string} file
+ * @param {{paused?: boolean, stop?: boolean, steer?: string}} update
+ * @returns {{ok: true} | {ok: false, reason: string}}
+ */
+export function writeControl(file, update) {
+  const cur = readControl(file);
+  if (!cur.ok) return cur;
+  /** @type {Record<string, unknown>} */
+  const base = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
+  const tmp = `${file}.tmp`;
+  writeFileSync(tmp, JSON.stringify({ ...base, ...update }));
+  renameSync(tmp, file);
+  return { ok: true };
+}
