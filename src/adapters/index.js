@@ -1,4 +1,5 @@
 import { createClaudeCodeAdapter } from './claude-code.js';
+import { createCodexAdapter } from './codex.js';
 import { createCopilotAdapter } from './copilot.js';
 
 /**
@@ -10,6 +11,7 @@ import { createCopilotAdapter } from './copilot.js';
 export const defaultRegistry = {
   copilot: ({ model }) => createCopilotAdapter({ model }),
   'claude-code': ({ model }) => createClaudeCodeAdapter({ model }),
+  codex: ({ model }) => createCodexAdapter({ model }),
 };
 
 /**

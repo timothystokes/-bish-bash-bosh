@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P0-6: Codex adapter (`src/adapters/codex.js`), via `adapterContract` with a fake-agent fixture, reusing `runProcessAgent`, registered in `defaultRegistry`.**
-Why: it is the next unblocked adapter and now cheap (shared process runner exists). Check the real CLI's output shape live first if installed. Also pending: live-verify the Claude Code parser (P0-5b) once `claude` is installed.
+**P0-7: generic OpenAI-compatible HTTP adapter (`src/adapters/openai-http.js`), via `adapterContract` with a local fake HTTP server, registered in `defaultRegistry`.**
+Why: last unblocked Phase 0 adapter; it is a different shape (HTTP, no process runner), so it exercises the adapter interface from a new angle. Pending live checks: Claude Code parser (P0-5b) and Codex parser (P0-6b) once those CLIs are installed.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -15,7 +15,8 @@ Why: it is the next unblocked adapter and now cheap (shared process runner exist
 | P0-4 | Adapter: Copilot CLI (non-interactive) | done | P0-3 |
 | P0-5 | Adapter: Claude Code | done | P0-3 |
 | P0-5b | Live-verify Claude Code output shape (`claude` not installed in P0-5 session) | todo | P0-5 |
-| P0-6 | Adapter: Codex | todo | P0-3 |
+| P0-6 | Adapter: Codex | done | P0-3 |
+| P0-6b | Live-verify Codex `exec --json` output shape (`codex` not installed in P0-6 session) | todo | P0-6 |
 | P0-7 | Adapter: generic OpenAI-compatible HTTP | todo | P0-3 |
 | P0-8 | Run-record format + writer (`specs/loop.md`) | done | P0-1 |
 
@@ -56,3 +57,4 @@ Phase 2 spec modes (interview, forward, spec-lint); Phase 3 control + TUI + secr
 - P1-7 done: `test/e2e-toy.test.js` (2 new, 96 total pass, check clean): toy target repo (spec, `tests/PLAN.md`, red test, open plan item) driven by the real `hodge run` CLI path + Copilot adapter + fake agent binary: goes red -> green in one step with a clean tree, committed record and `requireTestPlan` on; a green-from-start suite is gated. No harness code changes were needed. Learned: a nested `node --test` inherits `NODE_TEST_CONTEXT` from the outer runner and falsely reports green, so the test deletes it (harness itself unaffected in real use). Live Copilot and Docker build NOT done (split into P1-8). Sign: toy/e2e targets must run their suite standalone and avoid directory args to `node --test`.
 - P1-8 done: live Copilot run (`copilot -p ... --output-format json --allow-all --no-ask-user`) works through `createCopilotAdapter` (exit 0, changedFiles correct). Learned: real output has NO `assistant.usage` events; usage is cumulative in `session.usage_checkpoint` -> `data.accountingSnapshot.modelMetrics[model].usage.{inputTokens,outputTokens}`, plus a final `result` event with `usage.premiumRequests`. Parser now reads the last checkpoint (tokens = input+output, cache excluded; `assistant.usage` kept for the fake agent). Cost is 0 for Copilot (no USD figure, only premium requests/nanoAiu), so `maxCostUsd` is not enforced for it; token budget is. 97 tests pass, check clean (new test failed first). Docker build NOT done: daemon not running (split to P1-8b). Sign: verify event shapes against a live run before writing a parser; `timeout` is absent on macOS.
 - P0-5 done: `src/adapters/claude-code.js` (`createClaudeCodeAdapter`, `buildClaudeArgs`, `parseClaudeOutput`), fake `test/fixtures/fake-claude.js`, `test/claude-code-adapter.test.js` (10 new, 107 total pass, check clean; tests failed first); registered as `claude-code` in `defaultRegistry`. Extracted shared `src/adapters/process.js` (`runProcessAgent`: spawn, wall-clock kill, hash snapshot) and refactored the Copilot adapter onto it (its tests unchanged and green). Output shape (`claude -p --output-format json`: `result`, `total_cost_usd`, `usage.input_tokens/output_tokens`) is from documentation, NOT verified live: `claude` is not installed here (split to P0-5b). Sign: process adapters share `runProcessAgent`; only args/parsing are per-vendor.
+- P0-6 done: `src/adapters/codex.js` (`createCodexAdapter`, `buildCodexArgs`, `parseCodexOutput`), fake `test/fixtures/fake-codex.js`, `test/codex-adapter.test.js` (117 total pass, check clean; tests failed first); registered as `codex` in `defaultRegistry`, reuses `runProcessAgent`. Runs `codex exec --json --dangerously-bypass-approvals-and-sandbox [--model m] <prompt>`; transcript = `agent_message` items, tokens = sum of `turn.completed` input+output (cache excluded). Shape is from documentation, NOT verified live: `codex` not installed (split to P0-6b). Cost is read from an optional `usage.cost_usd` (real Codex reports none, so cost budget is not enforced for it; the contract test needs cost to round-trip). Sign: adapters built without the CLI installed must log an unverified-shape follow-up task.
