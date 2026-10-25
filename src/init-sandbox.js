@@ -10,7 +10,7 @@ import { checkRepoGate } from './repo-gate.js';
 import { validateConfig } from './config.js';
 
 const templates = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
-const SEEDS = ['toy', 'empty'];
+const SEEDS = ['toy', 'empty', 'objective'];
 const IGNORE = 'node_modules/\nruns/\n';
 
 /**
@@ -27,10 +27,13 @@ export function initSandbox(opts) {
   const config = join(dir, 'hodge.json');
   const cfg = {
     targetRepo: repo,
-    roles: { build: { adapter: opts.adapter, model: opts.model } },
+    roles: {
+      build: { adapter: opts.adapter, model: opts.model },
+      ...(seed === 'objective' ? { interview: { adapter: opts.adapter, model: opts.model } } : {}),
+    },
     budgets: { maxTokens: 200000, maxCostUsd: 2, maxWallClockSeconds: 600, maxIterations: 3 },
     allowedPaths: ['src/'],
-    requireTestPlan: seed === 'toy',
+    requireTestPlan: seed !== 'empty',
   };
   const valid = validateConfig(cfg);
   if (!valid.ok) return { ok: false, reason: `invalid config: ${valid.errors.join('; ')}` };
@@ -41,6 +44,7 @@ export function initSandbox(opts) {
   try {
     mkdirSync(repo, { recursive: true });
     if (seed === 'toy') copyTree(join(templates, 'toy'), repo);
+    else if (seed === 'objective') seedObjective(repo);
     else writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'target', private: true, type: 'module' }, null, 2) + '\n');
     writeFileSync(join(repo, '.gitignore'), IGNORE);
     writeFileSync(config, JSON.stringify(cfg, null, 2) + '\n');
@@ -66,4 +70,18 @@ function copyTree(from, to) {
     if (e.isDirectory()) copyTree(join(from, e.name), join(to, e.name));
     else copyFileSync(join(from, e.name), join(to, e.name));
   }
+}
+
+/**
+ * The objective kit (phases, interview protocol, readiness signals, brief, open questions) goes to
+ * `objective/`; the starter plan.md goes to the repo root. Nothing here is specific to a solution:
+ * the objective itself is gathered later by `hodge objective`.
+ * @param {string} repo
+ */
+function seedObjective(repo) {
+  const kit = join(templates, 'objective');
+  copyTree(kit, join(repo, 'objective'));
+  rmSync(join(repo, 'objective', 'plan.md'));
+  copyFileSync(join(kit, 'plan.md'), join(repo, 'plan.md'));
+  writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'target', private: true, type: 'module' }, null, 2) + '\n');
 }

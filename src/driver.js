@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { runStep } from './step.js';
 import { lintSpecs } from './spec-lint.js';
+import { checkReadiness, hasObjectiveKit } from './readiness.js';
 import { readControl, consumeSteer } from './control.js';
 
 /**
@@ -29,6 +30,10 @@ export function isPlanDone(plan) {
  */
 export async function runLoop(opts) {
   const { controlFile, pollMs = 1000, sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)), ...stepOpts } = opts;
+  if (hasObjectiveKit(stepOpts.repoDir)) {
+    const ready = checkReadiness(stepOpts.repoDir);
+    if (!ready.ready) return { status: 'gated', steps: [], reason: `objective not ready (run \`hodge ready\`): ${ready.gaps.join('; ')}` };
+  }
   if (stepOpts.requireTestPlan) {
     const lint = lintSpecs(stepOpts.repoDir);
     if (!lint.ok) return { status: 'gated', steps: [], reason: `spec-lint failed: ${lint.problems.join('; ')}` };

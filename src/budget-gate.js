@@ -8,15 +8,17 @@ import { join } from 'node:path';
 
 /**
  * Sum usage over a run's iteration records (`runs/<runId>/iterations/NNN/usage.json`)
- * plus its interview record (`runs/<runId>/interview/record.json`, not an iteration).
+ * plus its interview records (`runs/<runId>/interview[-N]/record.json`, one per conversation round, not iterations).
  * @param {string} repoDir
  * @param {string} runId
  * @returns {RunTotals}
  */
 export function sumRunUsage(repoDir, runId) {
   const totals = { tokens: 0, cost: 0, seconds: 0, iterations: 0 };
-  const interview = join(repoDir, 'runs', runId, 'interview', 'record.json');
-  if (existsSync(interview)) {
+  const runDir = join(repoDir, 'runs', runId);
+  for (const d of existsSync(runDir) ? readdirSync(runDir) : []) {
+    const interview = join(runDir, d, 'record.json');
+    if (!/^interview(-\d+)?$/.test(d) || !existsSync(interview)) continue;
     const u = JSON.parse(readFileSync(interview, 'utf8')).usage ?? {};
     totals.tokens += u.tokens ?? 0;
     totals.cost += u.cost ?? 0;

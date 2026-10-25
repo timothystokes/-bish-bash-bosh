@@ -7,14 +7,15 @@ import { checkBudgetGate } from './budget-gate.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { lintSpecs } from './spec-lint.js';
 import { loadModePrompt } from './prompts.js';
+import { checkReadiness, hasObjectiveKit } from './readiness.js';
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 
 /** Interview may only write specs and the tests that prove them. */
-const ALLOWED = ['specs/', 'tests/'];
+const ALLOWED = ['specs/', 'tests/', 'objective/'];
 
 /**
- * @typedef {{status: 'ok' | 'failed' | 'gated' | 'over-budget', sha: string | null, reason?: string}} InterviewResult
+ * @typedef {{status: 'ok' | 'incomplete' | 'failed' | 'gated' | 'over-budget', sha: string | null, reason?: string}} InterviewResult
  */
 
 /**
@@ -29,6 +30,7 @@ export function buildInterviewPrompt(repoDir, objective) {
     loadModePrompt('interview'),
     '## Objective',
     objective.trim(),
+    ...kitSections(repoDir),
     '## Existing specs',
     existing.length === 0 ? '(none)' : existing.map((f) => `- specs/${f}`).join('\n'),
     '## Spec template (templates/spec.md)',
@@ -36,6 +38,51 @@ export function buildInterviewPrompt(repoDir, objective) {
     '## Test-plan template (templates/tests-PLAN.md)',
     readFileSync(join(templatesDir, 'tests-PLAN.md'), 'utf8').trimEnd(),
   ].join('\n\n');
+}
+
+/**
+ * Broad until the first spec exists, then fine-grained.
+ * @param {string} repoDir
+ * @returns {'broad' | 'fine'}
+ */
+export function stageOf(repoDir) {
+  const specsDir = join(repoDir, 'specs');
+  return existsSync(specsDir) && readdirSync(specsDir).some((f) => f.endsWith('.md')) ? 'fine' : 'broad';
+}
+
+/**
+ * With an objective kit, the interview prompt also carries the protocol, the readiness signals,
+ * the brief, the open questions and the gaps still to close (so each round starts where the last stopped).
+ * @param {string} repoDir
+ * @returns {string[]}
+ */
+function kitSections(repoDir) {
+  if (!hasObjectiveKit(repoDir)) return [];
+  const read = (/** @type {string} */ f) => {
+    const p = join(repoDir, 'objective', f);
+    return existsSync(p) ? readFileSync(p, 'utf8').trimEnd() : '(missing)';
+  };
+  const { gaps } = checkReadiness(repoDir);
+  return [
+    '## objective/PHASES.md',
+    read('PHASES.md'),
+    '## objective/INTERVIEW.md',
+    read('INTERVIEW.md'),
+    '## objective/READINESS.md',
+    read('READINESS.md'),
+    '## objective/BRIEF.md',
+    read('BRIEF.md'),
+    '## objective/OPEN-QUESTIONS.md',
+    read('OPEN-QUESTIONS.md'),
+    '## objective/CONVERSATION.md (questions asked and the owner\'s answers so far)',
+    read('CONVERSATION.md'),
+    `## Stage: ${stageOf(repoDir)}`,
+    stageOf(repoDir) === 'broad'
+      ? 'No specs exist yet. Ask broad questions only (purpose, users, capabilities, scope, constraints, success). Write notes to objective/ and the next question to objective/QUESTION.md. Do not write specs/ or tests/ until the capabilities are clear.'
+      : 'Specs exist. Go deeper on the capability with the most gaps, down to individual requirements, failure paths and examples. Update specs/ and tests/ for everything already answered, then write the next question to objective/QUESTION.md.',
+    '## Readiness gaps (close these this round)',
+    gaps.length === 0 ? '(none: confirm and stop)' : gaps.map((g) => `- ${g}`).join('\n'),
+  ];
 }
 
 /**
@@ -53,11 +100,12 @@ const git = (dir, ...args) =>
  *   runId: string,
  *   adapter: import('./adapter.js').Adapter,
  *   objective: string,
+ *   round?: number,
  *   identity?: import('./repo-gate.js').HarnessIdentity,
  * }} opts
  * @returns {Promise<InterviewResult>}
  */
-export async function runInterview({ config, repoDir, runId, adapter, objective, identity }) {
+export async function runInterview({ config, repoDir, runId, adapter, objective, round = 1, identity }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
   const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets}} */ (config);
@@ -91,6 +139,7 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
   let status = 'ok';
   /** @type {string | undefined} */
   let reason;
+  const discoveryOnly = hasObjectiveKit(repoDir) && staged.length > 0 && staged.every((f) => f.startsWith('objective/'));
   const outside = staged.filter((f) => !ALLOWED.some((p) => f.startsWith(p)));
   if (result.exitStatus !== 0) {
     status = 'failed';
@@ -98,21 +147,32 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
   } else if (outside.length > 0) {
     status = 'failed';
     reason = `wrote outside specs/ and tests/: ${outside.join(', ')}`;
+  } else if (discoveryOnly) {
+    // Broad rounds only write notes and the next question; specs and their lint come later.
+    status = 'incomplete';
+    reason = 'discovery in progress: no specs written yet';
   } else {
     const lint = lintSpecs(repoDir);
     if (!lint.ok) {
       status = 'failed';
       reason = `spec-lint failed: ${lint.problems.join('; ')}`;
+    } else if (hasObjectiveKit(repoDir)) {
+      // A round that moved forward but is not ready yet is kept; the next round resumes from its gaps.
+      const ready = checkReadiness(repoDir);
+      if (!ready.ready) {
+        status = 'incomplete';
+        reason = `not ready: ${ready.gaps.join('; ')}`;
+      }
     }
   }
 
-  if (status !== 'ok') {
+  if (status === 'failed') {
     // The tree was clean at start, so this discards only the agent's work (kept in diff).
     git(repoDir, 'reset', '-q', '--hard', 'HEAD');
     git(repoDir, 'clean', '-fdq');
   }
 
-  const dir = join(repoDir, 'runs', runId, 'interview');
+  const dir = join(repoDir, 'runs', runId, round === 1 ? 'interview' : `interview-${round}`);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'prompt.md'), prompt);
   writeFileSync(join(dir, 'transcript.txt'), result.transcript);
@@ -122,7 +182,7 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
     `${JSON.stringify({ status, reason, usage: { ...result.usage, seconds }, changedFiles: result.changedFiles }, null, 2)}\n`,
   );
   git(repoDir, 'add', '-A');
-  git(repoDir, 'commit', '-q', '-m', `hodge interview ${runId}: ${status}`);
+  git(repoDir, 'commit', '-q', '--allow-empty', '-m', `hodge interview ${runId}: ${status}`);
 
   return { status, sha: git(repoDir, 'rev-parse', 'HEAD').trim(), ...(reason ? { reason } : {}) };
 }
