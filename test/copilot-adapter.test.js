@@ -40,6 +40,18 @@ test('parseCopilotOutput sums usage, joins messages, tolerates junk lines', () =
   assert.match(p.transcript, /hi/);
 });
 
+test('parseCopilotOutput reads the real session.usage_checkpoint shape (last checkpoint wins)', () => {
+  const cp = (/** @type {number} */ i, /** @type {number} */ o) =>
+    JSON.stringify({
+      type: 'session.usage_checkpoint',
+      data: { accountingSnapshot: { modelMetrics: { m1: { usage: { inputTokens: i, outputTokens: o, cacheReadTokens: 999 } }, m2: { usage: { inputTokens: 1, outputTokens: 2 } } } } },
+    });
+  const out = [cp(10, 1), JSON.stringify({ type: 'assistant.message', data: { content: 'Done.' } }), cp(51531, 90)].join('\n');
+  const p = parseCopilotOutput(out);
+  assert.deepEqual(p.usage, { tokens: 51531 + 90 + 3, cost: 0 });
+  assert.match(p.transcript, /Done\./);
+});
+
 test('wall-clock limit kills the agent and reports non-zero exit', async () => {
   const cwd = mkdtempSync(join(tmpdir(), 'hodge-cop-'));
   try {

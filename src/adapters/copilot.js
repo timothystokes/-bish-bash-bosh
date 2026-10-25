@@ -52,6 +52,8 @@ export function parseCopilotOutput(stdout) {
   const parts = [];
   let tokens = 0;
   let cost = 0;
+  /** Live CLI output carries cumulative usage in session.usage_checkpoint; the last one wins. */
+  let checkpointTokens = 0;
   for (const line of stdout.split('\n')) {
     if (!line.trim()) continue;
     let ev;
@@ -67,8 +69,17 @@ export function parseCopilotOutput(stdout) {
       for (const k of ['inputTokens', 'outputTokens']) if (Number.isFinite(d[k]) && d[k] > 0) tokens += d[k];
       if (Number.isFinite(d.cost) && d.cost > 0) cost += d.cost;
     }
+    if (ev?.type === 'session.usage_checkpoint') {
+      const metrics = Object.values(d.accountingSnapshot?.modelMetrics ?? {});
+      let t = 0;
+      for (const m of metrics) {
+        const u = /** @type {any} */ (m)?.usage ?? {};
+        for (const k of ['inputTokens', 'outputTokens']) if (Number.isFinite(u[k]) && u[k] > 0) t += u[k];
+      }
+      checkpointTokens = t;
+    }
   }
-  return { transcript: parts.join('\n'), usage: { tokens, cost } };
+  return { transcript: parts.join('\n'), usage: { tokens: tokens + checkpointTokens, cost } };
 }
 
 /**

@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P1-8: live smoke of the Copilot adapter on the toy target (and build the Dockerfile where a Docker daemon exists).**
-Why: the scripted end-to-end run is green (P1-7), so the only unproven assumptions left are real-agent ones: Copilot `--output-format json` usage parsing (`assistant.usage`) and the Dockerfile build. Needs an authenticated `copilot` CLI; if unavailable, record that and move to Phase 2 breakdown (P0-5..7 adapters are also unblocked).
+**P0-5: Claude Code adapter (`src/adapters/claude-code.js`), via `adapterContract` with a fake-agent fixture, registered in `defaultRegistry`.**
+Why: Phase 1 is functionally complete (only the Docker image build remains, blocked on a daemon: P1-8b); a second real adapter proves the interface is vendor-neutral and is unblocked. Check the real CLI's JSON output shape live first (lesson from P1-8).
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -29,7 +29,8 @@ Why: the scripted end-to-end run is green (P1-7), so the only unproven assumptio
 | P1-5 | Budget gate (tokens/cost/time/iterations) | done | P1-1 |
 | P1-6 | Local driver (`hodge run`) + Dockerfile for per-run container | done | P1-1 |
 | P1-7 | Toy objective end-to-end unattended, red to green (scripted adapter) | done | P1-2..P1-6 |
-| P1-8 | Live Copilot smoke on the toy target; build Dockerfile | todo | P1-7 |
+| P1-8 | Live Copilot smoke; fix usage parsing | done | P1-7 |
+| P1-8b | Build the Dockerfile where a Docker daemon runs (none in the last session) | todo | P1-7 |
 
 ## Later phases (not yet broken down)
 Phase 2 spec modes (interview, forward, spec-lint); Phase 3 control + TUI + secret-scanning proxy; Phase 4 reverse/brownfield/harden/clean-room; Phase 5 AWS (CDK, Step Functions driver, Fargate Spot). See `docs/PLAN.md`. Break each down into a table like the above when the previous phase is `done`.
@@ -52,3 +53,4 @@ Phase 2 spec modes (interview, forward, spec-lint); Phase 3 control + TUI + secr
 - P1-3 done: `src/test-plan-gate.js` (`checkTestPlanGate`), `test/test-plan-gate.test.js` (7 new, 86 total pass, check clean; tests failed first). Needs `tests/PLAN.md` where each line names a `specs/*.md` and `tests/*` path; every target spec must be mapped, mapped tests must exist, and before iteration 1 of a run the suite must be red. `runStep` opt-in `requireTestPlan` returns `gated` (nothing written) on failure; records a `test-plan` gate. Not yet wired to CLI/config (do in P1-6). Sign: red-first is checked by the harness running the suite, never by trusting agent claims.
 - P1-6 done: `src/driver.js` (`runLoop`, `isPlanDone`), `hodge run` in `src/cli.js` (same flags as step; JSON `{status: done|over-budget|failed|gated, steps, reason?}`; exit 0 only on done), optional config key `requireTestPlan` (schema) now honoured by both `step` and `run`, `Dockerfile` + `.dockerignore`. 95 tests pass, check clean (tests failed first). Loop stops on the first non-ok step (no blind retries); the terminating non-ok step is included in `steps`. Done = target `plan.md` has >=1 checkbox and none unchecked. Moved `ajv` to `dependencies` (src needs it at runtime; verified `npm ci --omit=dev` + `hodge --help`). Dockerfile NOT built: no Docker daemon in this session. Sign: validate prod-only installs when adding runtime imports.
 - P1-7 done: `test/e2e-toy.test.js` (2 new, 96 total pass, check clean): toy target repo (spec, `tests/PLAN.md`, red test, open plan item) driven by the real `hodge run` CLI path + Copilot adapter + fake agent binary: goes red -> green in one step with a clean tree, committed record and `requireTestPlan` on; a green-from-start suite is gated. No harness code changes were needed. Learned: a nested `node --test` inherits `NODE_TEST_CONTEXT` from the outer runner and falsely reports green, so the test deletes it (harness itself unaffected in real use). Live Copilot and Docker build NOT done (split into P1-8). Sign: toy/e2e targets must run their suite standalone and avoid directory args to `node --test`.
+- P1-8 done: live Copilot run (`copilot -p ... --output-format json --allow-all --no-ask-user`) works through `createCopilotAdapter` (exit 0, changedFiles correct). Learned: real output has NO `assistant.usage` events; usage is cumulative in `session.usage_checkpoint` -> `data.accountingSnapshot.modelMetrics[model].usage.{inputTokens,outputTokens}`, plus a final `result` event with `usage.premiumRequests`. Parser now reads the last checkpoint (tokens = input+output, cache excluded; `assistant.usage` kept for the fake agent). Cost is 0 for Copilot (no USD figure, only premium requests/nanoAiu), so `maxCostUsd` is not enforced for it; token budget is. 97 tests pass, check clean (new test failed first). Docker build NOT done: daemon not running (split to P1-8b). Sign: verify event shapes against a live run before writing a parser; `timeout` is absent on macOS.
