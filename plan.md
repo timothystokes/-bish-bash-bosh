@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P1-8c (small): silence the harmless `fatal: not a git repository` stderr line from the identity probe of `/opt/hodgepodge` when `hodge step` runs in the container; test first.**
-Why: all unblocked buildable tasks are done; this is the only known open harness defect (noted in P1-8b). Still pending and blocked: P5-4b/P5-6 need an AWS account (no `aws` CLI here); P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed). Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`) and a mounted fixture file lacks the exec bit, so wrap it in a `sh` script. Keep infra logic pure with injected clients; pointer shape is the contract in `specs/cloud-driver.md`.
+**P0-5b (live-verify Claude Code output shape) once `claude` is installed; otherwise P0-6b (Codex) or P5-4b/P5-6 once an AWS account and `aws` CLI exist. No unblocked buildable task remains: first check which CLI/credential is available, and if none, ask the owner to provide one.**
+Why: P1-8c is done; every remaining task needs an external CLI or account the harness cannot supply. Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`) and a mounted fixture file lacks the exec bit, so wrap it in a `sh` script. Keep infra logic pure with injected clients; pointer shape is the contract in `specs/cloud-driver.md`.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -33,6 +33,7 @@ Why: all unblocked buildable tasks are done; this is the only known open harness
 | P1-7 | Toy objective end-to-end unattended, red to green (scripted adapter) | done | P1-2..P1-6 |
 | P1-8 | Live Copilot smoke; fix usage parsing | done | P1-7 |
 | P1-8b | Build the Dockerfile where a Docker daemon runs (none in the last session) | done | P1-7 |
+| P1-8c | Silence `fatal: not a git repository` stderr from the harness identity probe | done | P1-8b |
 
 ## Phase 2: Spec modes
 | ID | Task | Status | Depends on |
@@ -130,3 +131,5 @@ Later phases: none yet. See `docs/PLAN.md`.
 - P5-5b done: `src/cloud-clients.js` (`createAwsCliS3Client`, `createGhPrOpener`, `defaultRun`; injectable `run`), `hodge sync --bucket --run-id [--repo]` and `hodge promote --run-id --head --base --bucket [--sha] [--repo]` in `src/cli.js` (`deps.exec` injected in tests), `test/cloud-clients.test.js` (8 new, 287 total pass, check clean; failed first on missing module). Used the `aws` CLI (sha256 in object metadata) instead of adding an SDK dependency. Live S3/PR use still needs AWS + `gh` auth (P5-6). Sign: shell-outs go through one injectable `run` so CLI paths test offline.
 - P1-8b done: started `colima`, `docker build -t hodgepodge:dev .` succeeds; in-container smoke `hodge step` (toy repo mounted at `/work`, config at `/config`, fake agent as `copilot`) goes red -> green with committed `ok` record (exit 0). Learned: colima only mounts `$HOME` (a `/tmp` bind mount showed an empty `/config`); a bind-mounted non-executable fixture gives `spawn copilot EACCES`, so use an `sh` wrapper; a harmless `fatal: not a git repository` line appears on stderr in the container (identity probe of `/opt/hodgepodge`, not fatal; worth silencing later). No harness code changes. Unblocks P3-5. Sign: verify daemon with `docker info`, start with `colima start`.
 - P3-5 done: `stopContainer({docker, name, controlFile?, graceSec?})` and `dockerRunner(bin)` in `src/kill-switch.js`, 5 new tests in `test/kill-switch.test.js` (292 total pass, check clean; failed first on missing exports). Sets `stop` in control.json first, then `docker stop --time N`; vanished container returns `{stopped:false}`, other failures throw, option-like names rejected. Live check via colima: started `alpine sleep` container, stop succeeded, control.json had `{"stop":true}`, second call reported it gone. Not wired to a CLI command yet. Sign: kill switches always write the control stop before terminating anything.
+
+- P1-8c done: `harnessIdentity(rootDir?)` now pipes git stderr to ignore (optional root override for tests); new test in `test/repo-gate.test.js` spawns a child on a non-git dir and asserts empty stderr (failed first; 293 total pass, check clean). Sign: assert on child-process stderr, since inherited fds bypass in-process capture.

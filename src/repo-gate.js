@@ -35,18 +35,22 @@ function real(p) {
 
 /**
  * Identify the hodgepodge checkout this code runs from.
+ * @param {string} [rootDir] override the checkout root (tests)
  * @returns {HarnessIdentity}
  */
-export function harnessIdentity() {
-  const root = real(join(dirname(fileURLToPath(import.meta.url)), '..'));
+export function harnessIdentity(rootDir) {
+  const root = real(rootDir ?? join(dirname(fileURLToPath(import.meta.url)), '..'));
   /** @type {string[]} */
   let remotes = [];
   try {
-    const names = execFileSync('git', ['-C', root, 'remote'], { encoding: 'utf8' })
+    const names = execFileSync('git', ['-C', root, 'remote'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
       .split('\n')
       .filter(Boolean);
     remotes = names.map((n) =>
-      execFileSync('git', ['-C', root, 'remote', 'get-url', n], { encoding: 'utf8' }).trim(),
+      execFileSync('git', ['-C', root, 'remote', 'get-url', n], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim(),
     );
   } catch {
     // not a git checkout: path comparison still applies

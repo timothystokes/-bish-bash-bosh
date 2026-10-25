@@ -57,3 +57,15 @@ test('allows an unrelated repo url and path', () => {
 test('refuses empty target', () => {
   assert.equal(checkRepoGate('', self).ok, false);
 });
+
+test('harnessIdentity on a non-git root is silent on stderr', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { mkdtempSync: mk } = await import('node:fs');
+  const dir = mk(join(tmpdir(), 'hodge-nogit-'));
+  const gate = new URL('../src/repo-gate.js', import.meta.url).href;
+  const code = `import(${JSON.stringify(gate)}).then(m => console.log(JSON.stringify(m.harnessIdentity(${JSON.stringify(dir)}))))`;
+  const r = spawnSync(process.execPath, ['-e', code], { encoding: 'utf8' });
+  assert.equal(r.status, 0);
+  assert.equal(r.stderr, '');
+  assert.deepEqual(JSON.parse(r.stdout).remotes, []);
+});
