@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P1-10: derived Docker image with agent CLIs (`copilot`, `claude`, `codex`) installed, smoke-tested in the container (`--version` per CLI; tests first, e.g. a Dockerfile.agents content test plus a live `docker run` smoke). Needs no credential: P0-5b and P0-6b only cover success-case output shape and stay open until `ANTHROPIC_API_KEY`/`claude login` and `OPENAI_API_KEY`/`codex login` exist. Docker (local) is the main target; Phase 5 (AWS) is a future goal, do not pick P5-* tasks.**
-Why: it is the last unblocked Docker task and makes the container usable with real agents. Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`) and a mounted fixture file lacks the exec bit, so wrap it in a `sh` script. Keep infra logic pure with injected clients.
+**Owner-blocked: P0-5b (`ANTHROPIC_API_KEY`/`claude login`) and P0-6b (`OPENAI_API_KEY`/`codex login`) need credentials; no unblocked Docker task remains. Next session: check whether the owner supplied a credential (`claude`/`codex` login or env key) and, if so, live-verify the success-case output shape of that adapter (P0-5b or P0-6b). If none, stop and log. Phase 5 (AWS) is a future goal, do not pick P5-* tasks.**
+Why: P1-10 was the last unblocked Docker task. Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents` (`docker build -f Dockerfile.agents -t hodgepodge-agents:dev .` after the base build).
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -72,7 +72,7 @@ Why: it is the last unblocked Docker task and makes the container usable with re
 |---|---|---|---|
 | P3-5b | Wire `stopContainer` to a CLI command (`hodge kill`) so the Docker run can be stopped from the observer | done | P3-5 |
 | P1-9 | Silence the harmless `fatal: not a git repository` stderr line in the container (identity probe of `/opt/hodgepodge`) | done (= P1-8c) | P1-8b |
-| P1-10 | Derived Docker image with agent CLIs (`copilot`, `claude`, `codex`) installed, smoke-tested in the container | todo | P1-8b |
+| P1-10 | Derived Docker image with agent CLIs (`copilot`, `claude`, `codex`) installed, smoke-tested in the container | done | P1-8b |
 
 ## Phase 5: Cloud (AWS) — FUTURE GOAL, not the current focus
 The main goal for now is the Docker-based local implementation. Do not pick P5-* tasks as the next best action until the owner promotes this phase.
@@ -175,3 +175,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (P0-5b): installed `claude` 2.1.310 via npm. Not logged in; live `-p --output-format json` returns a single `type:result` object (`result`, `usage`, `total_cost_usd`, `is_error`) with exit 1, which `parseClaudeOutput` handles; added a test for it. Success-case shape still needs `ANTHROPIC_API_KEY` or `claude login`. Sign: `is_error:true` results exit non-zero; keep surfacing `result` as the transcript. Next: P3-5b.
 - P3-5b done: `hodge kill --container <name> [--control <f>] [--grace <sec>]` in `src/cli.js` (injectable `deps.docker`), `test/cli-kill.test.js` (5 new, 299 total pass, check clean). Prints `{stopped, name}`; exit 0 for stopped or already gone, 1 on docker failure, 2 on bad usage (missing/option-like name, non-numeric grace). Control stop is written before `docker stop` (via `stopContainer`). Not exercised live against Docker this session (unit-tested with fake runner; live check was done for P3-5). Sign: CLI wrappers around infra take an injected client so tests never need the daemon. Next: P1-9.
 - Session (P1-9): found already done as P1-8c (commit aec7a7c); rebuilt `hodgepodge:dev` and confirmed `harnessIdentity()` in the container prints nothing to stderr (rc 0). Marked P1-9 done, dropped the P0-5b/P0-6b dependency from P1-10 (installing CLIs and `--version` smoke need no credential). Sign: grep the plan for the symptom before starting a task; duplicates happen after re-plans. Next: P1-10.
+- P1-10 done: `Dockerfile.agents` (ARG BASE_IMAGE=hodgepodge:dev; pinned `@github/copilot` 1.0.103, `@anthropic-ai/claude-code` 2.1.310, `@openai/codex` 0.164.0), `test/dockerfile-agents.test.js` (content + pin tests, plus live build and `--version` per CLI, skipped when Docker/base image absent; failed first, 302 total pass, check clean). Live smoke confirmed in container. Sign: pin agent CLI versions in the image; bump deliberately. Next: owner-blocked credentials (P0-5b/P0-6b).

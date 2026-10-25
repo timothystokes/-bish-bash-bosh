@@ -1,0 +1,6 @@
+# Derived image: the base hodgepodge image plus the agent CLIs the config's adapters call.
+# Build the base first: docker build -t hodgepodge:dev .
+ARG BASE_IMAGE=hodgepodge:dev
+FROM ${BASE_IMAGE}
+RUN npm install -g @github/copilot@1.0.103 @anthropic-ai/claude-code@2.1.310 @openai/codex@0.164.0 \
+    && npm cache clean --force
