@@ -3,13 +3,13 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P0-1: Scaffold the repo (package.json, `jsconfig`/`tsconfig` for `checkJs`, `node:test` wiring, `bin/hodge` stub that prints help) with a passing smoke test.**
-Why first: every later task needs a runnable test and type-check wheel (back-pressure) before any feature work.
+**P0-2: Config schema (JSON Schema): roles -> adapter + model, budgets, target repo, allowed paths (`specs/adapters.md`, `specs/repos.md`), with tests first.**
+Why: P0-3 (adapter interface), P1-2 (repo gate) and everything downstream depend on the config shape.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
 |---|---|---|---|
-| P0-1 | Scaffold repo + test/type-check wheel (`npm test`, `npm run check`) | todo | |
+| P0-1 | Scaffold repo + test/type-check wheel (`npm test`, `npm run check`) | done | |
 | P0-2 | Config schema (JSON Schema): roles -> adapter + model, budgets, target repo, allowed paths | todo | P0-1 |
 | P0-3 | Adapter interface + contract test suite (`specs/adapters.md`) | todo | P0-2 |
 | P0-4 | Adapter: Copilot CLI (non-interactive) | todo | P0-3 |
@@ -37,3 +37,4 @@ Phase 2 spec modes (interview, forward, spec-lint); Phase 3 control + TUI + secr
 
 ## Session log
 - Initial planning session: requirements and plan captured; no code yet.
+- P0-1 done: package.json, tsconfig (checkJs), `bin/hodge` shim -> `src/cli.js`, smoke tests (3 pass, `npm run check` clean). Learned: Node 26 `node --test test/` treats the dir as a module; use the glob `test/**/*.test.js`. Added .gitignore (node_modules). Sign: keep bin/hodge a thin shim so logic stays type-checked in src/.
