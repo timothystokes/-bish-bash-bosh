@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P3-5b: wire `stopContainer` to a CLI command (`hodge kill`) so the Docker run can be stopped from the observer (tests first). Then P1-9, then P1-10. P0-5b and P0-6b stay open but only for the success-case shape: they need a credential (`ANTHROPIC_API_KEY` or `claude login`; for Codex `OPENAI_API_KEY` or `codex login`). Docker (local) is the main target; Phase 5 (AWS) is a future goal, do not pick P5-* tasks.**
-Why: P3-5b needs no credential and makes the Docker run stoppable. Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`) and a mounted fixture file lacks the exec bit, so wrap it in a `sh` script. Keep infra logic pure with injected clients; pointer shape is the contract in `specs/cloud-driver.md`.
+**P1-9: silence the harmless `fatal: not a git repository` stderr line in the container (identity probe of `/opt/hodgepodge`; tests first). Then P1-10. P0-5b and P0-6b stay open but only for the success-case shape: they need a credential (`ANTHROPIC_API_KEY` or `claude login`; for Codex `OPENAI_API_KEY` or `codex login`). Docker (local) is the main target; Phase 5 (AWS) is a future goal, do not pick P5-* tasks.**
+Why: P1-9 needs no credential and removes noise from every container run. Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`) and a mounted fixture file lacks the exec bit, so wrap it in a `sh` script. Keep infra logic pure with injected clients; pointer shape is the contract in `specs/cloud-driver.md`.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -70,7 +70,7 @@ Why: P3-5b needs no credential and makes the Docker run stoppable. Sign: Docker 
 ## Docker follow-ups (current focus)
 | ID | Task | Status | Depends on |
 |---|---|---|---|
-| P3-5b | Wire `stopContainer` to a CLI command (`hodge kill`) so the Docker run can be stopped from the observer | todo | P3-5 |
+| P3-5b | Wire `stopContainer` to a CLI command (`hodge kill`) so the Docker run can be stopped from the observer | done | P3-5 |
 | P1-9 | Silence the harmless `fatal: not a git repository` stderr line in the container (identity probe of `/opt/hodgepodge`) | todo | P1-8b |
 | P1-10 | Derived Docker image with agent CLIs (`copilot`, `claude`, `codex`) installed, smoke-tested in the container | todo | P1-8b, P0-5b, P0-6b |
 
@@ -173,3 +173,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (blocked check, twenty-ninth): `claude`, `codex`, `aws` still not on PATH and no AWS credentials; only `gh` and `copilot` present. No code changes. Next best action unchanged; awaits the owner installing a CLI or providing AWS credentials. Sign: don't retry until the owner reports a tool installed.
 - Session (re-plan): AWS/Phase 5 deferred as a future goal; Docker is the main goal. Added Docker follow-ups P3-5b, P1-9, P1-10; next best action is P0-5b (install `claude` and verify). Sign: missing tools are never a blocker, install them; only missing credentials block.
 - Session (P0-5b): installed `claude` 2.1.310 via npm. Not logged in; live `-p --output-format json` returns a single `type:result` object (`result`, `usage`, `total_cost_usd`, `is_error`) with exit 1, which `parseClaudeOutput` handles; added a test for it. Success-case shape still needs `ANTHROPIC_API_KEY` or `claude login`. Sign: `is_error:true` results exit non-zero; keep surfacing `result` as the transcript. Next: P3-5b.
+- P3-5b done: `hodge kill --container <name> [--control <f>] [--grace <sec>]` in `src/cli.js` (injectable `deps.docker`), `test/cli-kill.test.js` (5 new, 299 total pass, check clean). Prints `{stopped, name}`; exit 0 for stopped or already gone, 1 on docker failure, 2 on bad usage (missing/option-like name, non-numeric grace). Control stop is written before `docker stop` (via `stopContainer`). Not exercised live against Docker this session (unit-tested with fake runner; live check was done for P3-5). Sign: CLI wrappers around infra take an injected client so tests never need the daemon. Next: P1-9.

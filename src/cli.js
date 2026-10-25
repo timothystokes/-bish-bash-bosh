@@ -11,6 +11,7 @@ import { exportBundle } from './clean-room.js';
 import { createLocalStatusSource, readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
 import { runTui } from './tui.js';
+import { stopContainer, dockerRunner } from './kill-switch.js';
 import { createSecretProxy } from './secret-proxy.js';
 import { syncArtifacts, requestPromotion } from './artifacts.js';
 import { createAwsCliS3Client, createGhPrOpener, defaultRun } from './cloud-clients.js';
@@ -33,6 +34,7 @@ export function helpText() {
     '  hodge sync --bucket <name> --run-id <id> [--repo <dir>]',
     '  hodge promote --run-id <id> --head <branch> --base <branch> --bucket <name> [--sha <sha>] [--repo <dir>]',
     '  hodge spec-lint [--repo <dir>]',
+    '  hodge kill --container <name> [--control <control.json>] [--grace <sec>]',
     '  hodge control --file <control.json> pause|resume|stop|steer <note...>',
     '',
     'Commands:',
@@ -53,6 +55,7 @@ export function helpText() {
     '         exit 0 only when clean',
     '  sync   copy runs/<id>/** to S3 (idempotent, needs the `aws` CLI); prints JSON {uploaded, skipped}',
     '  promote  open a promotion-review PR from --head to --base with the commit and artifacts URI (needs `gh`); never merges; prints JSON {url}',
+    '  kill   stop the run container: sets stop in --control first (so no new iteration starts), then `docker stop`; prints JSON {stopped, name};\n         exit 0 when stopped or already gone, 1 on docker failure',
     '  control  write pause/resume/stop/steer to a control file read by `hodge run --control`; prints JSON {ok}',
     '',
   ].join('\n');
@@ -96,6 +99,7 @@ export function parseStepArgs(args, opts = {}) {
  *   stdout?: (s: string) => void,
  *   stderr?: (s: string) => void,
  *   exec?: import('./cloud-clients.js').Run,
+ *   docker?: import('./kill-switch.js').DockerRunner,
  * }} CliDeps
  */
 
@@ -249,6 +253,45 @@ export async function main(argv, deps = {}) {
     await stopped;
     await proxy.close();
     return 0;
+  }
+  if (cmd === 'kill') {
+    const rest = argv.slice(1);
+    /** @type {Record<string, string | undefined>} */
+    const v = {};
+    for (let i = 0; i < rest.length; i += 2) {
+      const val = rest[i + 1];
+      if (!['--container', '--control', '--grace'].includes(rest[i])) {
+        err(`hodge kill: unknown argument '${rest[i]}'\n`);
+        return 2;
+      }
+      if (val === undefined || val.startsWith('--')) {
+        err(`hodge kill: ${rest[i]} requires a value\n`);
+        return 2;
+      }
+      v[rest[i]] = val;
+    }
+    const name = v['--container'];
+    if (!name || name.startsWith('-')) {
+      err('hodge kill: --container <name> is required (a name, not an option)\n');
+      return 2;
+    }
+    if (v['--grace'] !== undefined && !/^\d+$/.test(v['--grace'])) {
+      err('hodge kill: --grace must be a whole number of seconds\n');
+      return 2;
+    }
+    try {
+      const res = await stopContainer({
+        docker: deps.docker ?? dockerRunner(),
+        name,
+        ...(v['--control'] ? { controlFile: resolve(v['--control']) } : {}),
+        ...(v['--grace'] !== undefined ? { graceSec: Number(v['--grace']) } : {}),
+      });
+      out(`${JSON.stringify(res)}\n`);
+      return 0;
+    } catch (e) {
+      err(`hodge kill: ${/** @type {Error} */ (e).message}\n`);
+      return 1;
+    }
   }
   if (cmd === 'control') {
     const rest = argv.slice(1);
