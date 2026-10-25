@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P4-3: Test-hardening mode: `prompts/harden.md` + coverage/mutation gate (command injectable).**
-Why: P4-2 is done; P4-3 is the next unblocked Phase 4 task (P4-4 clean-room also unblocked, but hardening gate is smaller). Still pending: P1-8b (Docker daemon not running) which blocks P3-5; P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed). Note: `MODES` names it `test-hardening`, so the prompt file must be `prompts/test-hardening.md` (loadModePrompt maps mode to filename); update the task wording accordingly.
+**P4-4: Clean-room mode: builder repo gets specs + tests only, never the source (context firewall, tested).**
+Why: P4-3 is done; P4-4 is the next unblocked Phase 4 task and P4-5 (exit round trip) depends on it. Still pending: P1-8b (Docker daemon not running) which blocks P3-5; P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed). Sign: reverse/interview/clean-room steps now share a shape; extract a common helper if P4-4 repeats it.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -62,7 +62,7 @@ Why: P4-2 is done; P4-3 is the next unblocked Phase 4 task (P4-4 clean-room also
 |---|---|---|---|
 | P4-1 | Reverse mode: `prompts/reverse.md` + `hodge reverse` (writes only specs/ and tests/, spec-lint + green characterization tests required) | done | P2-4 |
 | P4-2 | Brownfield mode: `prompts/brownfield.md`; refuses to run without specs (points at reverse) | done | P4-1 |
-| P4-3 | Test-hardening mode: `prompts/harden.md` + coverage/mutation gate (command injectable) | todo | P1-4 |
+| P4-3 | Test-hardening mode: `prompts/test-hardening.md` + coverage/mutation gate (command injectable via config `hardenCommand`) | done | P1-4 |
 | P4-4 | Clean-room mode: builder repo gets specs + tests only, never the source (context firewall, tested) | todo | P2-3, P4-1 |
 | P4-5 | Phase 4 exit: round trip on a small project: code -> specs -> clean-room rebuild -> conformance suite passes (scripted adapter) | todo | P4-1..P4-4 |
 
@@ -108,3 +108,4 @@ Phase 5 AWS (CDK, Step Functions driver, Fargate Spot). See `docs/PLAN.md`. Brea
 - P3-8 done: `test/e2e-phase3.test.js` (2 new, 206 total pass, check clean; new file so it failed first by not existing; one test-authoring slip fixed: scripted writes must stay inside `allowedPaths`). Test 1: `hodge control pause` + `steer` before `hodge run --control`, no iteration while paused, `resume` starts it, steer appears in prompt 1 only and is consumed, `hodge control stop` issued mid-iteration 2 ends the run `stopped` (exit 1) with a clean tree. Test 2: real `bin/hodge proxy` subprocess redacts an AWS key before upstream, audit log has no secret value, meter records 42 tokens, SIGTERM exits 0. Container kill-switch (P3-5) not asserted (no Docker daemon). Phase 3 done except P3-5; Phase 4 broken down into P4-1..P4-5. Sign: e2e tests drive control through the CLI (`main`), and subprocess only where signals/ports matter.
 - P4-1 done: `prompts/reverse.md`, `src/reverse.js` (`runReverse`, `buildReversePrompt`), `hodge reverse` in `src/cli.js`, `test/reverse.test.js` (8 new, 214 total pass, check clean; failed first on missing module). Accepts only if agent exit 0, only specs/ + tests/ changed, spec-lint passes, and injectable test command is green; else hard-reset. `test/prompts.test.js` now uses `brownfield` as the unwritten-mode example. Sign: the reverse/interview steps share a shape; if P4-3/P4-4 add a third, extract a common helper.
 - P4-2 done: `prompts/brownfield.md`, `src/brownfield-gate.js` (`checkBrownfieldGate`), wired into `runStep` so `step` and `run` are gated pre-agent in `mode: brownfield` without specs (message points at `hodge reverse`); `test/brownfield.test.js` (6 new, 220 total pass, check clean; failed first on missing module). `test/prompts.test.js` unwritten-mode example is now `test-hardening`. Learned: `allowedPaths` entries are prefixes like `src/`. Sign: when P4-3 lands, move its example in prompts.test.js to `clean-room`; prompt filename equals the mode name.
+- P4-3 done: `prompts/test-hardening.md`, `src/hardening-gate.js` (`checkHardeningGate`), config key `hardenCommand`, wired into `runStep` (gated pre-agent without a command; `tests-only` scope gate; `hardening` gate after tests/types), `test/hardening.test.js` (8 new, 228 total pass, check clean; failed first on missing module). `test/prompts.test.js` unwritten-mode example is now `clean-room`. Prompt file is `test-hardening.md` (filename = mode name). Sign: gate commands are config-injected arrays, never hard-coded tools.

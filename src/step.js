@@ -9,6 +9,7 @@ import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { writeIterationRecord } from './run-record.js';
 import { loadModePrompt } from './prompts.js';
 import { checkBrownfieldGate } from './brownfield-gate.js';
+import { checkHardeningGate } from './hardening-gate.js';
 
 /**
  * @typedef {import('./adapter.js').Adapter} Adapter
@@ -78,7 +79,7 @@ function nextIteration(dir, /** @type {string} */ runId) {
 export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], typeCommand, requireTestPlan = false, steer, identity }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
-  const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets, allowedPaths: string[], mode?: string}} */ (config);
+  const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets, allowedPaths: string[], mode?: string, hardenCommand?: string[]}} */ (config);
 
   const self = identity ?? harnessIdentity();
   const gated = (/** @type {string} */ reason) => ({ sha: null, iteration: 0, cost: 0, status: /** @type {const} */ ('gated'), reason });
@@ -93,6 +94,11 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   if (cfg.mode === 'brownfield') {
     const bf = checkBrownfieldGate(repoDir);
     if (!bf.ok) return gated(bf.reason ?? 'brownfield gate failed');
+  }
+
+  const hardening = cfg.mode === 'test-hardening';
+  if (hardening && !(cfg.hardenCommand && cfg.hardenCommand.length > 0)) {
+    return gated(checkHardeningGate(repoDir, undefined).reason ?? 'hardening gate failed');
   }
 
   const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
@@ -141,6 +147,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     const diffOk = [
       record('scope', checkScopeGate(staged, cfg.allowedPaths)),
       record('anti-stub', checkAntiStubGate(diff)),
+      ...(hardening ? [record('tests-only', checkScopeGate(staged, ['tests/']))] : []),
     ].every(Boolean);
     if (!diffOk) {
       status = 'failed';
@@ -151,7 +158,8 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
       const testsOk = t.status === 0;
       gates.push({ name: 'tests', ok: testsOk, detail: testsOk ? undefined : 'failed' });
       const typesOk = record('types', checkTypeGate(repoDir, typeCommand));
-      if (!testsOk || !typesOk) status = 'failed';
+      const hardenOk = !hardening || !testsOk || record('hardening', checkHardeningGate(repoDir, cfg.hardenCommand));
+      if (!testsOk || !typesOk || !hardenOk) status = 'failed';
     }
   }
 
