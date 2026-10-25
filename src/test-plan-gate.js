@@ -5,6 +5,22 @@ import { join } from 'node:path';
 /** @typedef {import('./diff-gates.js').GateCheck} GateCheck */
 
 /**
+ * Parse `tests/PLAN.md` text into spec path -> mapped test paths.
+ * @param {string} text
+ * @returns {Map<string, string[]>}
+ */
+export function parseTestPlan(text) {
+  /** @type {Map<string, string[]>} */
+  const mapped = new Map();
+  for (const line of text.split('\n')) {
+    const specs = line.match(/specs\/[\w./-]+\.md/g) ?? [];
+    const tests = (line.match(/tests\/[\w./-]+/g) ?? []).filter((t) => t !== 'tests/PLAN.md');
+    for (const s of specs) mapped.set(s, [...(mapped.get(s) ?? []), ...tests]);
+  }
+  return mapped;
+}
+
+/**
  * Test-plan gate: the target needs `tests/PLAN.md` mapping every spec to existing tests,
  * and (before the first build iteration) the suite must be red.
  * A mapping is any line of PLAN.md naming a `specs/*.md` path and a `tests/*` path.
@@ -16,13 +32,7 @@ export function checkTestPlanGate(repoDir, { testCommand, requireRed }) {
   const planPath = join(repoDir, 'tests', 'PLAN.md');
   if (!existsSync(planPath)) return { ok: false, reason: 'tests/PLAN.md is missing' };
 
-  /** @type {Map<string, string[]>} */
-  const mapped = new Map();
-  for (const line of readFileSync(planPath, 'utf8').split('\n')) {
-    const specs = line.match(/specs\/[\w./-]+\.md/g) ?? [];
-    const tests = (line.match(/tests\/[\w./-]+/g) ?? []).filter((t) => t !== 'tests/PLAN.md');
-    for (const s of specs) mapped.set(s, [...(mapped.get(s) ?? []), ...tests]);
-  }
+  const mapped = parseTestPlan(readFileSync(planPath, 'utf8'));
 
   const specsDir = join(repoDir, 'specs');
   const specs = existsSync(specsDir) ? readdirSync(specsDir).filter((f) => f.endsWith('.md')) : [];

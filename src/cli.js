@@ -4,6 +4,7 @@ import { validateConfig } from './config.js';
 import { resolveAdapter, defaultRegistry } from './adapters/index.js';
 import { runStep } from './step.js';
 import { runLoop } from './driver.js';
+import { lintSpecs } from './spec-lint.js';
 
 /** @returns {string} */
 export function helpText() {
@@ -14,12 +15,15 @@ export function helpText() {
     '  hodge [--help]',
     '  hodge step --config <file> [--repo <dir>] [--run-id <id>]',
     '  hodge run  --config <file> [--repo <dir>] [--run-id <id>]',
+    '  hodge spec-lint [--repo <dir>]',
     '',
     'Commands:',
     '  step   run one loop iteration; prints JSON {sha, iteration, cost, status}',
     '         (--repo defaults to ., --run-id defaults to "default")',
     '  run    loop steps until the plan is done or a step fails/gates/runs out of budget;',
     '         prints JSON {status, steps, reason?}; exit 0 only when done',
+    '  spec-lint  check specs/*.md structure and tests/PLAN.md mapping; prints JSON {ok, problems};',
+    '         exit 0 only when clean',
     '',
   ].join('\n');
 }
@@ -65,6 +69,16 @@ export async function main(argv, deps = {}) {
     return 0;
   }
   const cmd = argv[0];
+  if (cmd === 'spec-lint') {
+    const rest = argv.slice(1);
+    if (rest.length > 0 && (rest[0] !== '--repo' || rest.length !== 2 || rest[1].startsWith('--'))) {
+      err(rest[0] === '--repo' ? 'hodge spec-lint: --repo requires a value\n' : `hodge spec-lint: unknown argument '${rest[0]}'\n`);
+      return 2;
+    }
+    const res = lintSpecs(resolve(rest[1] ?? '.'));
+    out(`${JSON.stringify(res)}\n`);
+    return res.ok ? 0 : 1;
+  }
   if (cmd !== 'step' && cmd !== 'run') {
     err(`hodge: unknown command '${argv[0]}'\n\n${helpText()}`);
     return 2;
