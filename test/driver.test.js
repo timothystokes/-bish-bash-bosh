@@ -93,6 +93,24 @@ test('runLoop with requireTestPlan gates when tests/PLAN.md is missing', async (
   assert.equal(res.status, 'gated');
 });
 
+test('runLoop with requireTestPlan refuses to start when spec-lint fails, without calling the agent', async () => {
+  const dir = makeRepo('- [ ] one\n');
+  let called = false;
+  const adapter = { async run() { called = true; return { exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0 }, changedFiles: [] }; } };
+  const res = await runLoop({ config: config(), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity, requireTestPlan: true });
+  assert.equal(res.status, 'gated');
+  assert.deepEqual(res.steps, []);
+  assert.match(res.reason ?? '', /spec-lint/);
+  assert.equal(called, false);
+});
+
+test('runLoop without requireTestPlan does not run spec-lint', async () => {
+  const dir = makeRepo('- [x] one\n');
+  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0 }, writes: {} });
+  const res = await runLoop({ config: config(), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity });
+  assert.notEqual(res.status, 'gated');
+});
+
 test('config accepts optional requireTestPlan boolean', () => {
   assert.equal(validateConfig({ ...config(), requireTestPlan: true }).ok, true);
   assert.equal(validateConfig({ ...config(), requireTestPlan: 'yes' }).ok, false);

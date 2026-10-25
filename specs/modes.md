@@ -8,3 +8,4 @@
 - Each mode has its own tuned loop prompt in `prompts/`.
 - Every objective must define its tests; the harness refuses to start loops without them.
 - Mode is selected by optional config key `mode` (default `forward`); a mode with no prompt file fails loudly.
+- With config `requireTestPlan: true`, `hodge run` runs spec-lint before the first step and gates (no agent call) on any problem; each step then also applies the test-plan gate.

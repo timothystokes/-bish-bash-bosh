@@ -25,7 +25,7 @@ function makeToyTarget() {
   mkdirSync(join(dir, 'specs'));
   mkdirSync(join(dir, 'tests'));
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'toy', type: 'module', scripts: { test: 'node --test tests/*.test.js' } }));
-  writeFileSync(join(dir, 'specs', 'add.md'), '# add(a, b) returns the sum\n');
+  writeFileSync(join(dir, 'specs', 'add.md'), '# Spec: add(a, b) returns the sum\n');
   writeFileSync(join(dir, 'tests', 'PLAN.md'), '- specs/add.md -> tests/add.test.js: sum of two numbers\n');
   writeFileSync(
     join(dir, 'tests', 'add.test.js'),

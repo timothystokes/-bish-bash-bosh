@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { runStep } from './step.js';
+import { lintSpecs } from './spec-lint.js';
 
 /**
  * @typedef {import('./step.js').StepResult} StepResult
@@ -24,6 +25,10 @@ export function isPlanDone(plan) {
  * @returns {Promise<LoopResult>}
  */
 export async function runLoop(opts) {
+  if (opts.requireTestPlan) {
+    const lint = lintSpecs(opts.repoDir);
+    if (!lint.ok) return { status: 'gated', steps: [], reason: `spec-lint failed: ${lint.problems.join('; ')}` };
+  }
   /** @type {StepResult[]} */
   const steps = [];
   for (;;) {
