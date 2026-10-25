@@ -62,3 +62,16 @@ test('gate refuses when the iteration cap is reached', () => {
   assert.equal(g.ok, false);
   assert.match(String(g.reason), /iteration/);
 });
+
+test('sumRunUsage counts interview usage without counting it as an iteration', async () => {
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const dir = mkdtempSync(join(tmpdir(), 'hodge-budget-'));
+  rec(dir, 1, { tokens: 10, cost: 0.25, seconds: 5 });
+  mkdirSync(join(dir, 'runs', 'r1', 'interview'), { recursive: true });
+  writeFileSync(
+    join(dir, 'runs', 'r1', 'interview', 'record.json'),
+    JSON.stringify({ status: 'ok', usage: { tokens: 40, cost: 0.5, seconds: 7 } }),
+  );
+  assert.deepEqual(sumRunUsage(dir, 'r1'), { tokens: 50, cost: 0.75, seconds: 12, iterations: 1 });
+  assert.equal(checkBudgetGate(dir, 'r1', budgets).remaining.tokens, 50);
+});

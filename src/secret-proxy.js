@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 
 /**
  * @typedef {{id: string, pattern: string, flags?: string}} SecretRule
@@ -44,8 +44,49 @@ export function redactSecrets(text, rules = DEFAULT_RULES) {
  *   rules?: SecretRule[],
  *   auditFile?: string,
  *   maxBodyBytes?: number,
+ *   meterFile?: string,
+ *   rates?: {inputPerMTok: number, outputPerMTok: number},
  * }} SecretProxyOptions
  */
+
+/**
+ * Token counts from an OpenAI- or Anthropic-shaped JSON response body, or null.
+ * @param {string} text
+ * @returns {{input: number, output: number} | null}
+ */
+function extractUsage(text) {
+  let u;
+  try {
+    u = JSON.parse(text)?.usage;
+  } catch {
+    return null;
+  }
+  if (typeof u !== 'object' || u === null) return null;
+  const num = (/** @type {unknown} */ v) => (typeof v === 'number' && v >= 0 ? v : undefined);
+  const input = num(u.prompt_tokens) ?? num(u.input_tokens);
+  const output = num(u.completion_tokens) ?? num(u.output_tokens);
+  if (input !== undefined || output !== undefined) return { input: input ?? 0, output: output ?? 0 };
+  const total = num(u.total_tokens);
+  return total === undefined ? null : { input: total, output: 0 };
+}
+
+/**
+ * Sum a proxy meter file (JSONL of `{tokens, cost}` per metered response).
+ * @param {string} meterFile
+ * @returns {{tokens: number, cost: number, requests: number}}
+ */
+export function readProxyUsage(meterFile) {
+  const totals = { tokens: 0, cost: 0, requests: 0 };
+  if (!existsSync(meterFile)) return totals;
+  for (const line of readFileSync(meterFile, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    const e = JSON.parse(line);
+    totals.tokens += e.tokens ?? 0;
+    totals.cost += e.cost ?? 0;
+    totals.requests += 1;
+  }
+  return totals;
+}
 
 class Blocked extends Error {
   /** @param {number} status @param {string} reason */
@@ -61,6 +102,8 @@ class Blocked extends Error {
  * buffered whole, redacted, then passed on; anything that cannot be fully inspected
  * (too large, audit log unwritable, upstream failure) is blocked, never forwarded.
  * The audit log (JSONL) records rule ids and counts, never secret values.
+ * With `meterFile`, each response carrying a token `usage` is metered (cost from
+ * optional `rates`, else 0); an unwritable meter file blocks the response.
  * @param {SecretProxyOptions} opts
  */
 export function createSecretProxy(opts) {
@@ -115,6 +158,14 @@ export function createSecretProxy(opts) {
       if (buf.length > max) throw new Blocked(502, 'too-large');
       const outRes = redactSecrets(buf.toString('utf8'), rules);
       audit({ direction: 'response', target, status: up.status, findings: outRes.findings });
+      if (opts.meterFile) {
+        const used = extractUsage(buf.toString('utf8'));
+        if (used) {
+          const r = opts.rates;
+          const cost = r ? (used.input * r.inputPerMTok + used.output * r.outputPerMTok) / 1e6 : 0;
+          appendFileSync(opts.meterFile, JSON.stringify({ time: new Date().toISOString(), tokens: used.input + used.output, cost }) + '\n');
+        }
+      }
 
       const ct = up.headers.get('content-type');
       res.writeHead(up.status, ct ? { 'content-type': ct } : {});

@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DEFAULT_RULES, redactSecrets, createSecretProxy } from '../src/secret-proxy.js';
+import { DEFAULT_RULES, redactSecrets, createSecretProxy, readProxyUsage } from '../src/secret-proxy.js';
 
 const AWS = 'AKIAIOSFODNN7EXAMPLE';
 const GH = 'ghp_' + 'a'.repeat(36);
@@ -142,6 +142,57 @@ test('if the audit log cannot be written the request is not forwarded (fail clos
     assert.equal(res.status, 502);
     assert.equal(up.seen.length, 0);
     assert.equal(existsSync(bad), false);
+  } finally {
+    await proxy.close();
+    up.close();
+  }
+});
+
+test('proxy meters token usage from OpenAI and Anthropic shaped responses', async () => {
+  const bodies = [
+    JSON.stringify({ usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } }),
+    JSON.stringify({ usage: { input_tokens: 7, output_tokens: 3 } }),
+    'not json',
+    JSON.stringify({ choices: [] }),
+  ];
+  const up = await startUpstream(() => ({ body: /** @type {string} */ (bodies.shift()) }));
+  const meterFile = join(mkdtempSync(join(tmpdir(), 'hodge-proxy-')), 'meter.jsonl');
+  const { proxy, url } = await startProxy({
+    upstream: up.url,
+    meterFile,
+    rates: { inputPerMTok: 1000000, outputPerMTok: 2000000 },
+  });
+  try {
+    for (let i = 0; i < 4; i++) await (await fetch(`${url}/v1/chat`, { method: 'POST', body: 'hi' })).text();
+    assert.deepEqual(readProxyUsage(meterFile), { tokens: 25, cost: 10 + 10 + 7 + 6, requests: 2 });
+  } finally {
+    await proxy.close();
+    up.close();
+  }
+});
+
+test('proxy without rates meters tokens at zero cost; missing meter file reads as zero', async () => {
+  const up = await startUpstream(() => ({ body: JSON.stringify({ usage: { total_tokens: 9 } }) }));
+  const meterFile = join(mkdtempSync(join(tmpdir(), 'hodge-proxy-')), 'meter.jsonl');
+  assert.deepEqual(readProxyUsage(meterFile), { tokens: 0, cost: 0, requests: 0 });
+  const { proxy, url } = await startProxy({ upstream: up.url, meterFile });
+  try {
+    await (await fetch(`${url}/x`, { method: 'POST', body: 'hi' })).text();
+    assert.deepEqual(readProxyUsage(meterFile), { tokens: 9, cost: 0, requests: 1 });
+  } finally {
+    await proxy.close();
+    up.close();
+  }
+});
+
+test('proxy blocks the response when the meter file is unwritable', async () => {
+  const up = await startUpstream(() => ({ body: JSON.stringify({ usage: { total_tokens: 9 } }) }));
+  const dir = mkdtempSync(join(tmpdir(), 'hodge-proxy-'));
+  const { proxy, url } = await startProxy({ upstream: up.url, meterFile: join(dir, 'no', 'such', 'm.jsonl') });
+  try {
+    const res = await fetch(`${url}/x`, { method: 'POST', body: 'hi' });
+    assert.equal(res.status, 502);
+    assert.equal((await res.text()).includes('total_tokens'), false);
   } finally {
     await proxy.close();
     up.close();

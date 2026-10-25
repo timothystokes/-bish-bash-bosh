@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P3-7: usage metering via the proxy; count interview usage in the run-wide budget.**
-Why: unblocked now that P3-6 is done, and it gates the P3-8 phase exit; P3-5 (kill switch) stays blocked on P1-8b. Still pending: P1-8b (needs a running Docker daemon; Dockerfile copies `prompts/` and `templates/`), P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed). Not yet done for P3-6: a `hodge proxy` CLI / wiring into `hodge run` (fold into P3-7 or P3-8).
+**P3-7b: `hodge proxy --upstream <url> [--audit <f>] [--meter <f>] [--port <n>]` CLI (prints the listening port).**
+Why: P3-6/P3-7 are library-only; the proxy must be runnable before the P3-8 e2e can exercise redaction. After that, P3-8 (scripted e2e of pause/steer/stop and redaction; the kill-switch part waits on P3-5). Still pending: P1-8b (needs a running Docker daemon; Dockerfile copies `prompts/` and `templates/`) which blocks P3-5; P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -53,8 +53,9 @@ Why: unblocked now that P3-6 is done, and it gates the P3-8 phase exit; P3-5 (ki
 | P3-4 | Terminal TUI: live log tail, cost meter vs budget, pause/resume/steer/stop keys | done | P3-2, P3-3 |
 | P3-5 | Kill switch: terminate the run container | todo | P3-1, P1-8b |
 | P3-6 | Secret-scanning proxy: regex rules, `[REDACTED:rule-id]`, nothing forwarded half-inspected, audit log | done | P0-3 |
-| P3-7 | Usage metering via proxy; count interview usage in run-wide budget | todo | P3-6 |
-| P3-8 | Phase 3 exit: e2e pause/steer/stop and redaction with scripted adapter | todo | P3-1..P3-7 |
+| P3-7 | Usage metering via proxy; count interview usage in run-wide budget | done | P3-6 |
+| P3-7b | `hodge proxy` CLI wiring the secret/metering proxy (audit + meter files) | todo | P3-7 |
+| P3-8 | Phase 3 exit: e2e pause/steer/stop and redaction with scripted adapter | todo | P3-1..P3-7b |
 
 ## Later phases (not yet broken down)
 Phase 4 reverse/brownfield/harden/clean-room; Phase 5 AWS (CDK, Step Functions driver, Fargate Spot). See `docs/PLAN.md`. Break each down into a table like the above when the previous phase is `done`.
@@ -93,3 +94,4 @@ Phase 4 reverse/brownfield/harden/clean-room; Phase 5 AWS (CDK, Step Functions d
 - P3-3 done: `src/status.js` (`createLocalStatusSource(repoDir)` -> `{totals, lastStatus}`; `readRunStatus(source, runId, budgets)` -> `{runId, iterations, lastStatus, totals, budgets, remaining}`), `hodge status --config <f> [--repo] [--run-id] [--control <file>]` prints that JSON (plus `control` state when given; unknown run = zeros, exit 0) (180 pass, check clean; tests failed first on missing module). Learned: CliDeps are `stdout`/`stderr`. Sign: status consumers depend on the `StatusSource` interface so the AWS source (cloud-driver) can swap in; TUI should read status and control only through these modules.
 - P3-4 done: `src/tui.js` (`renderFrame` pure, `createTui` key state machine, `runTui` raw-mode loop), `StatusSource.tail(runId, n)` (latest iteration transcript), `hodge tui --config <f> --control <f> [--repo] [--run-id]`; keys p/r pause/resume, s steer prompt (Enter sends, Esc cancels), x stop with y/n confirm, q/Ctrl-C quit; writes only via `writeControl` (malformed file is shown, not cleared). 8 new tests, 188 total pass, check clean; tests failed first (two test-authoring slips fixed after). Sign: tests that type into a modal UI must enter the mode first. Interactive TTY not exercised live; frames and keys are unit-tested.
 - P3-6 done: `src/secret-proxy.js` (`DEFAULT_RULES`, `redactSecrets(text, rules)` -> `{text, findings}`, `createSecretProxy({upstream, rules?, auditFile?, maxBodyBytes?})` -> `{listen, close}`), `test/secret-proxy.test.js` (9 new, 197 total pass, check clean; tests failed first on missing module). Requests and responses are buffered whole and redacted; over-limit body, upstream error, or unwritable audit log => blocked (413/502), nothing forwarded; audit JSONL holds rule ids and counts, never values. Streaming responses are buffered (no incremental pass-through). Not wired into the CLI yet. Sign: a security filter must fail closed, and its audit log must never contain the secret.
+- P3-7 done: `src/secret-proxy.js` options `meterFile` + `rates {inputPerMTok, outputPerMTok}` meter each response with a token `usage` (OpenAI `prompt/completion/total_tokens` or Anthropic `input/output_tokens`) as JSONL `{time, tokens, cost}`; `readProxyUsage(file)` -> `{tokens, cost, requests}`; unwritable meter file => 502, response not returned. `sumRunUsage` now also adds `runs/<runId>/interview/record.json` usage (no iteration count) so interview spend counts against the run-wide budget (4 new tests, 201 pass, check clean; tests failed first). Streaming/unparseable responses are not metered; proxy meter is a separate source from adapter-reported usage (not summed into the gate, to avoid double counting). Sign: any new usage source must say whether it is additive to or a cross-check of the adapter totals.
