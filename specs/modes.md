@@ -7,3 +7,4 @@
 - **Clean-room:** rebuild from the spec bundle only; the builder never sees the source (context firewall).
 - Each mode has its own tuned loop prompt in `prompts/`.
 - Every objective must define its tests; the harness refuses to start loops without them.
+- Mode is selected by optional config key `mode` (default `forward`); a mode with no prompt file fails loudly.

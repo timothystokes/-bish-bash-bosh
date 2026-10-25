@@ -22,6 +22,7 @@
         "maxIterations": { "type": "integer", "minimum": 1 }
       }
     },
+    "mode": { "enum": ["interview", "forward", "reverse", "brownfield", "test-hardening", "clean-room"] },
     "requireTestPlan": { "type": "boolean" },
     "allowedPaths": {
       "type": "array",

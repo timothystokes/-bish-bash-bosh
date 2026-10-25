@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P2-3: mode prompts (`prompts/forward.md`, the loop prompt used by `buildPrompt`, selected by config `mode`).**
-Why: unblocked, and both interview (P2-4) and the Phase 2 exit (P2-6) need a mode-selected prompt; P2-4 can follow now that templates exist. Still pending: P1-8b (needs a running Docker daemon), P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
+**P2-5: forward mode gate: wire spec-lint + test-plan gate into `hodge run` so loops refuse to start without objective tests.**
+Why: unblocked, finishes the "refuse to start loops without tests" rule in `specs/modes.md`; P2-4 (interview) can follow, then P2-6. Still pending: P1-8b (needs a running Docker daemon; Dockerfile now also copies `prompts/`), P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -39,7 +39,7 @@ Why: unblocked, and both interview (P2-4) and the Phase 2 exit (P2-6) need a mod
 |---|---|---|---|
 | P2-1 | Spec-lint: structure checks on `specs/*.md` + mapping in `tests/PLAN.md`; `hodge spec-lint` CLI | done | P1-3 |
 | P2-2 | Spec and test-plan templates (`templates/spec.md`, `templates/tests-PLAN.md`) that pass spec-lint | done | P2-1 |
-| P2-3 | Mode prompts: `prompts/forward.md` (loop prompt used by `buildPrompt`, selected by config `mode`) | todo | P1-1 |
+| P2-3 | Mode prompts: `prompts/forward.md` (loop prompt used by `buildPrompt`, selected by config `mode`) | done | P1-1 |
 | P2-4 | Interview mode: `hodge interview` runs the interview adapter role, writes `specs/*.md` + `tests/PLAN.md`, refuses to finish unless spec-lint passes | todo | P2-1, P2-2 |
 | P2-5 | Forward mode gate: refuse to start loops without objective tests (spec-lint + test-plan gate wired into `hodge run`) | todo | P2-1, P1-3 |
 | P2-6 | Phase 2 exit: throwaway objective goes interview -> specs -> test plan -> forward loops -> green (scripted adapter) | todo | P2-4, P2-5, P2-3 |
@@ -72,3 +72,4 @@ Phase 3 control + TUI + secret-scanning proxy; Phase 4 reverse/brownfield/harden
 - Session (P1-8b attempt): Docker client present but daemon not running (`docker.sock` missing), so the build was not attempted; P1-8b stays todo. Broke Phase 2 down into P2-1..P2-6 and set P2-1 as next. Sign: check `docker info` for a reachable daemon, not just the client.
 - P2-1 done: `src/spec-lint.js` (`lintSpecs`), `hodge spec-lint [--repo <dir>]` (JSON `{ok, problems}`, exit 0 clean / 1 problems / 2 usage), `test/spec-lint.test.js` (13 new, 140 total pass, check clean; tests failed first). Checks: specs/ non-empty, each file non-empty, starts with `# Spec: <name>`, exactly one top-level title outside code fences (one decision per file), unique titles, every spec mapped in `tests/PLAN.md`. Extracted `parseTestPlan` from the test-plan gate and shared it. Semantic duplicate/contradiction detection is NOT done (structure only). Sign: lint is pure and deterministic; problems are sorted by file so output is stable.
 - P2-2 done: `templates/spec.md` (sections: Purpose, Requirements, Examples, Out of scope) and `templates/tests-PLAN.md` (table mapping `specs/example.md` -> `tests/example.test.js`), `test/templates.test.js` (3 new, 143 total pass, check clean; tests failed first). The test instantiates both into a temp target (spec as `specs/example.md`) and asserts `lintSpecs` is clean, so templates cannot drift from the linter. Interview mode (P2-4) should emit from these. Sign: templates are tested by instantiation through the real linter.
+- P2-3 done: `prompts/forward.md` (moved out of `step.js`), `src/prompts.js` (`MODES`, `loadModePrompt`: rejects unknown modes and modes with no prompt file), `buildPrompt(repoDir, mode='forward')`, optional config key `mode` (enum of the six spec modes, default forward) passed by `runStep`; `test/prompts.test.js` (5 new, 148 total pass, check clean; tests failed first). Dockerfile now copies `prompts/` (not built; P1-8b). Only `forward` has a prompt so far; other modes error until written. Sign: any runtime file read by src must be added to the Dockerfile COPY list.

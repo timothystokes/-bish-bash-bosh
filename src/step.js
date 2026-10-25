@@ -7,6 +7,7 @@ import { checkBudgetGate } from './budget-gate.js';
 import { checkTestPlanGate } from './test-plan-gate.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { writeIterationRecord } from './run-record.js';
+import { loadModePrompt } from './prompts.js';
 
 /**
  * @typedef {import('./adapter.js').Adapter} Adapter
@@ -14,24 +15,16 @@ import { writeIterationRecord } from './run-record.js';
  * @typedef {{sha: string | null, iteration: number, cost: number, status: 'ok' | 'failed' | 'gated' | 'over-budget', reason?: string}} StepResult
  */
 
-const LOOP_PROMPT = [
-  'You are one iteration of a loop. Pick the single most important unfinished item from plan.md and complete it.',
-  '- Search before assuming something is missing.',
-  '- Use parallel subagents for search/read/write; exactly one for build/test.',
-  '- Run scoped tests after each change and record why each test exists.',
-  '- Tests come first. No stubs or partial implementations.',
-  '- Update plan.md when done, then stop.',
-].join('\n');
-
 /** @param {string} p */
 const readIfExists = (p) => (existsSync(p) ? readFileSync(p, 'utf8') : '');
 
 /**
  * Fixed per-iteration context stack: loop prompt + specs index + plan.md.
  * @param {string} repoDir
+ * @param {string} [mode]
  * @returns {string}
  */
-export function buildPrompt(repoDir) {
+export function buildPrompt(repoDir, mode = 'forward') {
   const specsDir = join(repoDir, 'specs');
   const specs = existsSync(specsDir)
     ? readdirSync(specsDir).filter((f) => f.endsWith('.md')).sort()
@@ -41,7 +34,7 @@ export function buildPrompt(repoDir) {
     return `- specs/${f}: ${title}`;
   });
   return [
-    LOOP_PROMPT,
+    loadModePrompt(mode),
     '## Specs index',
     index.join('\n'),
     '## plan.md',
@@ -81,7 +74,7 @@ function nextIteration(dir, /** @type {string} */ runId) {
 export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], typeCommand, requireTestPlan = false, identity }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
-  const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets, allowedPaths: string[]}} */ (config);
+  const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets, allowedPaths: string[], mode?: string}} */ (config);
 
   const self = identity ?? harnessIdentity();
   const gated = (/** @type {string} */ reason) => ({ sha: null, iteration: 0, cost: 0, status: /** @type {const} */ ('gated'), reason });
@@ -103,7 +96,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     const plan = checkTestPlanGate(repoDir, { testCommand, requireRed: iteration === 1 });
     if (!plan.ok) return gated(plan.reason ?? 'test-plan gate failed');
   }
-  const prompt = buildPrompt(repoDir);
+  const prompt = buildPrompt(repoDir, cfg.mode);
   const maxTokens = budget.remaining.tokens;
   const maxCostUsd = budget.remaining.cost;
   const maxWallClockSeconds = Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds);

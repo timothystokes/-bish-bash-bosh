@@ -8,6 +8,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY bin ./bin
 COPY src ./src
+COPY prompts ./prompts
 ENV PATH="/opt/hodgepodge/bin:${PATH}"
 WORKDIR /work
 ENTRYPOINT ["hodge"]
