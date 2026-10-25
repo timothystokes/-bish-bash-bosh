@@ -32,7 +32,8 @@ export function initSandbox(opts) {
     hodgepodge: root,
     roles: {
       build: { adapter: opts.adapter, model: opts.model },
-      ...(seed === 'objective' ? { interview: { adapter: opts.adapter, model: opts.model } } : {}),
+      interview: { adapter: opts.adapter, model: opts.model },
+      reverse: { adapter: opts.adapter, model: opts.model },
     },
     budgets: { maxTokens: 200000, maxCostUsd: 2, maxWallClockSeconds: 600, maxIterations: 3 },
     allowedPaths: ['src/'],

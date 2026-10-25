@@ -46,6 +46,16 @@ test('writes a valid config next to (not inside) the target repo', () => {
   assert.ok(!existsSync(join(dir, 'target', 'hodge.json')));
 });
 
+test('every seed configures the interview and reverse roles so those commands run right after init', () => {
+  for (const seed of ['toy', 'empty', 'objective']) {
+    const dir = fresh();
+    assert.equal(initSandbox({ dir, ...base, seed }).ok, true);
+    const cfg = JSON.parse(readFileSync(join(dir, 'hodge.json'), 'utf8'));
+    assert.deepEqual(cfg.roles.interview, { adapter: 'agent-x', model: 'model-y' });
+    assert.deepEqual(cfg.roles.reverse, { adapter: 'agent-x', model: 'model-y' });
+  }
+});
+
 test('empty seed: git repo without specs or plan items', () => {
   const dir = fresh();
   assert.equal(initSandbox({ dir, ...base, seed: 'empty' }).ok, true);
