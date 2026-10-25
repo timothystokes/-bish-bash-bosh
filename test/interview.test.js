@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -8,6 +9,7 @@ import { runInterview, buildInterviewPrompt } from '../src/interview.js';
 import { loadModePrompt } from '../src/prompts.js';
 import { main } from '../src/cli.js';
 import { lintSpecs } from '../src/spec-lint.js';
+import { sandboxOf } from './support/sandbox.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
@@ -136,16 +138,16 @@ test('hodge interview uses the interview role and exits 0 only when lint-clean',
   writeFileSync(cfgPath, JSON.stringify(config({ interview: { adapter: 'iv', model: 'm' } })));
   const out = /** @type {string[]} */ ([]);
   const registry = { iv: () => agent(goodWrites).adapter, f: () => { throw new Error('build role must not be used'); } };
-  const code = await main(['interview', '--config', cfgPath, '--repo', dir, '--objective', 'Build a greeter'], {
-    registry, identity, stdout: (s) => { out.push(s); }, stderr: () => {},
+  const code = await main(['interview', '--dir', sandboxOf(cfgPath, dir)], {
+    registry, identity, input: Readable.from(['Build a greeter\n']), stdout: (s) => { out.push(s); }, stderr: () => {},
   });
   assert.equal(code, 0);
-  assert.equal(JSON.parse(out.join('')).status, 'ok');
+  assert.equal(JSON.parse(out.join('').slice(out.join('').indexOf('{'))).status, 'ok');
 
   const dir2 = makeRepo();
   out.length = 0;
-  const bad = await main(['interview', '--config', cfgPath, '--repo', dir2, '--objective', 'x'], {
-    registry: { iv: () => agent({ 'specs/bad.md': 'x\n' }).adapter }, identity, stdout: (s) => { out.push(s); }, stderr: () => {},
+  const bad = await main(['interview', '--dir', sandboxOf(cfgPath, dir2)], {
+    registry: { iv: () => agent({ 'specs/bad.md': 'x\n' }).adapter }, identity, input: Readable.from(['x\n']), stdout: (s) => { out.push(s); }, stderr: () => {},
   });
   assert.equal(bad, 1);
 });
@@ -153,15 +155,15 @@ test('hodge interview uses the interview role and exits 0 only when lint-clean',
 test('hodge interview usage errors exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
   const e = (/** @type {string} */ s) => { err.push(s); };
-  assert.equal(await main(['interview', '--config', 'x.json'], { stdout: () => {}, stderr: e }), 2);
-  assert.match(err.join(''), /--objective/);
+  assert.equal(await main(['interview', '--dir', '/nonexistent/sandbox'], { stdout: () => {}, stderr: e }), 2);
+  assert.match(err.join(''), /hodge\.json/);
 
   const cfgPath = join(tmpdir(), `hodge-int-norole-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(config({})));
   err.length = 0;
-  assert.equal(await main(['interview', '--config', cfgPath, '--objective', 'x'], { registry: { f: () => agent({}).adapter }, stdout: () => {}, stderr: e }), 2);
+  assert.equal(await main(['interview', '--dir', sandboxOf(cfgPath)], { registry: { f: () => agent({}).adapter }, stdout: () => {}, stderr: e }), 2);
   assert.match(err.join(''), /no role 'interview'/);
 
   err.length = 0;
-  assert.equal(await main(['step', '--config', cfgPath, '--objective', 'x'], { stdout: () => {}, stderr: e }), 2);
+  assert.equal(await main(['step', '--dir', sandboxOf(cfgPath), '--objective', 'x'], { stdout: () => {}, stderr: e }), 2);
 });

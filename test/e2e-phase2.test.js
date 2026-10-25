@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -7,6 +8,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { main } from '../src/cli.js';
 import { createCopilotAdapter } from '../src/adapters/copilot.js';
+import { sandboxOf } from './support/sandbox.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fakeAgent = join(here, 'fixtures', 'fake-copilot.js');
@@ -23,17 +25,20 @@ const scripted = (fixture) => () =>
 /**
  * @param {string[]} argv
  * @param {Record<string, () => import('../src/adapter.js').Adapter>} registry
+ * @param {import('node:stream').Readable} [input]
  */
-async function hodge(argv, registry) {
+async function hodge(argv, registry, input) {
   /** @type {string[]} */
   const outs = [];
   const code = await main(argv, {
     registry,
+    ...(input ? { input } : {}),
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
     stdout: (s) => outs.push(s),
     stderr: () => {},
   });
-  return { code, res: JSON.parse(outs.join('')) };
+  // the interview prompts for the objective before printing its JSON result (on the same line)
+  return { code, res: JSON.parse(outs.join('').slice(outs.join('').indexOf('{'))) };
 }
 
 test('phase 2 exit: objective goes interview -> specs -> test plan -> forward loop -> green', async () => {
@@ -80,7 +85,7 @@ test('phase 2 exit: objective goes interview -> specs -> test plan -> forward lo
   const registry = { interviewer: scripted(interviewFixture), builder: scripted(buildFixture) };
 
   // 1. interview: specs + red tests committed, spec-lint passes
-  const iv = await hodge(['interview', '--config', cfgPath, '--objective', 'add two numbers', '--repo', dir, '--run-id', 'p2'], registry);
+  const iv = await hodge(['interview', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'p2'], registry, Readable.from(['add two numbers\n']));
   assert.equal(iv.res.status, 'ok', JSON.stringify(iv.res));
   assert.equal(iv.code, 0);
   assert.ok(existsSync(join(dir, 'specs', 'add.md')));
@@ -95,7 +100,7 @@ test('phase 2 exit: objective goes interview -> specs -> test plan -> forward lo
   git(dir, 'commit', '-qm', 'plan');
 
   // 3. forward loops: tests red first, then green
-  const run = await hodge(['run', '--config', cfgPath, '--repo', dir, '--run-id', 'p2'], registry);
+  const run = await hodge(['run', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'p2'], registry);
   assert.equal(run.res.status, 'done', JSON.stringify(run.res));
   assert.equal(run.code, 0);
   assert.equal(run.res.steps.length, 1);

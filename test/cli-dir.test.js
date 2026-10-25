@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main, helpText, parseStepArgs } from '../src/cli.js';
@@ -22,9 +22,40 @@ const sandbox = async () => {
   return dir;
 };
 
-test('parseStepArgs derives config and repo from --dir; explicit flags override', () => {
-  assert.deepEqual(parseStepArgs(['--dir', '/sb']), { ok: true, config: '/sb/hodge.json', repo: '/sb/target', runId: 'default' });
-  assert.deepEqual(parseStepArgs(['--dir', '/sb', '--repo', '/r', '--config', '/c.json']), { ok: true, config: '/c.json', repo: '/r', runId: 'default' });
+test('parseStepArgs takes only --dir (default .), --run-id and --control', () => {
+  assert.deepEqual(parseStepArgs([]), { ok: true, dir: '.', runId: 'default' });
+  assert.deepEqual(parseStepArgs(['--dir', '/sb', '--run-id', 'x']), { ok: true, dir: '/sb', runId: 'x' });
+  assert.deepEqual(parseStepArgs(['--control', 'c.json'], { control: true }), { ok: true, dir: '.', runId: 'default', control: 'c.json' });
+  for (const flag of ['--config', '--repo', '--objective']) assert.equal(parseStepArgs([flag, 'x']).ok, false, flag);
+});
+
+test('interview takes no --objective, --config or --repo', async () => {
+  for (const flag of ['--objective', '--config', '--repo']) {
+    const r = await run(['interview', flag, 'x']);
+    assert.equal(r.code, 2, flag);
+    assert.match(r.err, new RegExp(`unknown argument '${flag}'`));
+  }
+});
+
+test('commands run from inside the sandbox (--dir defaults to cwd)', async () => {
+  const dir = await sandbox();
+  const prev = process.cwd();
+  process.chdir(dir);
+  try {
+    const r = await run(['status']);
+    assert.equal(r.code, 0, r.err);
+    assert.equal(JSON.parse(r.out).iterations, 0);
+    const lint = await run(['spec-lint']);
+    assert.equal(lint.code, 0, lint.out + lint.err);
+  } finally {
+    process.chdir(prev);
+  }
+});
+
+test('init records where hodgepodge lives in the sandbox config', async () => {
+  const dir = await sandbox();
+  const cfg = JSON.parse(readFileSync(join(dir, 'hodge.json'), 'utf8'));
+  assert.equal(cfg.hodgepodge, join(import.meta.dirname, '..'));
 });
 
 test('status needs only --dir', async () => {

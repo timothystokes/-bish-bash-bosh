@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { writeIterationRecord } from '../src/run-record.js';
 import { createLocalStatusSource, readRunStatus } from '../src/status.js';
 import { main } from '../src/cli.js';
+import { sandboxOf } from './support/sandbox.js';
 
 const budgets = { maxTokens: 1000, maxCostUsd: 2, maxWallClockSeconds: 100, maxIterations: 5 };
 
@@ -50,16 +51,16 @@ test('hodge status prints JSON and includes control state', async () => {
   const ctl = join(dir, 'control.json');
   writeFileSync(ctl, JSON.stringify({ paused: true }));
   let out = '';
-  const code = await main(['status', '--config', cfg, '--repo', dir, '--run-id', 'r1', '--control', ctl], { stdout: (/** @type {string} */ s) => (out += s), stderr: () => {} });
+  const code = await main(['status', '--dir', sandboxOf(cfg, dir), '--run-id', 'r1', '--control', ctl], { stdout: (/** @type {string} */ s) => (out += s), stderr: () => {} });
   assert.equal(code, 0);
   const j = JSON.parse(out);
   assert.equal(j.iterations, 2);
   assert.equal(j.control.paused, true);
 });
 
-test('hodge status requires --config', async () => {
+test('hodge status needs a sandbox (hodge.json)', async () => {
   let e = '';
-  const code = await main(['status'], { stdout: () => {}, stderr: (/** @type {string} */ s) => (e += s) });
+  const code = await main(['status', '--dir', '/nonexistent/sandbox'], { stdout: () => {}, stderr: (/** @type {string} */ s) => (e += s) });
   assert.equal(code, 2);
-  assert.match(e, /config/);
+  assert.match(e, /hodge\.json/);
 });

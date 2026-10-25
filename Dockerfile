@@ -1,4 +1,4 @@
-# Per-run container: one run = one container. The target repo and config are mounted at runtime.
+# Per-run container: one run = one container. The sandbox (hodge.json + target/) is mounted at runtime.
 # Agent CLIs (whatever the config's adapters need) are installed in a derived image, not here.
 FROM node:22-slim
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
@@ -11,6 +11,6 @@ COPY src ./src
 COPY prompts ./prompts
 COPY templates ./templates
 ENV PATH="/opt/hodgepodge/bin:${PATH}"
-WORKDIR /work
+WORKDIR /sandbox
 ENTRYPOINT ["hodge"]
-CMD ["run", "--config", "/config/hodge.json", "--repo", "/work"]
+CMD ["run"]

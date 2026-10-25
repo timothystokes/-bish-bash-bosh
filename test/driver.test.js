@@ -8,6 +8,7 @@ import { runLoop, isPlanDone } from '../src/driver.js';
 import { main } from '../src/cli.js';
 import { createFakeAdapter } from '../src/adapter.js';
 import { validateConfig } from '../src/config.js';
+import { sandboxOf } from './support/sandbox.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
@@ -121,7 +122,7 @@ test('hodge run prints loop JSON, exit 0 when done, 1 otherwise', async () => {
   const cfgPath = join(tmpdir(), `hodge-run-cfg-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(config(2)));
   const out = /** @type {string[]} */ ([]);
-  const code = await main(['run', '--config', cfgPath, '--repo', dir, '--run-id', 'r'], {
+  const code = await main(['run', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r'], {
     registry: { f: () => createFakeAdapter({ exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0.1 }, writes: {} }) },
     testCommand: pass,
     identity,
@@ -138,5 +139,5 @@ test('hodge run reports usage errors with exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
   const code = await main(['run'], { stdout: () => {}, stderr: (s) => { err.push(s); } });
   assert.equal(code, 2);
-  assert.match(err.join(''), /hodge run: --config/);
+  assert.match(err.join(''), /hodge run: cannot read config .*hodge\.json/);
 });

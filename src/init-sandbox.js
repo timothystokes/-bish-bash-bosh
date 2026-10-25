@@ -2,21 +2,22 @@
  * Sandbox scaffolding: a fresh target repo (git, seeded) plus a config outside it.
  * The target never lives inside hodgepodge (repo gate).
  */
-import { mkdirSync, readdirSync, existsSync, writeFileSync, copyFileSync, rmSync } from 'node:fs';
+import { mkdirSync, readdirSync, existsSync, writeFileSync, copyFileSync, rmSync, chmodSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkRepoGate } from './repo-gate.js';
 import { validateConfig } from './config.js';
 
-const templates = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const templates = join(root, 'templates');
 const SEEDS = ['toy', 'empty', 'objective'];
 const IGNORE = 'node_modules/\nruns/\n';
 
 /**
  * @typedef {{dir: string, adapter: string, model: string, seed?: string}} InitOptions
- * @param {InitOptions} opts dir is the sandbox root: `<dir>/target` (repo) and `<dir>/hodge.json`
- * @returns {{ok: true, dir: string, repo: string, config: string} | {ok: false, reason: string}}
+ * @param {InitOptions} opts dir is the sandbox root: `<dir>/target` (repo), `<dir>/hodge.json` (config; `targetRepo` is relative to dir, `hodgepodge` points back at this tool) and `<dir>/hodge` (launcher)
+ * @returns {{ok: true, dir: string, repo: string, config: string, hodgepodge: string} | {ok: false, reason: string}}
  */
 export function initSandbox(opts) {
   const seed = opts.seed ?? 'toy';
@@ -25,8 +26,10 @@ export function initSandbox(opts) {
   const dir = resolve(opts.dir);
   const repo = join(dir, 'target');
   const config = join(dir, 'hodge.json');
+  const launcher = join(dir, 'hodge');
   const cfg = {
-    targetRepo: repo,
+    targetRepo: 'target',
+    hodgepodge: root,
     roles: {
       build: { adapter: opts.adapter, model: opts.model },
       ...(seed === 'objective' ? { interview: { adapter: opts.adapter, model: opts.model } } : {}),
@@ -48,6 +51,9 @@ export function initSandbox(opts) {
     else writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'target', private: true, type: 'module' }, null, 2) + '\n');
     writeFileSync(join(repo, '.gitignore'), IGNORE);
     writeFileSync(config, JSON.stringify(cfg, null, 2) + '\n');
+    // So the owner can `cd <dir>` and run `./hodge run`, `./hodge step`, ... without any path flags.
+    writeFileSync(launcher, `#!/bin/sh\nexec node ${JSON.stringify(join(root, 'bin', 'hodge'))} "$@"\n`);
+    chmodSync(launcher, 0o755);
     const git = (/** @type {string[]} */ ...a) =>
       execFileSync('git', ['-C', repo, '-c', 'user.name=hodge-init', '-c', 'user.email=hodge-init@localhost', ...a], { stdio: 'pipe' });
     git('init', '-q', '-b', 'main');
@@ -57,7 +63,7 @@ export function initSandbox(opts) {
     rmSync(dir, { recursive: true, force: true });
     return { ok: false, reason: `init failed: ${/** @type {Error} */ (e).message}` };
   }
-  return { ok: true, dir, repo, config };
+  return { ok: true, dir, repo, config, hodgepodge: root };
 }
 
 /**

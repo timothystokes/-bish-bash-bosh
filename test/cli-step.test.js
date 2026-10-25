@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { main, parseStepArgs } from '../src/cli.js';
 import { resolveAdapter } from '../src/adapters/index.js';
 import { createFakeAdapter } from '../src/adapter.js';
+import { sandboxOf } from './support/sandbox.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
@@ -35,17 +36,13 @@ const cfg = (/** @type {string} */ adapter) => ({
 const capture = (chunks) => (/** @type {string} */ s) => { chunks.push(s); };
 
 test('parseStepArgs reads flags and applies defaults', () => {
-  assert.deepEqual(parseStepArgs(['--config', 'c.json']), { ok: true, config: 'c.json', repo: '.', runId: 'default' });
-  assert.deepEqual(
-    parseStepArgs(['--config', 'c.json', '--repo', '/r', '--run-id', 'x1']),
-    { ok: true, config: 'c.json', repo: '/r', runId: 'x1' },
-  );
+  assert.deepEqual(parseStepArgs([]), { ok: true, dir: '.', runId: 'default' });
+  assert.deepEqual(parseStepArgs(['--dir', '/sb', '--run-id', 'x1']), { ok: true, dir: '/sb', runId: 'x1' });
 });
 
-test('parseStepArgs rejects missing config and unknown flags', () => {
-  assert.equal(parseStepArgs([]).ok, false);
-  assert.equal(parseStepArgs(['--config']).ok, false);
-  assert.equal(parseStepArgs(['--config', 'c.json', '--bogus']).ok, false);
+test('parseStepArgs rejects missing values and unknown flags', () => {
+  assert.equal(parseStepArgs(['--dir']).ok, false);
+  assert.equal(parseStepArgs(['--dir', 'd', '--bogus']).ok, false);
 });
 
 test('resolveAdapter maps role adapter id through the registry', () => {
@@ -71,7 +68,7 @@ test('hodge step prints JSON {sha, iteration, cost, status} and exits 0', async 
   const cfgPath = join(tmpdir(), `hodge-cfg-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(cfg('f')));
   const out = /** @type {string[]} */ ([]);
-  const code = await main(['step', '--config', cfgPath, '--repo', dir, '--run-id', 'r1'], {
+  const code = await main(['step', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r1'], {
     registry: { f: () => createFakeAdapter({ exitStatus: 0, transcript: 'ok', usage: { tokens: 5, cost: 0.1 }, writes: { 'src/a.js': 'x\n' } }) },
     testCommand: ['node', '-e', 'process.exit(0)'],
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
@@ -91,7 +88,7 @@ test('hodge step exits non-zero when the step fails or is gated', async () => {
   const cfgPath = join(tmpdir(), `hodge-cfg-f-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(cfg('f')));
   const out = /** @type {string[]} */ ([]);
-  const code = await main(['step', '--config', cfgPath, '--repo', dir, '--run-id', 'r1'], {
+  const code = await main(['step', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r1'], {
     registry: { f: () => createFakeAdapter({ exitStatus: 1, transcript: 'no', usage: { tokens: 1, cost: 0 }, writes: {} }) },
     testCommand: ['node', '-e', 'process.exit(0)'],
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
@@ -104,28 +101,26 @@ test('hodge step exits non-zero when the step fails or is gated', async () => {
 
 test('hodge step reports config problems on stderr with exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
-  const missing = await main(['step', '--config', '/nonexistent/c.json'], { stdout: () => {}, stderr: capture(err) });
+  const missing = await main(['step', '--dir', '/nonexistent/sandbox'], { stdout: () => {}, stderr: capture(err) });
   assert.equal(missing, 2);
   assert.match(err.join(''), /cannot read config/);
 
-  const badPath = join(tmpdir(), `hodge-cfg-bad-${Date.now()}.json`);
-  writeFileSync(badPath, JSON.stringify({ nope: true }));
   err.length = 0;
-  const bad = await main(['step', '--config', badPath], { stdout: () => {}, stderr: capture(err) });
+  const bad = await main(['step', '--dir', sandboxOf({ nope: true })], { stdout: () => {}, stderr: capture(err) });
   assert.equal(bad, 2);
   assert.match(err.join(''), /invalid config/);
 
   err.length = 0;
-  const noFlag = await main(['step'], { stdout: () => {}, stderr: capture(err) });
-  assert.equal(noFlag, 2);
-  assert.match(err.join(''), /--config/);
+  const noConfig = await main(['step', '--dir', mkdtempSync(join(tmpdir(), 'hodge-empty-'))], { stdout: () => {}, stderr: capture(err) });
+  assert.equal(noConfig, 2);
+  assert.match(err.join(''), /hodge\.json/);
 });
 
 test('hodge step reports unknown adapter with exit 2', async () => {
   const cfgPath = join(tmpdir(), `hodge-cfg-u-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(cfg('nope')));
   const err = /** @type {string[]} */ ([]);
-  const code = await main(['step', '--config', cfgPath], { registry: {}, stdout: () => {}, stderr: capture(err) });
+  const code = await main(['step', '--dir', sandboxOf(cfgPath)], { registry: {}, stdout: () => {}, stderr: capture(err) });
   assert.equal(code, 2);
   assert.match(err.join(''), /unknown adapter 'nope'/);
 });
@@ -166,7 +161,7 @@ test('hodge run --control passes the control file so a stop is honoured', async 
   const cfgFile = join(dir, '..', `cfg-${Date.now()}.json`);
   writeFileSync(cfgFile, JSON.stringify(cfg('fake')));
   const o = /** @type {string[]} */ ([]);
-  const code = await main(['run', '--config', cfgFile, '--repo', dir, '--control', f], {
+  const code = await main(['run', '--dir', sandboxOf(cfgFile, dir), '--control', f], {
     registry: { fake: () => createFakeAdapter({ exitStatus: 0, transcript: '', usage: { tokens: 0, cost: 0 }, writes: {} }) },
     stdout: capture(o),
     stderr: capture([]),

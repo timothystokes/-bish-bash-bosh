@@ -8,6 +8,7 @@ import { runReverse, buildReversePrompt } from '../src/reverse.js';
 import { loadModePrompt } from '../src/prompts.js';
 import { main } from '../src/cli.js';
 import { lintSpecs } from '../src/spec-lint.js';
+import { sandboxOf } from './support/sandbox.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
@@ -137,14 +138,14 @@ test('hodge reverse uses the reverse role; usage errors exit 2', async () => {
   writeFileSync(cfgPath, JSON.stringify(config({ reverse: { adapter: 'rv', model: 'm' } })));
   const out = /** @type {string[]} */ ([]);
   const registry = { rv: () => agent(goodWrites).adapter, f: () => { throw new Error('build role must not be used'); } };
-  const code = await main(['reverse', '--config', cfgPath, '--repo', dir], {
+  const code = await main(['reverse', '--dir', sandboxOf(cfgPath, dir)], {
     registry, identity, testCommand: pass, stdout: (s) => { out.push(s); }, stderr: () => {},
   });
   assert.equal(code, 0);
   assert.equal(JSON.parse(out.join('')).status, 'ok');
 
   const dir2 = makeRepo();
-  const bad = await main(['reverse', '--config', cfgPath, '--repo', dir2], {
+  const bad = await main(['reverse', '--dir', sandboxOf(cfgPath, dir2)], {
     registry, identity, testCommand: fail, stdout: () => {}, stderr: () => {},
   });
   assert.equal(bad, 1);
@@ -152,6 +153,6 @@ test('hodge reverse uses the reverse role; usage errors exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
   const noRole = join(tmpdir(), `hodge-rev-norole-${Date.now()}.json`);
   writeFileSync(noRole, JSON.stringify(config({})));
-  assert.equal(await main(['reverse', '--config', noRole], { registry, stdout: () => {}, stderr: (s) => { err.push(s); } }), 2);
+  assert.equal(await main(['reverse', '--dir', sandboxOf(noRole)], { registry, stdout: () => {}, stderr: (s) => { err.push(s); } }), 2);
   assert.match(err.join(''), /no role 'reverse'/);
 });

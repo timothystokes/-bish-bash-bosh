@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { main } from '../src/cli.js';
+import { sandboxOf } from './support/sandbox.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const bin = join(here, '..', 'bin', 'hodge');
@@ -74,7 +75,7 @@ test('phase 3 exit: pause, steer and stop via hodge control drive hodge run', as
   // pause first, then steer: the run must not start an iteration while paused
   assert.equal((await hodge(['control', '--file', ctl, 'pause'])).res.ok, true);
   assert.equal((await hodge(['control', '--file', ctl, 'steer', 'prefer small functions'])).res.ok, true);
-  const running = hodge(['run', '--config', cfgPath, '--repo', dir, '--run-id', 'p3', '--control', ctl], { scripted: () => adapter });
+  const running = hodge(['run', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'p3', '--control', ctl], { scripted: () => adapter });
   await sleep(300);
   assert.equal(prompts.length, 0, 'no iteration while paused');
   assert.equal(existsSync(join(dir, 'runs', 'p3')), false);

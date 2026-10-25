@@ -7,6 +7,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { main } from '../src/cli.js';
 import { createCopilotAdapter } from '../src/adapters/copilot.js';
+import { sandboxOf } from './support/sandbox.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fakeAgent = join(here, 'fixtures', 'fake-copilot.js');
@@ -65,7 +66,7 @@ test('toy objective: hodge run takes a red target to green unattended', async ()
   };
   /** @type {string[]} */
   const outs = [];
-  const code = await main(['run', '--config', cfgPath, '--repo', dir, '--run-id', 'toy'], {
+  const code = await main(['run', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'toy'], {
     registry,
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
     stdout: (s) => outs.push(s),
@@ -104,7 +105,7 @@ test('toy objective: green-from-the-start suite is gated (tests must fail first)
   );
   /** @type {string[]} */
   const outs = [];
-  const code = await main(['run', '--config', cfgPath, '--repo', dir, '--run-id', 'toy'], {
+  const code = await main(['run', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'toy'], {
     registry: { agent: () => createCopilotAdapter({ command: process.execPath, prefixArgs: [fakeAgent] }) },
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
     stdout: (s) => outs.push(s),

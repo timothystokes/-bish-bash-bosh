@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -171,4 +172,19 @@ test('hodge ready reports gaps then ready', async () => {
 
 test('kit files live under templates/objective (shipped in the image)', () => {
   for (const f of [...KIT, 'plan.md']) assert.ok(existsSync(join(root, 'templates', 'objective', f)), f);
+});
+
+test('hodge interview in an objective-kit sandbox asks for the objective and is gated without one', async () => {
+  const dir = fresh();
+  assert.equal((await main(['init', '--dir', dir, '--adapter', 'a', '--model', 'm', '--seed', 'objective'], { stdout: () => {}, stderr: () => {} })), 0);
+  let out = '';
+  const code = await main(['interview', '--dir', dir], {
+    registry: { a: () => ({ run: async () => { throw new Error('agent must not run without an objective'); } }) },
+    input: Readable.from(['']),
+    stdout: (s) => (out += s),
+    stderr: () => {},
+  });
+  assert.equal(code, 1);
+  assert.match(out, /Describe the objective/);
+  assert.match(out, /no objective description given/);
 });

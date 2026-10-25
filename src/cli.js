@@ -1,11 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { validateConfig } from './config.js';
+import { loadSandbox, CONFIG_FILE } from './sandbox.js';
 import { resolveAdapter, defaultRegistry } from './adapters/index.js';
 import { runStep } from './step.js';
 import { runLoop } from './driver.js';
 import { lintSpecs } from './spec-lint.js';
-import { checkReadiness } from './readiness.js';
+import { checkReadiness, hasObjectiveKit } from './readiness.js';
 import { createInterface } from 'node:readline';
 import { runInterview } from './interview.js';
 import { runObjective } from './objective.js';
@@ -27,19 +27,19 @@ export function helpText() {
     '',
     'Usage:',
     '  hodge [--help]',
-    '  Sandbox shortcut: after `hodge init --dir <sandbox>`, pass just --dir <sandbox> instead of --config and --repo (config <sandbox>/hodge.json, repo <sandbox>/target);',
-    '  step/run/interview/objective/reverse/status/tui/spec-lint/sync/promote all accept it; explicit --config/--repo override.',
-    '  hodge step --config <file> [--repo <dir>] [--run-id <id>]',
-    '  hodge run  --config <file> [--repo <dir>] [--run-id <id>]',
-    '  hodge objective --config <file> [--repo <dir>] [--run-id <id>]',
-    '  hodge interview --config <file> --objective <text> [--repo <dir>] [--run-id <id>]',
-    '  hodge reverse --config <file> [--repo <dir>] [--run-id <id>]',
+    '  Sandbox commands take --dir <sandbox> (default: the current directory). `hodge init` writes <sandbox>/hodge.json holding the target repo,',
+    '  roles, budgets and the path back to hodgepodge, so after `cd <sandbox>` just run `hodge run`, `hodge step`, `hodge interview`, ... (or ./hodge).',
+    '  hodge step [--dir <sandbox>] [--run-id <id>]',
+    '  hodge run  [--dir <sandbox>] [--run-id <id>] [--control <control.json>]',
+    '  hodge objective [--dir <sandbox>] [--run-id <id>]',
+    '  hodge interview [--dir <sandbox>] [--run-id <id>]',
+    '  hodge reverse [--dir <sandbox>] [--run-id <id>]',
     '  hodge clean-room --source <dir> --repo <builder-dir>',
-    '  hodge status --config <file> [--repo <dir>] [--run-id <id>] [--control <control.json>]',
-    '  hodge tui --config <file> --control <control.json> [--repo <dir>] [--run-id <id>]',
+    '  hodge status [--dir <sandbox>] [--run-id <id>] [--control <control.json>]',
+    '  hodge tui --control <control.json> [--dir <sandbox>] [--run-id <id>]',
     '  hodge proxy --upstream <url> [--audit <file>] [--meter <file>] [--port <n>]',
-    '  hodge sync --bucket <name> --run-id <id> [--repo <dir>]',
-    '  hodge promote --run-id <id> --head <branch> --base <branch> --bucket <name> [--sha <sha>] [--repo <dir>]',
+    '  hodge sync --bucket <name> --run-id <id> [--repo <dir> | --dir <sandbox>]',
+    '  hodge promote --run-id <id> --head <branch> --base <branch> --bucket <name> [--sha <sha>] [--repo <dir> | --dir <sandbox>]',
     '  hodge init --dir <sandbox> --adapter <id> --model <id> [--seed toy|empty|objective]',
     '  hodge spec-lint [--repo <dir> | --dir <sandbox>]',
     '  hodge ready [--repo <dir> | --dir <sandbox>]',
@@ -48,17 +48,17 @@ export function helpText() {
     '',
     'Commands:',
     '  step   run one loop iteration; prints JSON {sha, iteration, cost, status}',
-    '         (--repo defaults to ., --run-id defaults to "default")',
+    '         (--dir defaults to ., --run-id defaults to "default")',
     '  run    loop steps until the plan is done or a step fails/gates/runs out of budget (--control <file> honours control.json);',
     '         prints JSON {status, steps, reason?}; exit 0 only when done',
     '  objective  requirements gathering: asks for a description of the objective, then alternates agent rounds with your answers (broad first,',
     '         then fine-grained) until `hodge ready` passes; needs a sandbox from `hodge init --seed objective`; Ctrl-D or an empty answer pauses and a',
     '         rerun resumes; prints JSON {status, rounds, reason?}; exit 0 only when ready',
-    '  interview  run the `interview` role to write specs/*.md + tests/PLAN.md; commits only if spec-lint passes;',
-    '         with an objective kit a round that is lint-clean but not yet `hodge ready` is kept as status `incomplete` (prefer `hodge objective`, which drives the rounds); prints JSON {status, sha, reason?}; exit 0 only when ok',
+    '  interview  asks for the objective (it is not a flag), then runs the `interview` role to write specs/*.md + tests/PLAN.md; commits only if spec-lint passes;',
+    '         with an objective kit it is the same conversation as `hodge objective` (rounds until `hodge ready`); prints JSON {status, ...}; exit 0 only when ok',
     '  reverse  run the `reverse` role to write specs/ + characterization tests from existing code; commits only if only specs/tests changed,',
     '         spec-lint passes and the test suite is green; prints JSON {status, sha, reason?}; exit 0 only when ok',
-    '  init   scaffold a sandbox: <dir>/target (git repo seeded from templates) + <dir>/hodge.json (outside the repo); refuses dirs inside hodgepodge\n         or non-empty dirs; seed toy (default: spec, red tests, open plan), empty, or objective (objective/ kit: phases, interview protocol, readiness signals, brief and open questions to be filled by `hodge objective`; plus an interview role); prints JSON {ok, dir, repo, config}; exit 0 only when ok',
+    '  init   scaffold a sandbox: <dir>/target (git repo seeded from templates) + <dir>/hodge.json (outside the repo; holds the target repo and a reference back to hodgepodge) + <dir>/hodge launcher; refuses dirs inside hodgepodge\n         or non-empty dirs; seed toy (default: spec, red tests, open plan), empty, or objective (objective/ kit: phases, interview protocol, readiness signals, brief and open questions to be filled by `hodge objective`; plus an interview role); prints JSON {ok, dir, repo, config, hodgepodge}; exit 0 only when ok',
     '  clean-room  export only specs/ + tests/ from --source into a fresh git repo at --repo (the builder never sees source); prints JSON {ok, sha, files};',
     '         exit 0 only when ok. Then run `hodge run` there with config mode clean-room (firewall gate checks the bundle first)',
     '  status  print JSON run status: iterations, tokens, cost, seconds vs budgets (and control state with --control)',
@@ -76,15 +76,15 @@ export function helpText() {
 }
 
 /**
+ * Sandbox commands take only --dir (default: the current directory): the config, target repo and roles live in `<dir>/hodge.json`.
  * @param {string[]} args
- * `--dir <sandbox>` (as scaffolded by `hodge init`) stands for --config <dir>/hodge.json and --repo <dir>/target; explicit flags win.
- * @param {{objective?: boolean, control?: boolean}} [opts] interview also takes (and requires) --objective; run takes --control
- * @returns {{ok: true, config: string, repo: string, runId: string, objective?: string, control?: string} | {ok: false, error: string}}
+ * @param {{control?: boolean}} [opts] run/status/tui also take --control
+ * @returns {{ok: true, dir: string, runId: string, control?: string} | {ok: false, error: string}}
  */
 export function parseStepArgs(args, opts = {}) {
-  const flags = ['--dir', '--config', '--repo', '--run-id', ...(opts.objective ? ['--objective'] : []), ...(opts.control ? ['--control'] : [])];
+  const flags = ['--dir', '--run-id', ...(opts.control ? ['--control'] : [])];
   /** @type {Record<string, string | undefined>} */
-  const v = { '--run-id': 'default' };
+  const v = { '--run-id': 'default', '--dir': '.' };
   for (let i = 0; i < args.length; i += 2) {
     const flag = args[i];
     if (!flags.includes(flag)) return { ok: false, error: `unknown argument '${flag}'` };
@@ -92,19 +92,29 @@ export function parseStepArgs(args, opts = {}) {
     if (val === undefined || val.startsWith('--')) return { ok: false, error: `${flag} requires a value` };
     v[flag] = val;
   }
-  const dir = v['--dir'];
-  v['--config'] ??= dir ? join(dir, 'hodge.json') : undefined;
-  v['--repo'] ??= dir ? join(dir, 'target') : '.';
-  if (!v['--config']) return { ok: false, error: '--config <file> (or --dir <sandbox>) is required' };
-  if (opts.objective && !v['--objective']) return { ok: false, error: '--objective <text> is required' };
   return {
     ok: true,
-    config: v['--config'],
-    repo: /** @type {string} */ (v['--repo']),
+    dir: /** @type {string} */ (v['--dir']),
     runId: /** @type {string} */ (v['--run-id']),
-    ...(opts.objective ? { objective: v['--objective'] } : {}),
     ...(v['--control'] ? { control: v['--control'] } : {}),
   };
+}
+
+/**
+ * The repo a repo-level command works on: an explicit --repo, else the target of the sandbox in --dir (or in the current
+ * directory when it holds a hodge.json), else the current directory.
+ * @param {string | undefined} repo
+ * @param {string | undefined} dir
+ * @returns {string}
+ */
+function repoFor(repo, dir) {
+  if (repo) return resolve(repo);
+  const root = dir ?? '.';
+  if (dir || existsSync(join(root, CONFIG_FILE))) {
+    const sb = loadSandbox(root);
+    return sb.ok ? sb.repo : resolve(join(root, 'target'));
+  }
+  return resolve('.');
 }
 
 /**
@@ -150,7 +160,7 @@ export async function main(argv, deps = {}) {
       }
       v[rest[i]] = val;
     }
-    const res = lintSpecs(resolve(v['--repo'] ?? (v['--dir'] ? join(v['--dir'], 'target') : '.')));
+    const res = lintSpecs(repoFor(v['--repo'], v['--dir']));
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
   }
@@ -170,7 +180,7 @@ export async function main(argv, deps = {}) {
       }
       v[rest[i]] = val;
     }
-    const res = checkReadiness(resolve(v['--repo'] ?? (v['--dir'] ? join(v['--dir'], 'target') : '.')));
+    const res = checkReadiness(repoFor(v['--repo'], v['--dir']));
     out(`${JSON.stringify(res)}\n`);
     return res.ready ? 0 : 1;
   }
@@ -198,7 +208,7 @@ export async function main(argv, deps = {}) {
       return 2;
     }
     const run = deps.exec ?? defaultRun;
-    const repoDir = resolve(v['--repo'] ?? (v['--dir'] ? join(v['--dir'], 'target') : '.'));
+    const repoDir = repoFor(v['--repo'], v['--dir']);
     try {
       if (cmd === 'sync') {
         const res = await syncArtifacts({ client: createAwsCliS3Client({ run }), bucket: v['--bucket'] ?? '', repoDir, runId: v['--run-id'] ?? '' });
@@ -389,7 +399,7 @@ export async function main(argv, deps = {}) {
     return 2;
   }
 
-  const parsed = parseStepArgs(argv.slice(1), { objective: cmd === 'interview', control: cmd === 'run' || cmd === 'status' || cmd === 'tui' });
+  const parsed = parseStepArgs(argv.slice(1), { control: cmd === 'run' || cmd === 'status' || cmd === 'tui' });
   if (!parsed.ok) {
     err(`hodge ${cmd}: ${parsed.error}\n`);
     return 2;
@@ -398,24 +408,17 @@ export async function main(argv, deps = {}) {
     err('hodge tui: --control <control.json> is required\n');
     return 2;
   }
-  /** @type {unknown} */
-  let config;
-  try {
-    config = JSON.parse(readFileSync(parsed.config, 'utf8'));
-  } catch (e) {
-    err(`hodge ${cmd}: cannot read config '${parsed.config}': ${/** @type {Error} */ (e).message}\n`);
+  const sandbox = loadSandbox(parsed.dir);
+  if (!sandbox.ok) {
+    err(`hodge ${cmd}: ${sandbox.error}\n`);
     return 2;
   }
-  const v = validateConfig(config);
-  if (!v.ok) {
-    err(`hodge ${cmd}: invalid config: ${v.errors.join('; ')}\n`);
-    return 2;
-  }
+  const { config, repo } = sandbox;
   if (cmd === 'tui') {
     await runTui({
-      source: createLocalStatusSource(resolve(parsed.repo)),
+      source: createLocalStatusSource(repo),
       runId: parsed.runId,
-      budgets: /** @type {any} */ (config).budgets,
+      budgets: config.budgets,
       controlFile: resolve(/** @type {string} */ (parsed.control)),
       input: deps.input ?? process.stdin,
       output: { write: out },
@@ -423,27 +426,36 @@ export async function main(argv, deps = {}) {
     return 0;
   }
   if (cmd === 'status') {
-    const status = readRunStatus(createLocalStatusSource(resolve(parsed.repo)), parsed.runId, /** @type {any} */ (config).budgets);
+    const status = readRunStatus(createLocalStatusSource(repo), parsed.runId, config.budgets);
     const control = parsed.control ? readControl(resolve(parsed.control)) : undefined;
     out(`${JSON.stringify(control ? { ...status, control } : status)}\n`);
     return 0;
   }
   try {
     const adapter = resolveAdapter(config, cmd === 'interview' || cmd === 'objective' || cmd === 'reverse' ? (cmd === 'objective' ? 'interview' : cmd) : 'build', deps.registry ?? defaultRegistry);
-    if (cmd === 'objective') {
+    if (cmd === 'objective' || cmd === 'interview') {
       const rl = createInterface({ input: deps.input ?? process.stdin });
       const lines = rl[Symbol.asyncIterator]();
+      /** @type {(prompt: string) => Promise<string | null>} */
+      const ask = async (prompt) => {
+        out(prompt);
+        const next = await lines.next();
+        return next.done ? null : next.value;
+      };
       try {
+        // The objective is never a flag: it is captured here, as the first answer of the interview.
+        if (cmd === 'interview' && !hasObjectiveKit(repo)) {
+          const objective = ((await ask('Describe the objective in a sentence or two: what should exist when this is done, and why?\n> ')) ?? '').trim();
+          const res = await runInterview({ config, repoDir: repo, runId: parsed.runId, adapter, objective, identity: deps.identity });
+          out(`${JSON.stringify(res)}\n`);
+          return res.status === 'ok' ? 0 : 1;
+        }
         const res = await runObjective({
           config,
-          repoDir: resolve(parsed.repo),
+          repoDir: repo,
           runId: parsed.runId,
           adapter,
-          ask: async (prompt) => {
-            out(prompt);
-            const next = await lines.next();
-            return next.done ? null : next.value;
-          },
+          ask,
           say: out,
           identity: deps.identity,
         });
@@ -453,22 +465,10 @@ export async function main(argv, deps = {}) {
         rl.close();
       }
     }
-    if (cmd === 'interview') {
-      const res = await runInterview({
-        config,
-        repoDir: resolve(parsed.repo),
-        runId: parsed.runId,
-        adapter,
-        objective: parsed.objective ?? '',
-        identity: deps.identity,
-      });
-      out(`${JSON.stringify(res)}\n`);
-      return res.status === 'ok' ? 0 : 1;
-    }
     if (cmd === 'reverse') {
       const res = await runReverse({
         config,
-        repoDir: resolve(parsed.repo),
+        repoDir: repo,
         runId: parsed.runId,
         adapter,
         testCommand: deps.testCommand,
@@ -480,7 +480,7 @@ export async function main(argv, deps = {}) {
     const run = cmd === 'run' ? runLoop : runStep;
     const res = await run({
       config,
-      repoDir: resolve(parsed.repo),
+      repoDir: repo,
       runId: parsed.runId,
       adapter,
       testCommand: deps.testCommand,

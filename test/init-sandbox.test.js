@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, existsSync, readFileSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,7 +40,8 @@ test('writes a valid config next to (not inside) the target repo', () => {
   const cfg = JSON.parse(readFileSync(join(dir, 'hodge.json'), 'utf8'));
   assert.deepEqual(validateConfig(cfg), { ok: true, errors: [] });
   assert.deepEqual(cfg.roles.build, { adapter: 'agent-x', model: 'model-y' });
-  assert.equal(cfg.targetRepo, join(dir, 'target'));
+  assert.equal(cfg.targetRepo, 'target');
+  assert.equal(cfg.hodgepodge, root);
   assert.equal(cfg.requireTestPlan, true);
   assert.ok(!existsSync(join(dir, 'target', 'hodge.json')));
 });
@@ -109,4 +110,14 @@ test('cli init requires --dir, --adapter and --model; exits 1 on refusal', async
   const r = await run(['init', '--dir', join(root, 'nope'), '--adapter', 'a', '--model', 'm']);
   assert.equal(r.code, 1);
   assert.equal(JSON.parse(r.out).ok, false);
+});
+
+test('writes a launcher so the sandbox can be driven from inside it', () => {
+  const dir = fresh();
+  assert.equal(initSandbox({ dir, ...base }).ok, true);
+  const launcher = join(dir, 'hodge');
+  assert.ok(statSync(launcher).mode & 0o100, 'launcher is executable');
+  const out = spawnSync(launcher, ['status'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(JSON.parse(out.stdout).iterations, 0);
 });
