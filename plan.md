@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P2-2: spec and test-plan templates (`templates/spec.md`, `templates/tests-PLAN.md`) that pass `hodge spec-lint`.**
-Why: first unblocked Phase 2 task after spec-lint; interview mode (P2-4) needs templates to emit, and a test asserting templates lint clean keeps them honest. Still pending: P1-8b (needs a running Docker daemon), P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
+**P2-3: mode prompts (`prompts/forward.md`, the loop prompt used by `buildPrompt`, selected by config `mode`).**
+Why: unblocked, and both interview (P2-4) and the Phase 2 exit (P2-6) need a mode-selected prompt; P2-4 can follow now that templates exist. Still pending: P1-8b (needs a running Docker daemon), P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed).
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -38,7 +38,7 @@ Why: first unblocked Phase 2 task after spec-lint; interview mode (P2-4) needs t
 | ID | Task | Status | Depends on |
 |---|---|---|---|
 | P2-1 | Spec-lint: structure checks on `specs/*.md` + mapping in `tests/PLAN.md`; `hodge spec-lint` CLI | done | P1-3 |
-| P2-2 | Spec and test-plan templates (`templates/spec.md`, `templates/tests-PLAN.md`) that pass spec-lint | todo | P2-1 |
+| P2-2 | Spec and test-plan templates (`templates/spec.md`, `templates/tests-PLAN.md`) that pass spec-lint | done | P2-1 |
 | P2-3 | Mode prompts: `prompts/forward.md` (loop prompt used by `buildPrompt`, selected by config `mode`) | todo | P1-1 |
 | P2-4 | Interview mode: `hodge interview` runs the interview adapter role, writes `specs/*.md` + `tests/PLAN.md`, refuses to finish unless spec-lint passes | todo | P2-1, P2-2 |
 | P2-5 | Forward mode gate: refuse to start loops without objective tests (spec-lint + test-plan gate wired into `hodge run`) | todo | P2-1, P1-3 |
@@ -71,3 +71,4 @@ Phase 3 control + TUI + secret-scanning proxy; Phase 4 reverse/brownfield/harden
 - P0-7 done: `src/adapters/openai-http.js` (`createOpenAiHttpAdapter`, `parseFileBlocks`), `test/openai-http-adapter.test.js` runs `adapterContract` against a local fake HTTP server plus auth/model, path-escape, timeout (124), unreachable (127) tests (127 total pass, check clean). Registered as `openai-http`; endpoint/key come from env `HODGE_HTTP_BASE_URL` / `HODGE_HTTP_API_KEY` (key never in config). The model has no tools, so it returns whole files as `<<<FILE path>>>...<<<END>>>` blocks (protocol sent as system message) which the adapter writes; paths outside cwd are rejected (exit 1). HTTP error => exit 2. Cost read from optional `usage.cost`. Sign: tool-less adapters need an explicit file protocol and must confine writes to cwd. Docker client + daemon seem available now (-> P1-8b).
 - Session (P1-8b attempt): Docker client present but daemon not running (`docker.sock` missing), so the build was not attempted; P1-8b stays todo. Broke Phase 2 down into P2-1..P2-6 and set P2-1 as next. Sign: check `docker info` for a reachable daemon, not just the client.
 - P2-1 done: `src/spec-lint.js` (`lintSpecs`), `hodge spec-lint [--repo <dir>]` (JSON `{ok, problems}`, exit 0 clean / 1 problems / 2 usage), `test/spec-lint.test.js` (13 new, 140 total pass, check clean; tests failed first). Checks: specs/ non-empty, each file non-empty, starts with `# Spec: <name>`, exactly one top-level title outside code fences (one decision per file), unique titles, every spec mapped in `tests/PLAN.md`. Extracted `parseTestPlan` from the test-plan gate and shared it. Semantic duplicate/contradiction detection is NOT done (structure only). Sign: lint is pure and deterministic; problems are sorted by file so output is stable.
+- P2-2 done: `templates/spec.md` (sections: Purpose, Requirements, Examples, Out of scope) and `templates/tests-PLAN.md` (table mapping `specs/example.md` -> `tests/example.test.js`), `test/templates.test.js` (3 new, 143 total pass, check clean; tests failed first). The test instantiates both into a temp target (spec as `specs/example.md`) and asserts `lintSpecs` is clean, so templates cannot drift from the linter. Interview mode (P2-4) should emit from these. Sign: templates are tested by instantiation through the real linter.
