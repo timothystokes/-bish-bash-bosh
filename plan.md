@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P1-1: `hodge step`: one idempotent iteration (repo gate, agent call via adapter, scoped tests, commit, run record, JSON status).**
-Why: P0-3, P0-4 (a real adapter) and P0-8 are done, so the core loop step is unblocked; P0-5..P0-7 can follow later and are not on the critical path.
+**P1-1b: wire `hodge step` into the CLI (load config file, adapter registry from role -> adapter id, print the JSON `{sha, iteration, cost, status}`).**
+Why: `runStep` (src/step.js) is done and tested but the CLI still prints "not yet implemented"; this makes the loop runnable and unblocks P1-6 (`hodge run`).
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -21,7 +21,8 @@ Why: P0-3, P0-4 (a real adapter) and P0-8 are done, so the core loop step is unb
 ## Phase 1: Loop + gates
 | ID | Task | Status | Depends on |
 |---|---|---|---|
-| P1-1 | `hodge step`: one idempotent iteration (stack allocation, agent call, scoped tests, commit, JSON status) | todo | P0-3, P0-8 |
+| P1-1 | `runStep`: one idempotent iteration (repo gate, agent call, scoped tests, commit, run record, JSON status) | done | P0-3, P0-8 |
+| P1-1b | Wire `hodge step` CLI (config file, adapter registry, JSON output) | todo | P1-1 |
 | P1-2 | Repo gate (refuse target == hodgepodge) | done | P0-2 |
 | P1-3 | Test-plan gate (plan exists, tests red first) | todo | P1-1 |
 | P1-4 | Type gate, anti-stub gate, scope gate | todo | P1-1 |
@@ -43,3 +44,4 @@ Phase 2 spec modes (interview, forward, spec-lint); Phase 3 control + TUI + secr
 - P0-8 done: `src/run-record.js` (`validateRunRecord`, `iterationDir`, `writeIterationRecord`), 7 new tests (24 total pass, check clean). Writes `runs/<id>/iterations/NNN/{prompt,transcript,diff,test.json,usage.json,record.json}` atomically (temp dir + rename), never overwrites, rejects unsafe runId/iteration. Statuses: ok|failed|gated|over-budget. Sign: validate before touching disk so failures leave no partial records.
 - P1-2 done: `src/repo-gate.js` (`checkRepoGate`, `normalizeRepoId`, `harnessIdentity`), 6 new tests (30 total pass, check clean). Refuses by normalized remote URL (ssh/https/scp, case, .git) and by real path equal to/inside the hodgepodge root (symlinks resolved). Not yet wired into the CLI (no `hodge step` yet): P1-1 must call it first. Sign: the gate takes an injectable identity so tests never depend on this checkout's remotes.
 - P0-4 done: `src/adapters/copilot.js` (`createCopilotAdapter`, `buildCopilotArgs`, `parseCopilotOutput`), fake agent `test/fixtures/fake-copilot.js`, `test/copilot-adapter.test.js` runs `adapterContract` plus args/parse/timeout/missing-binary tests (38 pass, check clean). changedFiles come from a before/after file-hash snapshot (no git needed); wall-clock limit => SIGKILL, exit 124; spawn failure => exit 127. Assumption: usage parsed from `assistant.usage` JSONL events (inputTokens/outputTokens/cost); verify against real `--output-format json` output when first run live. Sign: adapters take injectable `command`/`prefixArgs`/`env` so tests use a fake binary, never the network.
+- P1-1 done: `src/step.js` (`runStep`, `buildPrompt`), `test/step.test.js` (10 new, 48 total pass, check clean; tests failed first). Flow: validate config -> repo gate on targetRepo and repoDir -> clean-tree check -> fixed prompt stack (loop prompt + specs index + plan.md) -> adapter -> scoped test command (injectable, default `npm test`) -> on failure/over-budget `git reset --hard` + clean (diff kept in the record) -> write record -> commit -> `{sha, iteration, cost, status}`. Gated steps return sha null and touch nothing. Iteration number = max existing + 1. Not yet done: CLI wiring (P1-1b), per-gate detail beyond repo/tests (P1-3..P1-5), per-run (not per-step) budget accounting. Sign: a step must start from a clean tree; discard agent work on failure but always commit the record.

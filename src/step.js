@@ -1,0 +1,140 @@
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { validateConfig } from './config.js';
+import { checkRepoGate, harnessIdentity } from './repo-gate.js';
+import { writeIterationRecord } from './run-record.js';
+
+/**
+ * @typedef {import('./adapter.js').Adapter} Adapter
+ * @typedef {import('./repo-gate.js').HarnessIdentity} HarnessIdentity
+ * @typedef {{sha: string | null, iteration: number, cost: number, status: 'ok' | 'failed' | 'gated' | 'over-budget', reason?: string}} StepResult
+ */
+
+const LOOP_PROMPT = [
+  'You are one iteration of a loop. Pick the single most important unfinished item from plan.md and complete it.',
+  '- Search before assuming something is missing.',
+  '- Use parallel subagents for search/read/write; exactly one for build/test.',
+  '- Run scoped tests after each change and record why each test exists.',
+  '- Tests come first. No stubs or partial implementations.',
+  '- Update plan.md when done, then stop.',
+].join('\n');
+
+/** @param {string} p */
+const readIfExists = (p) => (existsSync(p) ? readFileSync(p, 'utf8') : '');
+
+/**
+ * Fixed per-iteration context stack: loop prompt + specs index + plan.md.
+ * @param {string} repoDir
+ * @returns {string}
+ */
+export function buildPrompt(repoDir) {
+  const specsDir = join(repoDir, 'specs');
+  const specs = existsSync(specsDir)
+    ? readdirSync(specsDir).filter((f) => f.endsWith('.md')).sort()
+    : [];
+  const index = specs.map((f) => {
+    const title = readFileSync(join(specsDir, f), 'utf8').split('\n')[0];
+    return `- specs/${f}: ${title}`;
+  });
+  return [
+    LOOP_PROMPT,
+    '## Specs index',
+    index.join('\n'),
+    '## plan.md',
+    readIfExists(join(repoDir, 'plan.md')),
+  ].join('\n\n');
+}
+
+/**
+ * @param {string} dir
+ * @param {string[]} args
+ */
+const git = (dir, ...args) =>
+  execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' });
+
+/** @param {string} dir */
+function nextIteration(dir, /** @type {string} */ runId) {
+  const base = join(dir, 'runs', runId, 'iterations');
+  if (!existsSync(base)) return 1;
+  const nums = readdirSync(base).filter((n) => /^\d+$/.test(n)).map(Number);
+  return nums.length === 0 ? 1 : Math.max(...nums) + 1;
+}
+
+/**
+ * One idempotent loop iteration: gates, agent call, scoped tests, commit, run record.
+ * @param {{
+ *   config: unknown,
+ *   repoDir: string,
+ *   runId: string,
+ *   adapter: Adapter,
+ *   testCommand?: string[],
+ *   identity?: HarnessIdentity,
+ * }} opts
+ * @returns {Promise<StepResult>}
+ */
+export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], identity }) {
+  const v = validateConfig(config);
+  if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
+  const cfg = /** @type {{targetRepo: string, budgets: {maxTokens: number, maxCostUsd: number, maxWallClockSeconds: number}}} */ (config);
+
+  const self = identity ?? harnessIdentity();
+  const gated = (/** @type {string} */ reason) => ({ sha: null, iteration: 0, cost: 0, status: /** @type {const} */ ('gated'), reason });
+  for (const target of [cfg.targetRepo, repoDir]) {
+    const g = checkRepoGate(target, self);
+    if (!g.ok) return gated(g.reason);
+  }
+  if (git(repoDir, 'status', '--porcelain').trim() !== '') {
+    return gated('working tree is not clean');
+  }
+
+  const iteration = nextIteration(repoDir, runId);
+  const prompt = buildPrompt(repoDir);
+  const { maxTokens, maxCostUsd, maxWallClockSeconds } = cfg.budgets;
+  const result = await adapter.run({
+    prompt,
+    cwd: repoDir,
+    limits: { maxTokens, maxCostUsd, maxWallClockSeconds },
+  });
+
+  git(repoDir, 'add', '-A');
+  const diff = git(repoDir, 'diff', '--cached');
+
+  /** @type {StepResult['status']} */
+  let status = 'ok';
+  /** @type {unknown} */
+  let test = { skipped: true };
+  const overBudget = result.usage.tokens > maxTokens || result.usage.cost > maxCostUsd;
+  if (result.exitStatus !== 0) {
+    status = overBudget ? 'over-budget' : 'failed';
+  } else {
+    const [cmd, ...args] = testCommand;
+    const t = spawnSync(cmd, args, { cwd: repoDir, encoding: 'utf8' });
+    test = { exitStatus: t.status ?? 1, output: `${t.stdout ?? ''}${t.stderr ?? ''}` };
+    if (t.status !== 0) status = 'failed';
+  }
+
+  if (status !== 'ok') {
+    // The tree was clean at start, so resetting discards only the agent's work (kept in diff).
+    git(repoDir, 'reset', '-q', '--hard', 'HEAD');
+    git(repoDir, 'clean', '-fdq');
+  }
+
+  writeIterationRecord(repoDir, runId, iteration, {
+    status,
+    usage: result.usage,
+    changedFiles: result.changedFiles,
+    gates: [
+      { name: 'repo', ok: true },
+      { name: 'tests', ok: status === 'ok', detail: status === 'ok' ? undefined : status },
+    ],
+    prompt,
+    transcript: result.transcript,
+    diff,
+    test,
+  });
+  git(repoDir, 'add', '-A');
+  git(repoDir, 'commit', '-q', '-m', `hodge step ${runId}/${String(iteration).padStart(3, '0')}: ${status}`);
+
+  return { sha: git(repoDir, 'rev-parse', 'HEAD').trim(), iteration, cost: result.usage.cost, status };
+}

@@ -6,3 +6,4 @@
 - Run records in the target repo: `runs/<id>/{plan.md, iterations/NNN/{prompt,transcript,diff,test.json,usage.json}, control.json}`. Each iteration dir also has `record.json` (iteration, status, changedFiles, gate results); written atomically, never overwritten (`src/run-record.js`).
 - Drivers: local Node `while` loop (`hodge run`); AWS Step Functions (see `cloud-driver.md`). Both only call `hodge step`.
 - Failures lead to tuning prompts/specs/gates, not blind retries.
+- `runStep` (`src/step.js`): gates (repo, clean tree) -> agent -> scoped tests -> commit. On failed/over-budget the agent's work is reverted (diff preserved in the record) and only the record is committed. Gated steps (sha null) write nothing.
