@@ -18,11 +18,13 @@ npm install
 npx hodge init --dir ~/sandboxes/demo --adapter copilot --model <model-id>
 ```
 
-`init` creates `~/sandboxes/demo/target` (a git repo seeded with a toy spec, red tests and an open plan) and `~/sandboxes/demo/hodge.json` (config, kept outside the repo). Then:
+`init` creates `~/sandboxes/demo/target` (a git repo seeded with a toy spec, red tests and an open plan) and `~/sandboxes/demo/hodge.json` (config, kept outside the repo). `init` also persists the repo and config paths (to `$HODGE_SETTINGS`, default `~/.hodge/settings.json`), so afterwards the other commands need no flags:
 
 ```sh
-npx hodge run --config ~/sandboxes/demo/hodge.json --repo ~/sandboxes/demo/target
+npx hodge run
 ```
+
+`step`, `run`, `interview`, `reverse`, `status` and `tui` default `--config` and `--repo` to the last sandbox you initialised; `spec-lint`, `sync` and `promote` default `--repo`. Explicit flags always override. The last successful `init` wins.
 
 `run` loops one iteration at a time until the target `plan.md` is fully checked, a step fails or is gated, or a budget runs out. It prints JSON `{status, steps, reason?}` and exits 0 only when done.
 

@@ -15,6 +15,7 @@ import { runTui } from './tui.js';
 import { stopContainer, dockerRunner } from './kill-switch.js';
 import { createSecretProxy } from './secret-proxy.js';
 import { syncArtifacts, requestPromotion } from './artifacts.js';
+import { loadSettings, saveSettings, defaultSettingsFile } from './settings.js';
 import { createAwsCliS3Client, createGhPrOpener, defaultRun } from './cloud-clients.js';
 
 /** @returns {string} */
@@ -24,6 +25,7 @@ export function helpText() {
     '',
     'Usage:',
     '  hodge [--help]',
+    '  (after `hodge init`, --config and --repo default to the sandbox it persisted; explicit flags override)',
     '  hodge step --config <file> [--repo <dir>] [--run-id <id>]',
     '  hodge run  --config <file> [--repo <dir>] [--run-id <id>]',
     '  hodge interview --config <file> --objective <text> [--repo <dir>] [--run-id <id>]',
@@ -48,7 +50,7 @@ export function helpText() {
     '         prints JSON {status, sha, reason?}; exit 0 only when ok',
     '  reverse  run the `reverse` role to write specs/ + characterization tests from existing code; commits only if only specs/tests changed,',
     '         spec-lint passes and the test suite is green; prints JSON {status, sha, reason?}; exit 0 only when ok',
-    '  init   scaffold a sandbox: <dir>/target (git repo seeded from templates) + <dir>/hodge.json (outside the repo); refuses dirs inside hodgepodge\n         or non-empty dirs; seed toy (default: spec, red tests, open plan) or empty; prints JSON {ok, dir, repo, config}; exit 0 only when ok',
+    '  init   scaffold a sandbox: <dir>/target (git repo seeded from templates) + <dir>/hodge.json (outside the repo); refuses dirs inside hodgepodge\n         or non-empty dirs; seed toy (default: spec, red tests, open plan) or empty; prints JSON {ok, dir, repo, config}; exit 0 only when ok.\n         On success persists {repo, config} (to $HODGE_SETTINGS or ~/.hodge/settings.json) as the defaults for step/run/interview/reverse/status/tui (--config, --repo), spec-lint, sync and promote (--repo)',
     '  clean-room  export only specs/ + tests/ from --source into a fresh git repo at --repo (the builder never sees source); prints JSON {ok, sha, files};',
     '         exit 0 only when ok. Then run `hodge run` there with config mode clean-room (firewall gate checks the bundle first)',
     '  status  print JSON run status: iterations, tokens, cost, seconds vs budgets (and control state with --control)',
@@ -66,13 +68,13 @@ export function helpText() {
 
 /**
  * @param {string[]} args
- * @param {{objective?: boolean, control?: boolean}} [opts] interview also takes (and requires) --objective; run takes --control
+ * @param {{objective?: boolean, control?: boolean, defaults?: import('./settings.js').Settings | null}} [opts] interview also takes (and requires) --objective; run takes --control; defaults are the settings persisted by `hodge init`
  * @returns {{ok: true, config: string, repo: string, runId: string, objective?: string, control?: string} | {ok: false, error: string}}
  */
 export function parseStepArgs(args, opts = {}) {
   const flags = ['--config', '--repo', '--run-id', ...(opts.objective ? ['--objective'] : []), ...(opts.control ? ['--control'] : [])];
   /** @type {Record<string, string | undefined>} */
-  const v = { '--repo': '.', '--run-id': 'default' };
+  const v = { '--repo': opts.defaults?.repo ?? '.', '--run-id': 'default', '--config': opts.defaults?.config };
   for (let i = 0; i < args.length; i += 2) {
     const flag = args[i];
     if (!flags.includes(flag)) return { ok: false, error: `unknown argument '${flag}'` };
@@ -80,7 +82,7 @@ export function parseStepArgs(args, opts = {}) {
     if (val === undefined || val.startsWith('--')) return { ok: false, error: `${flag} requires a value` };
     v[flag] = val;
   }
-  if (!v['--config']) return { ok: false, error: '--config <file> is required' };
+  if (!v['--config']) return { ok: false, error: '--config <file> is required (or run `hodge init` first)' };
   if (opts.objective && !v['--objective']) return { ok: false, error: '--objective <text> is required' };
   return {
     ok: true,
@@ -103,6 +105,7 @@ export function parseStepArgs(args, opts = {}) {
  *   stderr?: (s: string) => void,
  *   exec?: import('./cloud-clients.js').Run,
  *   docker?: import('./kill-switch.js').DockerRunner,
+ *   settingsFile?: string,
  * }} CliDeps
  */
 
@@ -119,13 +122,14 @@ export async function main(argv, deps = {}) {
     return 0;
   }
   const cmd = argv[0];
+  const settingsFile = deps.settingsFile ?? defaultSettingsFile();
   if (cmd === 'spec-lint') {
     const rest = argv.slice(1);
     if (rest.length > 0 && (rest[0] !== '--repo' || rest.length !== 2 || rest[1].startsWith('--'))) {
       err(rest[0] === '--repo' ? 'hodge spec-lint: --repo requires a value\n' : `hodge spec-lint: unknown argument '${rest[0]}'\n`);
       return 2;
     }
-    const res = lintSpecs(resolve(rest[1] ?? '.'));
+    const res = lintSpecs(resolve(rest[1] ?? loadSettings(settingsFile)?.repo ?? '.'));
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
   }
@@ -134,7 +138,7 @@ export async function main(argv, deps = {}) {
     const allowed = cmd === 'sync' ? ['--bucket', '--run-id', '--repo'] : ['--bucket', '--run-id', '--head', '--base', '--sha', '--repo'];
     const required = cmd === 'sync' ? ['--bucket', '--run-id'] : ['--bucket', '--run-id', '--head', '--base'];
     /** @type {Record<string, string | undefined>} */
-    const v = { '--repo': '.' };
+    const v = { '--repo': loadSettings(settingsFile)?.repo ?? '.' };
     for (let i = 0; i < rest.length; i += 2) {
       const val = rest[i + 1];
       if (!allowed.includes(rest[i])) {
@@ -202,6 +206,7 @@ export async function main(argv, deps = {}) {
       return 2;
     }
     const res = initSandbox({ dir: v['--dir'], adapter: v['--adapter'], model: v['--model'], seed: v['--seed'] });
+    if (res.ok) saveSettings(settingsFile, { repo: res.repo, config: res.config });
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
   }
@@ -344,7 +349,7 @@ export async function main(argv, deps = {}) {
     return 2;
   }
 
-  const parsed = parseStepArgs(argv.slice(1), { objective: cmd === 'interview', control: cmd === 'run' || cmd === 'status' || cmd === 'tui' });
+  const parsed = parseStepArgs(argv.slice(1), { objective: cmd === 'interview', control: cmd === 'run' || cmd === 'status' || cmd === 'tui', defaults: loadSettings(settingsFile) });
   if (!parsed.ok) {
     err(`hodge ${cmd}: ${parsed.error}\n`);
     return 2;
