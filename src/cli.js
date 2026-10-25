@@ -12,6 +12,8 @@ import { createLocalStatusSource, readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
 import { runTui } from './tui.js';
 import { createSecretProxy } from './secret-proxy.js';
+import { syncArtifacts, requestPromotion } from './artifacts.js';
+import { createAwsCliS3Client, createGhPrOpener, defaultRun } from './cloud-clients.js';
 
 /** @returns {string} */
 export function helpText() {
@@ -28,6 +30,8 @@ export function helpText() {
     '  hodge status --config <file> [--repo <dir>] [--run-id <id>] [--control <control.json>]',
     '  hodge tui --config <file> --control <control.json> [--repo <dir>] [--run-id <id>]',
     '  hodge proxy --upstream <url> [--audit <file>] [--meter <file>] [--port <n>]',
+    '  hodge sync --bucket <name> --run-id <id> [--repo <dir>]',
+    '  hodge promote --run-id <id> --head <branch> --base <branch> --bucket <name> [--sha <sha>] [--repo <dir>]',
     '  hodge spec-lint [--repo <dir>]',
     '  hodge control --file <control.json> pause|resume|stop|steer <note...>',
     '',
@@ -47,6 +51,8 @@ export function helpText() {
     '  proxy  secret-redacting, usage-metering proxy in front of a model endpoint; prints JSON {port} then serves until SIGINT/SIGTERM',
     '  spec-lint  check specs/*.md structure and tests/PLAN.md mapping; prints JSON {ok, problems};',
     '         exit 0 only when clean',
+    '  sync   copy runs/<id>/** to S3 (idempotent, needs the `aws` CLI); prints JSON {uploaded, skipped}',
+    '  promote  open a promotion-review PR from --head to --base with the commit and artifacts URI (needs `gh`); never merges; prints JSON {url}',
     '  control  write pause/resume/stop/steer to a control file read by `hodge run --control`; prints JSON {ok}',
     '',
   ].join('\n');
@@ -89,6 +95,7 @@ export function parseStepArgs(args, opts = {}) {
  *   input?: NodeJS.ReadableStream & {setRawMode?: (b: boolean) => unknown},
  *   stdout?: (s: string) => void,
  *   stderr?: (s: string) => void,
+ *   exec?: import('./cloud-clients.js').Run,
  * }} CliDeps
  */
 
@@ -114,6 +121,58 @@ export async function main(argv, deps = {}) {
     const res = lintSpecs(resolve(rest[1] ?? '.'));
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
+  }
+  if (cmd === 'sync' || cmd === 'promote') {
+    const rest = argv.slice(1);
+    const allowed = cmd === 'sync' ? ['--bucket', '--run-id', '--repo'] : ['--bucket', '--run-id', '--head', '--base', '--sha', '--repo'];
+    const required = cmd === 'sync' ? ['--bucket', '--run-id'] : ['--bucket', '--run-id', '--head', '--base'];
+    /** @type {Record<string, string | undefined>} */
+    const v = { '--repo': '.' };
+    for (let i = 0; i < rest.length; i += 2) {
+      const val = rest[i + 1];
+      if (!allowed.includes(rest[i])) {
+        err(`hodge ${cmd}: unknown argument '${rest[i]}'\n`);
+        return 2;
+      }
+      if (val === undefined || val.startsWith('--')) {
+        err(`hodge ${cmd}: ${rest[i]} requires a value\n`);
+        return 2;
+      }
+      v[rest[i]] = val;
+    }
+    const missing = required.filter((f) => !v[f]);
+    if (missing.length > 0) {
+      err(`hodge ${cmd}: ${missing.join(', ')} required\n`);
+      return 2;
+    }
+    const run = deps.exec ?? defaultRun;
+    const repoDir = resolve(v['--repo'] ?? '.');
+    try {
+      if (cmd === 'sync') {
+        const res = await syncArtifacts({ client: createAwsCliS3Client({ run }), bucket: v['--bucket'] ?? '', repoDir, runId: v['--run-id'] ?? '' });
+        out(`${JSON.stringify(res)}\n`);
+        return 0;
+      }
+      let sha = v['--sha'];
+      if (!sha) {
+        const r = await run('git', ['-C', repoDir, 'rev-parse', v['--head'] ?? ''], { cwd: repoDir });
+        if (r.code !== 0) throw new Error(`git rev-parse failed: ${r.stderr.trim()}`);
+        sha = r.stdout.trim();
+      }
+      const res = await requestPromotion({
+        opener: createGhPrOpener({ run, cwd: repoDir }),
+        runId: v['--run-id'] ?? '',
+        head: v['--head'] ?? '',
+        base: v['--base'] ?? '',
+        artifactsUri: `s3://${v['--bucket']}/runs/${v['--run-id']}/`,
+        sha,
+      });
+      out(`${JSON.stringify(res)}\n`);
+      return 0;
+    } catch (e) {
+      err(`hodge ${cmd}: ${/** @type {Error} */ (e).message}\n`);
+      return 2;
+    }
   }
   if (cmd === 'clean-room') {
     const rest = argv.slice(1);
