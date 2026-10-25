@@ -7,6 +7,7 @@ import { runLoop } from './driver.js';
 import { lintSpecs } from './spec-lint.js';
 import { runInterview } from './interview.js';
 import { runReverse } from './reverse.js';
+import { initSandbox } from './init-sandbox.js';
 import { exportBundle } from './clean-room.js';
 import { createLocalStatusSource, readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
@@ -33,6 +34,7 @@ export function helpText() {
     '  hodge proxy --upstream <url> [--audit <file>] [--meter <file>] [--port <n>]',
     '  hodge sync --bucket <name> --run-id <id> [--repo <dir>]',
     '  hodge promote --run-id <id> --head <branch> --base <branch> --bucket <name> [--sha <sha>] [--repo <dir>]',
+    '  hodge init --dir <sandbox> --adapter <id> --model <id> [--seed toy|empty]',
     '  hodge spec-lint [--repo <dir>]',
     '  hodge kill --container <name> [--control <control.json>] [--grace <sec>]',
     '  hodge control --file <control.json> pause|resume|stop|steer <note...>',
@@ -46,6 +48,7 @@ export function helpText() {
     '         prints JSON {status, sha, reason?}; exit 0 only when ok',
     '  reverse  run the `reverse` role to write specs/ + characterization tests from existing code; commits only if only specs/tests changed,',
     '         spec-lint passes and the test suite is green; prints JSON {status, sha, reason?}; exit 0 only when ok',
+    '  init   scaffold a sandbox: <dir>/target (git repo seeded from templates) + <dir>/hodge.json (outside the repo); refuses dirs inside hodgepodge\n         or non-empty dirs; seed toy (default: spec, red tests, open plan) or empty; prints JSON {ok, dir, repo, config}; exit 0 only when ok',
     '  clean-room  export only specs/ + tests/ from --source into a fresh git repo at --repo (the builder never sees source); prints JSON {ok, sha, files};',
     '         exit 0 only when ok. Then run `hodge run` there with config mode clean-room (firewall gate checks the bundle first)',
     '  status  print JSON run status: iterations, tokens, cost, seconds vs budgets (and control state with --control)',
@@ -177,6 +180,30 @@ export async function main(argv, deps = {}) {
       err(`hodge ${cmd}: ${/** @type {Error} */ (e).message}\n`);
       return 2;
     }
+  }
+  if (cmd === 'init') {
+    const rest = argv.slice(1);
+    /** @type {Record<string, string | undefined>} */
+    const v = {};
+    for (let i = 0; i < rest.length; i += 2) {
+      const val = rest[i + 1];
+      if (!['--dir', '--adapter', '--model', '--seed'].includes(rest[i])) {
+        err(`hodge init: unknown argument '${rest[i]}'\n`);
+        return 2;
+      }
+      if (val === undefined || val.startsWith('--')) {
+        err(`hodge init: ${rest[i]} requires a value\n`);
+        return 2;
+      }
+      v[rest[i]] = val;
+    }
+    if (!v['--dir'] || !v['--adapter'] || !v['--model']) {
+      err('hodge init: --dir, --adapter and --model are required\n');
+      return 2;
+    }
+    const res = initSandbox({ dir: v['--dir'], adapter: v['--adapter'], model: v['--model'], seed: v['--seed'] });
+    out(`${JSON.stringify(res)}\n`);
+    return res.ok ? 0 : 1;
   }
   if (cmd === 'clean-room') {
     const rest = argv.slice(1);
