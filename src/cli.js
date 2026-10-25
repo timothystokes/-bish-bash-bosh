@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { validateConfig } from './config.js';
 import { resolveAdapter, defaultRegistry } from './adapters/index.js';
 import { runStep } from './step.js';
+import { runLoop } from './driver.js';
 
 /** @returns {string} */
 export function helpText() {
@@ -12,11 +13,13 @@ export function helpText() {
     'Usage:',
     '  hodge [--help]',
     '  hodge step --config <file> [--repo <dir>] [--run-id <id>]',
+    '  hodge run  --config <file> [--repo <dir>] [--run-id <id>]',
     '',
     'Commands:',
     '  step   run one loop iteration; prints JSON {sha, iteration, cost, status}',
     '         (--repo defaults to ., --run-id defaults to "default")',
-    '  run    (not yet implemented)',
+    '  run    loop steps until the plan is done or a step fails/gates/runs out of budget;',
+    '         prints JSON {status, steps, reason?}; exit 0 only when done',
     '',
   ].join('\n');
 }
@@ -61,14 +64,15 @@ export async function main(argv, deps = {}) {
     out(helpText());
     return 0;
   }
-  if (argv[0] !== 'step') {
+  const cmd = argv[0];
+  if (cmd !== 'step' && cmd !== 'run') {
     err(`hodge: unknown command '${argv[0]}'\n\n${helpText()}`);
     return 2;
   }
 
   const parsed = parseStepArgs(argv.slice(1));
   if (!parsed.ok) {
-    err(`hodge step: ${parsed.error}\n`);
+    err(`hodge ${cmd}: ${parsed.error}\n`);
     return 2;
   }
   /** @type {unknown} */
@@ -76,28 +80,30 @@ export async function main(argv, deps = {}) {
   try {
     config = JSON.parse(readFileSync(parsed.config, 'utf8'));
   } catch (e) {
-    err(`hodge step: cannot read config '${parsed.config}': ${/** @type {Error} */ (e).message}\n`);
+    err(`hodge ${cmd}: cannot read config '${parsed.config}': ${/** @type {Error} */ (e).message}\n`);
     return 2;
   }
   const v = validateConfig(config);
   if (!v.ok) {
-    err(`hodge step: invalid config: ${v.errors.join('; ')}\n`);
+    err(`hodge ${cmd}: invalid config: ${v.errors.join('; ')}\n`);
     return 2;
   }
   try {
     const adapter = resolveAdapter(config, 'build', deps.registry ?? defaultRegistry);
-    const res = await runStep({
+    const run = cmd === 'run' ? runLoop : runStep;
+    const res = await run({
       config,
       repoDir: resolve(parsed.repo),
       runId: parsed.runId,
       adapter,
       testCommand: deps.testCommand,
       identity: deps.identity,
+      requireTestPlan: /** @type {{requireTestPlan?: boolean}} */ (config).requireTestPlan === true,
     });
     out(`${JSON.stringify(res)}\n`);
-    return res.status === 'ok' ? 0 : 1;
+    return res.status === 'ok' || res.status === 'done' ? 0 : 1;
   } catch (e) {
-    err(`hodge step: ${/** @type {Error} */ (e).message}\n`);
+    err(`hodge ${cmd}: ${/** @type {Error} */ (e).message}\n`);
     return 2;
   }
 }

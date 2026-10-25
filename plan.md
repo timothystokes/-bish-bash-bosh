@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P1-6: local driver (`hodge run`) + Dockerfile for per-run container.**
-Why: all gates exist; the driver loops `runStep` until done/over-budget and is the last piece before the toy end-to-end (P1-7). It should also enable `requireTestPlan` (not yet exposed in the CLI/config).
+**P1-7: toy objective end-to-end unattended, red to green.**
+Why: every gate and the local driver exist; the toy run (small target repo with specs + `tests/PLAN.md` + red tests, `hodge run` with a scripted/fake adapter first, then the Copilot adapter live) proves the harness and will surface the remaining gaps (e.g. verify the Copilot usage-parsing assumption, build-and-run the Dockerfile where a Docker daemon exists).
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -27,7 +27,7 @@ Why: all gates exist; the driver loops `runStep` until done/over-budget and is t
 | P1-3 | Test-plan gate (plan exists, tests red first) | done | P1-1 |
 | P1-4 | Type gate, anti-stub gate, scope gate | done | P1-1 |
 | P1-5 | Budget gate (tokens/cost/time/iterations) | done | P1-1 |
-| P1-6 | Local driver (`hodge run`) + Dockerfile for per-run container | todo | P1-1 |
+| P1-6 | Local driver (`hodge run`) + Dockerfile for per-run container | done | P1-1 |
 | P1-7 | Toy objective end-to-end unattended, red to green | todo | P1-2..P1-6 |
 
 ## Later phases (not yet broken down)
@@ -49,3 +49,4 @@ Phase 2 spec modes (interview, forward, spec-lint); Phase 3 control + TUI + secr
 - P1-5 done: `src/budget-gate.js` (`sumRunUsage`, `checkBudgetGate`), 9 new tests (66 total pass, check clean; tests failed first). `runStep` sums `runs/<id>/iterations/*/usage.json`, refuses with `{status:'over-budget', sha:null, reason}` and writes nothing when iterations/tokens/cost/wall-clock is exhausted, and passes the adapter the remaining run budget as limits (wall-clock also capped per step). usage.json now carries optional `seconds` (measured around the adapter call); records gain a `budget` gate entry. Budgets in config are therefore run-wide. Sign: budget accounting reads only run records, so a restarted driver cannot lose it.
 - P1-4 done: `src/diff-gates.js` (`checkScopeGate`, `checkAntiStubGate`, `checkTypeGate`), `test/diff-gates.test.js` (13 new, 79 total pass, check clean; tests failed first). `runStep` takes optional `typeCommand`; scope/anti-stub run before tests, all gates recorded in `record.json`. Decisions: plan.md always in scope; markdown not stub-scanned; type gate skipped when target has no tsconfig.json (recorded as skipped). Sign: gates read staged git state, not the adapter's self-reported changedFiles.
 - P1-3 done: `src/test-plan-gate.js` (`checkTestPlanGate`), `test/test-plan-gate.test.js` (7 new, 86 total pass, check clean; tests failed first). Needs `tests/PLAN.md` where each line names a `specs/*.md` and `tests/*` path; every target spec must be mapped, mapped tests must exist, and before iteration 1 of a run the suite must be red. `runStep` opt-in `requireTestPlan` returns `gated` (nothing written) on failure; records a `test-plan` gate. Not yet wired to CLI/config (do in P1-6). Sign: red-first is checked by the harness running the suite, never by trusting agent claims.
+- P1-6 done: `src/driver.js` (`runLoop`, `isPlanDone`), `hodge run` in `src/cli.js` (same flags as step; JSON `{status: done|over-budget|failed|gated, steps, reason?}`; exit 0 only on done), optional config key `requireTestPlan` (schema) now honoured by both `step` and `run`, `Dockerfile` + `.dockerignore`. 95 tests pass, check clean (tests failed first). Loop stops on the first non-ok step (no blind retries); the terminating non-ok step is included in `steps`. Done = target `plan.md` has >=1 checkbox and none unchecked. Moved `ajv` to `dependencies` (src needs it at runtime; verified `npm ci --omit=dev` + `hodge --help`). Dockerfile NOT built: no Docker daemon in this session. Sign: validate prod-only installs when adding runtime imports.
