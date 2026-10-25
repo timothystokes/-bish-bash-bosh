@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P1-8b: Build the Dockerfile where a Docker daemon runs (start Docker Desktop/colima first), then `docker build` + a smoke `hodge step` in the container.**
-Why: every offline-testable task is done; this is the only blocked item that needs just a local daemon, and it unblocks P3-5 (container kill switch) and P5-6. Still pending: P5-4b/P5-6 need an AWS account (no `aws` CLI here); P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed). If no daemon is available again, ask the owner to start one rather than looping. Sign: keep infra logic as pure, testable JS with injected clients; the pointer shape is the contract in `specs/cloud-driver.md`.
+**P3-5: Kill switch for the local run container: pure `stopContainer({run, name})` (injected `docker` runner) that sets `stop` in control.json first, then `docker stop`; offline-tested, plus a live check against a real container via colima.**
+Why: P1-8b unblocked it (image builds, container `hodge step` works), and it is the last Phase 3 gap. Still pending: P5-4b/P5-6 need an AWS account (no `aws` CLI here); P0-5b Claude Code and P0-6b Codex live checks (CLIs not installed). Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`) and a mounted fixture file lacks the exec bit, so wrap it in a `sh` script. Keep infra logic pure with injected clients; pointer shape is the contract in `specs/cloud-driver.md`.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -32,7 +32,7 @@ Why: every offline-testable task is done; this is the only blocked item that nee
 | P1-6 | Local driver (`hodge run`) + Dockerfile for per-run container | done | P1-1 |
 | P1-7 | Toy objective end-to-end unattended, red to green (scripted adapter) | done | P1-2..P1-6 |
 | P1-8 | Live Copilot smoke; fix usage parsing | done | P1-7 |
-| P1-8b | Build the Dockerfile where a Docker daemon runs (none in the last session) | todo | P1-7 |
+| P1-8b | Build the Dockerfile where a Docker daemon runs (none in the last session) | done | P1-7 |
 
 ## Phase 2: Spec modes
 | ID | Task | Status | Depends on |
@@ -128,3 +128,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - P5-4 done: `src/kill-switch.js` (`stopRun({client, executionArn, controlFile?, cause?})`), `test/kill-switch.test.js` (6 new, 274 total pass, check clean; failed first on missing module). Sets `stop` in the control file first so no successor starts, then `StopExecution` (error `KillSwitch`); idempotent on `ExecutionDoesNotExist`, rethrows other errors, rejects an empty ARN. Learned: stopping only the current execution would let a successor start, hence control-first ordering. The live `.sync` ECS stop check needs AWS: P5-4b. Sign: observers take an injected client with a minimal interface so they test offline.
 - P5-5 done: `src/artifacts.js` (`syncArtifacts({client,bucket,repoDir,runId})`, `requestPromotion({opener,...})`), `test/artifacts.test.js` (5 new, 279 total pass, check clean; failed first on missing module). Sync copies `runs/<runId>/**` to the same S3 key, skipping files whose sha256 matches (idempotent); rejects unsafe run ids. Promotion opens a PR from the sandbox branch, refuses head == base, never merges. Learned: real clients/CLI are a separate small step (P5-5b). Sign: injected minimal client interfaces (`headObject`/`putObject`, `openPullRequest`).
 - P5-5b done: `src/cloud-clients.js` (`createAwsCliS3Client`, `createGhPrOpener`, `defaultRun`; injectable `run`), `hodge sync --bucket --run-id [--repo]` and `hodge promote --run-id --head --base --bucket [--sha] [--repo]` in `src/cli.js` (`deps.exec` injected in tests), `test/cloud-clients.test.js` (8 new, 287 total pass, check clean; failed first on missing module). Used the `aws` CLI (sha256 in object metadata) instead of adding an SDK dependency. Live S3/PR use still needs AWS + `gh` auth (P5-6). Sign: shell-outs go through one injectable `run` so CLI paths test offline.
+- P1-8b done: started `colima`, `docker build -t hodgepodge:dev .` succeeds; in-container smoke `hodge step` (toy repo mounted at `/work`, config at `/config`, fake agent as `copilot`) goes red -> green with committed `ok` record (exit 0). Learned: colima only mounts `$HOME` (a `/tmp` bind mount showed an empty `/config`); a bind-mounted non-executable fixture gives `spawn copilot EACCES`, so use an `sh` wrapper; a harmless `fatal: not a git repository` line appears on stderr in the container (identity probe of `/opt/hodgepodge`, not fatal; worth silencing later). No harness code changes. Unblocks P3-5. Sign: verify daemon with `docker info`, start with `colima start`.
