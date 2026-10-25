@@ -8,6 +8,7 @@ import { checkTestPlanGate } from './test-plan-gate.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { writeIterationRecord } from './run-record.js';
 import { loadModePrompt } from './prompts.js';
+import { checkBrownfieldGate } from './brownfield-gate.js';
 
 /**
  * @typedef {import('./adapter.js').Adapter} Adapter
@@ -87,6 +88,11 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   }
   if (git(repoDir, 'status', '--porcelain').trim() !== '') {
     return gated('working tree is not clean');
+  }
+
+  if (cfg.mode === 'brownfield') {
+    const bf = checkBrownfieldGate(repoDir);
+    if (!bf.ok) return gated(bf.reason ?? 'brownfield gate failed');
   }
 
   const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
