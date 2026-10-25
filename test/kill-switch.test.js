@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { stopRun } from '../src/kill-switch.js';
+import { stopRun, stopContainer, dockerRunner } from '../src/kill-switch.js';
 
 const ARN = 'arn:aws:states:ap-southeast-2:123456789012:execution:hodge-loop:run-1';
 
@@ -71,4 +71,57 @@ test('stopRun rejects an empty execution ARN without calling the client', async 
   const client = fakeClient();
   await assert.rejects(stopRun({ client, executionArn: '' }), /executionArn/);
   assert.equal(client.calls.length, 0);
+});
+
+/** @param {(args: string[]) => {code: number, stdout?: string, stderr?: string}} [impl] */
+function fakeDocker(impl) {
+  /** @type {string[][]} */
+  const calls = [];
+  return {
+    calls,
+    run: async (/** @type {string[]} */ args) => {
+      calls.push(args);
+      const r = impl ? impl(args) : { code: 0 };
+      return { stdout: '', stderr: '', ...r };
+    },
+  };
+}
+
+test('stopContainer sets stop in control.json before docker stop', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hodge-kill-'));
+  const controlFile = join(dir, 'control.json');
+  const docker = fakeDocker(() => {
+    assert.equal(JSON.parse(readFileSync(controlFile, 'utf8')).stop, true);
+    return { code: 0 };
+  });
+  const r = await stopContainer({ docker: docker.run, name: 'hodge-run-1', controlFile });
+  assert.deepEqual(docker.calls, [['stop', '--time', '10', 'hodge-run-1']]);
+  assert.deepEqual(r, { stopped: true, name: 'hodge-run-1' });
+});
+
+test('stopContainer reports a vanished container as not stopped, without throwing', async () => {
+  const docker = fakeDocker(() => ({ code: 1, stderr: 'Error response from daemon: No such container: x' }));
+  const r = await stopContainer({ docker: docker.run, name: 'x' });
+  assert.deepEqual(r, { stopped: false, name: 'x', reason: 'container does not exist' });
+});
+
+test('stopContainer throws on other docker failures, after setting stop', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hodge-kill-'));
+  const controlFile = join(dir, 'control.json');
+  const docker = fakeDocker(() => ({ code: 1, stderr: 'Cannot connect to the Docker daemon' }));
+  await assert.rejects(stopContainer({ docker: docker.run, name: 'x', controlFile }), /Cannot connect/);
+  assert.equal(JSON.parse(readFileSync(controlFile, 'utf8')).stop, true);
+});
+
+test('stopContainer requires a name and rejects option-like names', async () => {
+  const docker = fakeDocker();
+  await assert.rejects(stopContainer({ docker: docker.run, name: '' }), /name is required/);
+  await assert.rejects(stopContainer({ docker: docker.run, name: '--all' }), /invalid container name/);
+  assert.equal(docker.calls.length, 0);
+});
+
+test('dockerRunner executes the docker binary and returns code and output', async () => {
+  const r = await dockerRunner('node')(['-e', 'console.log("hi"); process.exit(3)']);
+  assert.equal(r.code, 3);
+  assert.equal(r.stdout.trim(), 'hi');
 });
