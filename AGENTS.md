@@ -21,6 +21,13 @@ Hodgepodge is a **model-agnostic harness for delivering software with loop-engin
 - Keep `plan.md` truthful: update task status and the "Next best action" at the end of every session.
 - When something goes wrong, tune the prompts/specs/gates ("add a sign"); don't just retry.
 
+## End-of-session checklist (mandatory, every session)
+1. Update task statuses in `plan.md`.
+2. Rewrite the **">>> Next best action"** section in `plan.md`: the single most valuable next task, with a one-line "why", chosen from unblocked tasks (break down the next phase first if none remain).
+3. Append a line to the "Session log" in `plan.md`: what was done, what was learned, any new "signs" added.
+4. Update any `specs/*.md` or `AGENTS.md` rules that changed.
+5. Commit locally (with the co-author trailer). Do not push unless the user says to.
+
 ## Out of scope for planning
 Punk (a functional language) is a later validation project, to be run once a harness version exists. Do not plan around it.
 
