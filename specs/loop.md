@@ -7,3 +7,4 @@
 - Drivers: local Node `while` loop (`hodge run`); AWS Step Functions (see `cloud-driver.md`). Both only call `hodge step`.
 - Failures lead to tuning prompts/specs/gates, not blind retries.
 - `runStep` (`src/step.js`): gates (repo, clean tree) -> agent -> scoped tests -> commit. On failed/over-budget the agent's work is reverted (diff preserved in the record) and only the record is committed. Gated steps (sha null) write nothing.
+- CLI: `hodge step --config <file> [--repo <dir>] [--run-id <id>]` prints the step JSON to stdout; exit 0 ok, 1 failed/gated/over-budget, 2 usage/config/adapter error. The `build` role's adapter id is resolved via `src/adapters/index.js` (`defaultRegistry`).

@@ -26,7 +26,8 @@ Hodgepodge is a **model-agnostic harness for delivering software with loop-engin
 2. Rewrite the **">>> Next best action"** section in `plan.md`: the single most valuable next task, with a one-line "why", chosen from unblocked tasks (break down the next phase first if none remain).
 3. Append a line to the "Session log" in `plan.md`: what was done, what was learned, any new "signs" added.
 4. Update any `specs/*.md` or `AGENTS.md` rules that changed.
-5. Commit (with the co-author trailer) and push to `main`. Do not watch or poll CI afterwards.
+5. Evaluate if additional steps should be added to the checklist or plan, and assess which step is the next best action and mark it in `plan.md`.
+6. Commit (with the co-author trailer) and push to `main`. Do not watch or poll CI afterwards.
 
 ## Out of scope for planning
 Punk (a functional language) is a later validation project, to be run once a harness version exists. Do not plan around it.
