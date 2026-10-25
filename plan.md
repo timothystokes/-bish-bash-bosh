@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P0-5b (live-verify Claude Code output shape): install `claude` yourself (e.g. `npm i -g @anthropic-ai/claude-code`) and verify; then P0-6b (Codex, install `codex`), then the Docker follow-ups P3-5b, P1-9, P1-10. Stop only if a credential is missing, and name it. Docker (local) is the main target; Phase 5 (AWS) is a future goal, do not pick P5-* tasks.**
-Why: P0-5b/P0-6b only need a CLI install, which the agent can do; the AWS tasks are deferred. Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`) and a mounted fixture file lacks the exec bit, so wrap it in a `sh` script. Keep infra logic pure with injected clients; pointer shape is the contract in `specs/cloud-driver.md`.
+**P3-5b: wire `stopContainer` to a CLI command (`hodge kill`) so the Docker run can be stopped from the observer (tests first). Then P1-9, then P1-10. P0-5b and P0-6b stay open but only for the success-case shape: they need a credential (`ANTHROPIC_API_KEY` or `claude login`; for Codex `OPENAI_API_KEY` or `codex login`). Docker (local) is the main target; Phase 5 (AWS) is a future goal, do not pick P5-* tasks.**
+Why: P3-5b needs no credential and makes the Docker run stoppable. Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`) and a mounted fixture file lacks the exec bit, so wrap it in a `sh` script. Keep infra logic pure with injected clients; pointer shape is the contract in `specs/cloud-driver.md`.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -14,7 +14,7 @@ Why: P0-5b/P0-6b only need a CLI install, which the agent can do; the AWS tasks 
 | P0-3 | Adapter interface + contract test suite (`specs/adapters.md`) | done | P0-2 |
 | P0-4 | Adapter: Copilot CLI (non-interactive) | done | P0-3 |
 | P0-5 | Adapter: Claude Code | done | P0-3 |
-| P0-5b | Live-verify Claude Code output shape (`claude` not installed in P0-5 session) | todo | P0-5 |
+| P0-5b | Live-verify Claude Code output shape (`claude` 2.1.310 installed; error-result shape verified, success shape needs `ANTHROPIC_API_KEY`/login) | blocked (credential) | P0-5 |
 | P0-6 | Adapter: Codex | done | P0-3 |
 | P0-6b | Live-verify Codex `exec --json` output shape (`codex` not installed in P0-6 session) | todo | P0-6 |
 | P0-7 | Adapter: generic OpenAI-compatible HTTP | done | P0-3 |
@@ -172,3 +172,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (blocked check, twenty-eighth): `claude`, `codex`, `aws` still not on PATH and no AWS credentials; only `gh` present. No code changes. Next best action unchanged; awaits the owner installing a CLI or providing AWS credentials. Sign: don't retry until the owner reports a tool installed.
 - Session (blocked check, twenty-ninth): `claude`, `codex`, `aws` still not on PATH and no AWS credentials; only `gh` and `copilot` present. No code changes. Next best action unchanged; awaits the owner installing a CLI or providing AWS credentials. Sign: don't retry until the owner reports a tool installed.
 - Session (re-plan): AWS/Phase 5 deferred as a future goal; Docker is the main goal. Added Docker follow-ups P3-5b, P1-9, P1-10; next best action is P0-5b (install `claude` and verify). Sign: missing tools are never a blocker, install them; only missing credentials block.
+- Session (P0-5b): installed `claude` 2.1.310 via npm. Not logged in; live `-p --output-format json` returns a single `type:result` object (`result`, `usage`, `total_cost_usd`, `is_error`) with exit 1, which `parseClaudeOutput` handles; added a test for it. Success-case shape still needs `ANTHROPIC_API_KEY` or `claude login`. Sign: `is_error:true` results exit non-zero; keep surfacing `result` as the transcript. Next: P3-5b.

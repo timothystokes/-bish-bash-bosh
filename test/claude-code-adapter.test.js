@@ -72,3 +72,8 @@ test('missing command yields exit 127, not a throw', async () => {
 test('registered in defaultRegistry as claude-code', () => {
   assert.equal(typeof defaultRegistry['claude-code'], 'function');
 });
+
+test('parses real claude 2.1.310 error result (not logged in): transcript kept, zero usage', () => {
+  const real = JSON.stringify({ type: 'result', subtype: 'success', is_error: true, result: 'Not logged in · Please run /login', total_cost_usd: 0, usage: { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } });
+  assert.deepEqual(parseClaudeOutput(real), { transcript: 'Not logged in · Please run /login', usage: { tokens: 0, cost: 0 } });
+});
