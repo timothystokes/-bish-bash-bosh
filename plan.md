@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**No unblocked Docker work remains. Ask the owner what to do next (e.g. promote Phase 5, or new work). Do NOT check for `codex`/`claude`/`OPENAI_API_KEY`: P0-5b and P0-6b are "implement later" (deferred by the owner); skip them.**
-Why: Phase 0-4 and 6 and all Docker tasks are done; the only `todo` items are Phase 5 (AWS, not the current focus) and the deferred live-verifies.
+**P5-4b: live-verify that `.sync` stops the running ECS task on `StopExecution` (Phase 5 / AWS, promoted by the owner for this pick). Needs an AWS account/credentials: if none are available, state exactly which credential is missing and stop. Do NOT check for `codex`/`claude`/`OPENAI_API_KEY`: P0-5b and P0-6b are "implement later" (deferred by the owner); skip them.**
+Why: all Docker tasks are done; the only remaining `todo` items are Phase 5 (P5-4b, then P5-6 toy objective in AWS, which depends on it) and P5-4b is the smaller, earlier step.
 Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`.
 
 ## Phase 0: Foundations
@@ -169,7 +169,7 @@ Ordered; each task is tests-first and updates docs/specs/templates in the same s
 Deferred and unchanged: H-7, H-8, H-9, H-12, H-18, H-20, H-24, H-27, H-28, F-12.
 
 ## Phase 5: Cloud (AWS) — FUTURE GOAL, not the current focus
-The main goal for now is the Docker-based local implementation. Do not pick P5-* tasks as the next best action until the owner promotes this phase.
+The main goal for now is the Docker-based local implementation. The owner promoted P5-4b as the next best action (see top of file); other P5-* tasks stay unpicked until promoted.
 
 | ID | Task | Status | Depends on |
 |---|---|---|---|
@@ -361,3 +361,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (no-op check): Next best action still says no unblocked Docker work remains (Phase 5 and `implement later` excluded). No task picked, no code changes, nothing tested or run (full loop not run). No new signs.
 - Session (no-op check): Next best action still says no unblocked Docker work remains (Phase 5 and `implement later` excluded). No task picked, no code changes, nothing tested or run (full loop not run). Awaits owner direction. Sign: don't invent work; log and stop.
 - Session (no-op check): Next best action still says no unblocked Docker work remains (Phase 5 and `implement later` excluded). No task picked, no code changes, nothing tested or run (full loop not run). Awaits owner direction. No new signs.
+- Session (owner request): all Docker tasks were already `done`, so none were changed. Owner chose to pick the next best action: set to P5-4b (Phase 5 promoted for that pick; needs AWS credentials). No code changes; nothing tested or run (full loop not run).
