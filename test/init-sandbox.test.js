@@ -132,3 +132,20 @@ test('writes hodgepodge, hodge and podge launchers so the sandbox can be driven 
   assert.equal(out.status, 0, out.stderr);
   assert.equal(JSON.parse(out.stdout).iterations, 0);
 });
+
+test('objective seed lets the build agent write bin/ and lib/ as well as src/', () => {
+  const dir = fresh();
+  assert.equal(initSandbox({ dir, ...base, seed: 'objective' }).ok, true);
+  const cfg = JSON.parse(readFileSync(join(dir, 'hodge.json'), 'utf8'));
+  assert.deepEqual(cfg.allowedPaths, ['src/', 'bin/', 'lib/']);
+});
+
+test('default budgets fit a live agent: one conversation round plus several steps', () => {
+  const dir = fresh();
+  assert.equal(initSandbox({ dir, ...base }).ok, true);
+  const b = JSON.parse(readFileSync(join(dir, 'hodge.json'), 'utf8')).budgets;
+  assert.ok(b.maxTokens >= 2_000_000, 'a single live agent call can use over 100k tokens');
+  assert.ok(b.maxWallClockSeconds >= 3600);
+  assert.ok(b.maxIterations >= 10);
+  assert.ok(b.maxCostUsd >= 10);
+});

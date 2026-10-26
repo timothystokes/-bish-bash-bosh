@@ -42,6 +42,22 @@ test('isPlanDone: needs at least one checkbox and none unchecked', () => {
   assert.equal(isPlanDone('# no items\n'), false);
 });
 
+test('runLoop stops gated when the agent records an unresolved CONFLICT item in plan.md', async () => {
+  const dir = makeRepo('- [ ] one\n- [ ] two\n');
+  let n = 0;
+  const adapter = {
+    async run(/** @type {any} */ req) {
+      n += 1;
+      writeFileSync(join(req.cwd, 'plan.md'), '- [ ] one\n- [ ] two\n\n- [ ] CONFLICT: specs/a.md:2 vs tests/a.test.js:3\n');
+      return { exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0.1 }, changedFiles: ['plan.md'] };
+    },
+  };
+  const res = await runLoop({ config: config(), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity });
+  assert.equal(res.status, 'gated');
+  assert.match(res.reason ?? '', /CONFLICT/);
+  assert.equal(n, 1, 'no further iterations are spent on a conflict');
+});
+
 test('runLoop stops with done when the agent ticks the last plan item', async () => {
   const dir = makeRepo('- [ ] one\n- [ ] two\n');
   let n = 0;

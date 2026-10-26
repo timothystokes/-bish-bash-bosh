@@ -39,9 +39,9 @@ Use `--seed empty` to start from an empty target. Run `npx hodgepodge --help` fo
 
 `hodge.json` is validated against `src/config.schema.json`. The key parts:
 
-- `targetRepo` (relative to the sandbox dir), `hodgepodge` (written by `init`: where the tool lives), `allowedPaths`: where the agent works and what it may write.
+- `targetRepo` (relative to the sandbox dir), `hodgepodge` (written by `init`: where the tool lives), `allowedPaths`: where the agent works and what it may write (`init` defaults to `src/`; `--seed objective` also allows `bin/` and `lib/`, since a CLI entry point is not solution-specific).
 - `roles`: map roles (`build`, `interview`, `reverse`, ...) to an adapter and model. Models live in config only.
-- `budgets`: `maxTokens`, `maxCostUsd`, `maxWallClockSeconds`, `maxIterations`.
+- `budgets`: `maxTokens`, `maxCostUsd`, `maxWallClockSeconds`, `maxIterations`. They are per run id and shared by `hodge` and `podge`. `init` defaults to 5,000,000 tokens, $20, 7200 s and 20 iterations (one live agent call can use over 100k tokens).
 - `mode`: `forward` (default), `interview`, `reverse`, `brownfield`, `test-hardening`, `clean-room`.
 
 Adapters: `copilot`, `claude-code`, `codex`, `openai-http` (endpoint and key come from `HODGE_HTTP_BASE_URL` / `HODGE_HTTP_API_KEY`, never from config).

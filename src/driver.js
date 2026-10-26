@@ -40,6 +40,9 @@ export async function runLoop(opts) {
   }
   /** @type {StepResult[]} */
   const steps = [];
+  const startPlan = join(stepOpts.repoDir, 'plan.md');
+  const startConflict = existsSync(startPlan) ? findConflict(readFileSync(startPlan, 'utf8')) : undefined;
+  if (startConflict) return { status: 'gated', steps, reason: `unresolved ${startConflict}: fix the spec or tests (\`hodge\`), then resolve it in plan.md` };
   for (;;) {
     /** @type {string | undefined} */
     let steer;
@@ -58,6 +61,18 @@ export async function runLoop(opts) {
     steps.push(res);
     if (res.status !== 'ok') return { status: res.status, steps, ...(res.reason ? { reason: res.reason } : {}) };
     const planPath = join(stepOpts.repoDir, 'plan.md');
-    if (existsSync(planPath) && isPlanDone(readFileSync(planPath, 'utf8'))) return { status: 'done', steps };
+    const plan = existsSync(planPath) ? readFileSync(planPath, 'utf8') : '';
+    const conflict = findConflict(plan);
+    if (conflict) return { status: 'gated', steps, reason: `unresolved ${conflict}: fix the spec or tests (\`hodge\`), then resolve it in plan.md` };
+    if (isPlanDone(plan)) return { status: 'done', steps };
   }
+}
+
+/**
+ * First unchecked plan item the agent marked as a spec/test conflict.
+ * @param {string} plan
+ * @returns {string | undefined}
+ */
+export function findConflict(plan) {
+  return plan.match(/^\s*[-*] \[ \] (CONFLICT:.*)$/m)?.[1]?.slice(0, 200);
 }

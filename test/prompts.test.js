@@ -23,6 +23,12 @@ test('forward prompt carries the loop rules', () => {
   assert.match(p, /plan\.md/);
 });
 
+test('forward prompt makes specs and tests read-only and routes conflicts to plan.md', () => {
+  const p = loadModePrompt('forward');
+  assert.match(p, /do not (edit|change) .*specs\/.*tests\//is);
+  assert.match(p, /conflict/i);
+});
+
 test('unknown or unwritten modes are rejected', () => {
   assert.throws(() => loadModePrompt('nonsense'), /unknown mode/i);
   assert.throws(() => loadModePrompt('../forward'), /unknown mode/i);
