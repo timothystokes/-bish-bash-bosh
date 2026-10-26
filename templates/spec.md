@@ -11,7 +11,7 @@ One or two sentences: what this decides and why it exists.
 - Input -> expected output. Prefer concrete, executable cases (conformance examples).
 
 ## Formats
-Optional: one bullet per artifact in an adopted standard format: `- <format>: <path>` (for example `- json-schema: specs/schemas/order.json`). Delete this section when unused; a requirement must reference each declared path.
+Optional: one bullet per artifact in an adopted standard format: `- <format>: <path>` (for example `- json-schema: specs/schemas/order.json`); add `-> <output path>` for a file the loop produces that must conform (`- json-schema: specs/schemas/order.json -> out/order.json`). Delete this section when unused; a requirement must reference each declared path.
 
 ## Out of scope
 - What this spec deliberately does not cover.

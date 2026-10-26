@@ -11,6 +11,7 @@ import { loadModePrompt } from './prompts.js';
 import { checkBrownfieldGate } from './brownfield-gate.js';
 import { checkHardeningGate } from './hardening-gate.js';
 import { checkCleanRoomGate } from './clean-room.js';
+import { checkFormatGate, declaresFormats } from './formats.js';
 
 /**
  * @typedef {import('./adapter.js').Adapter} Adapter
@@ -153,6 +154,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     const diffOk = [
       record('scope', checkScopeGate(staged, cfg.allowedPaths)),
       record('anti-stub', checkAntiStubGate(diff)),
+      ...(declaresFormats(repoDir) ? [record('formats', checkFormatGate(repoDir))] : []),
       ...(hardening ? [record('tests-only', checkScopeGate(staged, ['tests/']))] : []),
     ].every(Boolean);
     if (!diffOk) {

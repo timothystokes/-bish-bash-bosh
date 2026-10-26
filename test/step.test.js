@@ -193,3 +193,49 @@ test('step caps adapter limits to the remaining run budget and records wall-cloc
   const u = JSON.parse(readFileSync(join(dir, 'runs/rc/iterations/001/usage.json'), 'utf8'));
   assert.equal(typeof u.seconds, 'number');
 });
+
+const formatSpec = '# Spec: Order\nImplementation: none\n\n## Requirements\n- R-order-1: Output must conform to `specs/schemas/order.json`.\n\n## Formats\n- json-schema: specs/schemas/order.json -> src/order.json\n\n## Out of scope\n- x\n';
+const orderSchema = JSON.stringify({ $id: 'https://x/order', type: 'object', required: ['total'] });
+
+/** @param {string} dir */
+function addFormatSpec(dir) {
+  mkdirSync(join(dir, 'specs', 'schemas'), { recursive: true });
+  writeFileSync(join(dir, 'specs', 'order.md'), formatSpec);
+  writeFileSync(join(dir, 'specs', 'schemas', 'order.json'), orderSchema);
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-qm', 'formats');
+}
+
+test('format gate: output violating the declared schema fails the step and is reverted', async () => {
+  const dir = makeRepo();
+  addFormatSpec(dir);
+  const res = await runStep({
+    config: config('o/target'), repoDir: dir, runId: 'r1',
+    adapter: adapter({ writes: { 'src/order.json': '{}' } }), testCommand: pass, identity: self,
+  });
+  assert.equal(res.status, 'failed');
+  assert.ok(!existsSync(join(dir, 'src', 'order.json')));
+  const rec = JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
+  const g = rec.gates.find((/** @type {{name: string}} */ x) => x.name === 'formats');
+  assert.equal(g.ok, false);
+  assert.match(g.detail, /src\/order\.json/);
+});
+
+test('format gate: conforming output passes and records the gate', async () => {
+  const dir = makeRepo();
+  addFormatSpec(dir);
+  const res = await runStep({
+    config: config('o/target'), repoDir: dir, runId: 'r1',
+    adapter: adapter({ writes: { 'src/order.json': '{"total": 1}' } }), testCommand: pass, identity: self,
+  });
+  assert.equal(res.status, 'ok');
+  const rec = JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
+  assert.ok(rec.gates.some((/** @type {{name: string, ok: boolean}} */ x) => x.name === 'formats' && x.ok));
+});
+
+test('format gate: absent when no spec declares formats', async () => {
+  const dir = makeRepo();
+  await runStep({ config: config('o/target'), repoDir: dir, runId: 'r1', adapter: adapter(), testCommand: pass, identity: self });
+  const rec = JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
+  assert.ok(!rec.gates.some((/** @type {{name: string}} */ x) => x.name === 'formats'));
+});

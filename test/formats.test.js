@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { parseFormats, checkFormats, FORMATS } from '../src/formats.js';
+import { parseFormats, checkFormats, checkFormatGate, FORMATS } from '../src/formats.js';
 import { checkReadiness } from '../src/readiness.js';
 
 const spec = (/** @type {string} */ formats, req = 'R-order-1: An order must conform to `specs/schemas/order.json`.') => `# Spec: Order
@@ -127,4 +127,73 @@ test('conflicting $id across json-schema artifacts is a cross-file gap', () => {
 test('readiness includes format gaps', () => {
   const dir = repo({ 'specs/order.md': spec(declared) });
   assert.ok(checkReadiness(dir).gaps.some((g) => /json-schema/.test(g) && /missing/.test(g)));
+});
+
+const withOutput = '## Formats\n- json-schema: specs/schemas/order.json -> out/order.json\n\n';
+const strictSchema = JSON.stringify({ $id: 'https://x/order', type: 'object', required: ['total'], properties: { total: { type: 'number', minimum: 0 } } });
+const orderSpec = () => spec(withOutput, 'R-order-1: An order must conform to `specs/schemas/order.json`.');
+
+test('parseFormats reads an optional `-> <output path>`', () => {
+  const r = parseFormats(spec(withOutput));
+  assert.deepEqual(r.declared, [{ format: 'json-schema', path: 'specs/schemas/order.json', output: 'out/order.json' }]);
+});
+
+test('a JSON value that breaks the schema meta-schema is a gap', () => {
+  const dir = repo({ 'specs/order.md': spec(declared), 'specs/schemas/order.json': JSON.stringify({ type: 'nonsense' }) });
+  assert.ok(checkFormats(dir).some((g) => /invalid/.test(g) && /order\.json/.test(g)));
+});
+
+test('a $ref that resolves in another declared schema is fine', () => {
+  const cart = '# Spec: Cart\nImplementation: none\n\n## Requirements\n- R-cart-1: A cart must conform to `specs/schemas/cart.json`.\n\n## Formats\n- json-schema: specs/schemas/cart.json\n\n## Out of scope\n- x\n';
+  const dir = repo({
+    'specs/order.md': spec(declared),
+    'specs/cart.md': cart,
+    'specs/schemas/order.json': schema,
+    'specs/schemas/cart.json': JSON.stringify({ $id: 'https://x/cart', type: 'object', properties: { order: { $ref: 'https://x/order' } } }),
+  });
+  assert.deepEqual(checkFormats(dir), []);
+});
+
+test('an unresolved $ref is a cross-file gap', () => {
+  const dir = repo({
+    'specs/order.md': spec(declared),
+    'specs/schemas/order.json': JSON.stringify({ $id: 'https://x/order', properties: { a: { $ref: 'https://x/missing' } } }),
+  });
+  assert.ok(checkFormats(dir).some((g) => /unresolved \$ref/.test(g) && /missing/.test(g)));
+});
+
+test('output that conforms to the declared schema passes', () => {
+  const dir = repo({ 'specs/order.md': orderSpec(), 'specs/schemas/order.json': strictSchema, 'out/order.json': '{"total": 3}' });
+  assert.deepEqual(checkFormats(dir), []);
+});
+
+test('output that violates the declared schema is a gap naming the path', () => {
+  const dir = repo({ 'specs/order.md': orderSpec(), 'specs/schemas/order.json': strictSchema, 'out/order.json': '{"total": -1}' });
+  assert.ok(checkFormats(dir).some((g) => /out\/order\.json/.test(g) && /minimum|>= 0/.test(g)));
+});
+
+test('output that is not JSON is a gap', () => {
+  const dir = repo({ 'specs/order.md': orderSpec(), 'specs/schemas/order.json': strictSchema, 'out/order.json': '{nope' });
+  assert.ok(checkFormats(dir).some((g) => /out\/order\.json/.test(g) && /invalid JSON/.test(g)));
+});
+
+test('output not yet produced is skipped', () => {
+  const dir = repo({ 'specs/order.md': orderSpec(), 'specs/schemas/order.json': strictSchema });
+  assert.deepEqual(checkFormats(dir), []);
+});
+
+test('an output path outside the repo is a gap', () => {
+  const dir = repo({
+    'specs/order.md': spec('## Formats\n- json-schema: specs/schemas/order.json -> ../out.json\n\n'),
+    'specs/schemas/order.json': strictSchema,
+  });
+  assert.ok(checkFormats(dir).some((g) => /output/.test(g) && /outside the repo/.test(g)));
+});
+
+test('checkFormatGate passes with no formats and fails on a nonconforming output', () => {
+  assert.equal(checkFormatGate(repo({ 'specs/a.md': '# Spec: A\n' })).ok, true);
+  const dir = repo({ 'specs/order.md': orderSpec(), 'specs/schemas/order.json': strictSchema, 'out/order.json': '{}' });
+  const g = checkFormatGate(dir);
+  assert.equal(g.ok, false);
+  assert.match(g.reason ?? '', /out\/order\.json/);
 });
