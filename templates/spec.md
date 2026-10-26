@@ -10,5 +10,8 @@ One or two sentences: what this decides and why it exists.
 ## Examples
 - Input -> expected output. Prefer concrete, executable cases (conformance examples).
 
+## Formats
+Optional: one bullet per artifact in an adopted standard format: `- <format>: <path>` (for example `- json-schema: specs/schemas/order.json`). Delete this section when unused; a requirement must reference each declared path.
+
 ## Out of scope
 - What this spec deliberately does not cover.

@@ -9,6 +9,7 @@ Signals checked, per spec in `specs/*.md`:
 - Atomic: no requirement contains more than one "must"; split compound ones.
 - Traceable requirements: every requirement starts with a unique ID `R-<spec file name>-<n>:` and is mapped to a test in `tests/PLAN.md`.
 - Negative path: at least one requirement or example describes a failure (throws, rejects, error, invalid, fails, refuses, must not, never).
+- Formats: every `## Formats` bullet (`- <format>: <path>`) names a known format whose artifact exists inside the repo, validates, and is referenced by a requirement; artifacts agree across specs (e.g. no duplicate JSON Schema `$id`).
 - Boundaries: Out of scope has at least one bullet.
 - Complete: no TBD, TODO, FIXME, `??` or `<angle>` placeholders outside code spans.
 - Tests exist: every test file named in `tests/PLAN.md` exists.

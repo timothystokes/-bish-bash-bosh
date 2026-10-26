@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { checkFormats } from './formats.js';
 import { bulletsBySection, lintSpecs } from './spec-lint.js';
 import { parseTestPlan } from './test-plan-gate.js';
 
@@ -65,6 +66,8 @@ export function checkReadiness(repoDir) {
     if (![...reqs, ...examples].some((s) => NEGATIVE.test(s))) gaps.push(`${path}: no failure or negative path in requirements or examples`);
     if (scope.length === 0) gaps.push(`${path}: Out of scope is empty`);
   }
+
+  gaps.push(...checkFormats(repoDir));
 
   const planPath = join(repoDir, 'tests', 'PLAN.md');
   if (existsSync(planPath)) {
