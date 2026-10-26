@@ -3,9 +3,9 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**F-9b: parse JUnit XML test results and map them to requirement IDs in `src/done.js` (feeds `done.json`), tests first; update `specs/formats.md`, `specs/gates.md` and README if behaviour changes.**
-Why: the audit of the stale `implement` rows found everything built and tested except JUnit XML parsing; this is the only non-deferred, non-`implement later` item left.
-Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`. P0-5b, P0-6b, P5-4b and P5-6 are `implement later`: skip them.
+**None: no unblocked work remains. Ask the owner what to promote from the `implement later` items (H-7, H-8, H-9, H-12, H-18, H-20, H-24, H-27, H-28, F-12, P0-5b, P0-6b, P5-4b, P5-6); do not pick any of them, and do not check for CLIs, keys or AWS credentials.**
+Why: all Docker tasks are done, the stale `implement` rows were audited as done, and F-9b (JUnit XML) is `Will not implement`.
+Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -83,7 +83,7 @@ Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not
 | P1-10 | Derived Docker image with agent CLIs (`copilot`, `claude`, `codex`) installed, smoke-tested in the container | done | P1-8b |
 
 ## Harness hardening (from the ghuntley repo assessment)
-Status `implement` = decided to do; `defer` = noted, not now. Move to `todo`/`done` when picked up. Items covered by a Phase 6 task (see its "Covers" column) are built there: do not implement them separately, and mark them done when that task is done.
+Status `implement later` = noted, not now (the only deferred status); `Will not implement` = decided against. Move to `todo`/`done` when picked up. Items covered by a Phase 6 task (see its "Covers" column) are built there: do not implement them separately, and mark them done when that task is done.
 | ID | Task | Status | Source |
 |---|---|---|---|
 | H-1 | Diagnosis output shape: when a step fails or gates, the agent (or a diagnosis role prompt) reports root cause, evidence, fix, test and prevention in a fixed structure, so failures become "signs" (prompt/spec/gate changes) instead of retries. Define the shape, prompt and where it is recorded (e.g. the run record); tests first | done (X-6; `src/diagnosis.js`, `diagnosis.json`; scripted, unit level) | monorepo-2026 `debugger` subagent |
@@ -92,28 +92,28 @@ Status `implement` = decided to do; `defer` = noted, not now. Move to `todo`/`do
 | H-4 | `AGENTS.md` rule: reconcile, don't rewrite. Fix code that violates a spec, or change the spec deliberately with rationale; never edit a spec to match accidental behaviour | done | overalls AGENTS.md |
 | H-5 | `AGENTS.md` sign: never `git stash` (shared across sessions); compare against a baseline with a detached `git worktree` | done | overalls AGENTS.md |
 | H-6 | Specs carry `Implementation: none/partial/implemented` plus evidence links (code, tests); `spec-lint` checks the field | done (X-1; `spec-lint` checks `Implementation:` + `Evidence:`; scripted, unit level) | overalls ADR format |
-| H-7 | Verbose/diagnostic log mode (`--verbose` / env, to stderr) for `hodge`/`podge`, with a fixed event catalog and no free-form payloads so secrets cannot leak | defer | how-to-build-a-coding-agent, overalls Events catalog |
-| H-8 | Colocated `@cc`-style code contracts with a `--check` gate | defer | overalls code-contracts |
-| H-9 | Review receipts that fail precommit when docs go stale against source | defer | overalls HLDD maintenance |
+| H-7 | Verbose/diagnostic log mode (`--verbose` / env, to stderr) for `hodge`/`podge`, with a fixed event catalog and no free-form payloads so secrets cannot leak | implement later | how-to-build-a-coding-agent, overalls Events catalog |
+| H-8 | Colocated `@cc`-style code contracts with a `--check` gate | implement later | overalls code-contracts |
+| H-9 | Review receipts that fail precommit when docs go stale against source | implement later | overalls HLDD maintenance |
 | H-10 | Single-run lock per sandbox: `podge`/`podge step`/`hodge` refuse to start when another live process holds the sandbox (lock file with PID, stale locks cleared), so two loops cannot corrupt one target repo | done (X-2; `src/run-lock.js`, wired in `src/cli.js` for hodge/podge/podge step; unit level) | ralph-to-ralph-prod `ralph-watchdog.sh` lockfile |
 | H-11 | Independent evaluator role (`qa`): a separate role, normally a different adapter/model from `build`, verifies the build's claims against specs/tests (and E2E where available), records bugs, and hands them back to `podge` as plan items; bounded build/qa fix cycles (e.g. max 5). Design the spec first (`specs/modes.md`), tests first | done (X-7; `src/qa.js`, driver QA cycles, `maxQaCycles` default 5; scripted, unit level) | ralph-to-ralph-prod Build to QA loop, Codex as evaluator |
-| H-12 | Append-only progress notes (what was built, test results, decisions, files) readable by each fresh-context iteration, in addition to `plan.md` and the run records | defer | ralph-to-ralph-prod `build-progress.txt` |
+| H-12 | Append-only progress notes (what was built, test results, decisions, files) readable by each fresh-context iteration, in addition to `plan.md` and the run records | implement later | ralph-to-ralph-prod `build-progress.txt` |
 | H-13 | Build prompts: scope the red step (run only the new test file to confirm failure; the full suite only for green) | done (X-10; `prompts/forward.md` scoped red step, snapshot tested) | ralph-to-ralph-prod `build-prompt.md` |
 | H-14 | "Out of scope" section in the spec template; `hodge` captures it during the interview | done (X-10; `templates/spec.md`, `prompts/interview.md`, readiness gap on empty Out of scope) | ralph-to-ralph-prod `CLAUDE.md` |
 | H-15 | QA prompt (part of H-11): skeptical "different agent" framing; findings classified as violated decision / unimplemented requirement / decision needing replacement, each with severity, evidence, spec, consequence, recommendation; structured bug report (shares the H-1 shape) | done (X-7; `prompts/qa.md`, classified findings with X-6 shape; scripted, unit level) | ralph-to-ralph-prod `qa-prompt.md`; overalls `architecture-review` |
 | H-16 | Anti-gaming lines in gate-checked prompts: never mark done or implemented just to satisfy a gate; don't weaken validation | done (X-10; anti-gaming lines in `prompts/forward.md`) | overalls `adr-maintenance`; ralph-to-ralph-prod `build-prompt.md` |
 | H-17 | Tiny adapter smoke prompt (create and run a fizzbuzz file, check the output) for live checks and a future `hodgepodge doctor` | done (X-11; `src/smoke.js`, `test/smoke.test.js`; scripted adapter only) | how-to-build-a-coding-agent `04-edit_tool` |
-| H-18 | "Pre-configured, check first" notice for the sandbox toolchain; conditional prompt sections by item category | defer | ralph-to-ralph-prod `pre-setup.md`, `qa-prompt.md` |
+| H-18 | "Pre-configured, check first" notice for the sandbox toolchain; conditional prompt sections by item category | implement later | ralph-to-ralph-prod `pre-setup.md`, `qa-prompt.md` |
 | H-19 | `test-hardening`: require a green baseline before the mutation gate; record each surviving mutant with a diagnosis (bad mutant / weak test / missing spec); apply mutants only in a throwaway worktree | done (X-10; `prompts/test-hardening.md` baseline, throwaway worktree, mutant diagnosis; prompt-level, not machine-enforced) | overalls `antithesis-mutation-testing` |
-| H-20 | Gate self-test suite: feed each gate (anti-stub, scope, spec-lint, ready) a known-bad fixture and assert it fires for the predicted reason | defer | overalls `antithesis-mutation-testing` ("validate the oracle") |
+| H-20 | Gate self-test suite: feed each gate (anti-stub, scope, spec-lint, ready) a known-bad fixture and assert it fires for the predicted reason | implement later | overalls `antithesis-mutation-testing` ("validate the oracle") |
 | H-21 | `podge` "done" is harness-derived, not agent-ticked: full suite green, types clean, every requirement mapped to a passing test, every spec `Implementation: implemented` (H-6), no open QA findings (H-11), no stubs; a ticked but unproven `plan.md` item is reverted | done (X-5; `verifyDone` in `src/done.js`, wired in `src/driver.js`; scripted, unit level) | ralph-to-ralph-prod `build-prompt.md`, `qa-prompt.md`; overalls `adr-maintenance` |
 | H-22 | Requirement-level traceability: `tests/PLAN.md` maps each requirement (not just each spec) to a test; readiness fails on a requirement with no executable example (replaces the 1-example-per-2-requirements ratio) | done (X-1; per-requirement mapping in spec-lint/readiness; scripted, unit level) | ralph-to-ralph-prod `prd.json` (`tests` input/expected_output) |
 | H-23 | `podge` writes a `done.json` evidence report per requirement (test, result, implementation status, boundary verified) for owner review | done (X-5; `done.json` via `writeDoneReport`; scripted, unit level) | ralph-to-ralph-prod `qa-report.json`; overalls `covenant` |
-| H-24 | Distinguish `done` (all verified) from `plan-empty` (all ticked but verification failed) as separate statuses and exit codes | defer | derived from H-21 |
+| H-24 | Distinguish `done` (all verified) from `plan-empty` (all ticked but verification failed) as separate statuses and exit codes | implement later | derived from H-21 |
 | H-25 | Readiness lint for vague words (fast, secure, robust, user-friendly, etc.) and non-functional requirements without a measurable threshold | done (X-4) | `INTERVIEW.md` fine-grain rules (currently unchecked) |
 | H-26 | Per-capability dimension coverage: each of the ten interview dimensions is recorded as covered or n/a with a reason, and `ready` fails on any missing | done (X-4) | `INTERVIEW.md` dimensions (currently judgement only) |
-| H-27 | Numbered brief items (B-1..); each requirement cites the brief item it satisfies; `ready` fails on an uncited brief item | defer | `READINESS.md` "not machine-checkable" list |
-| H-28 | Independent spec-review pass (H-11 evaluator idea) looks for gaps and contradictions before `ready` can pass | defer | ralph-to-ralph-prod `qa-prompt.md` |
+| H-27 | Numbered brief items (B-1..); each requirement cites the brief item it satisfies; `ready` fails on an uncited brief item | implement later | `READINESS.md` "not machine-checkable" list |
+| H-28 | Independent spec-review pass (H-11 evaluator idea) looks for gaps and contradictions before `ready` can pass | implement later | ralph-to-ralph-prod `qa-prompt.md` |
 
 ## Spec formats (declared standards that constrain specs)
 Design in `specs/formats.md`. F-1..F-11 are scheduled in Phase 6 (X-1, X-3, X-5, X-8, X-9); F-10 is part of X-4. Embedded harness tools validate spec artifacts; declared formats also gate loop output where they apply.
@@ -128,10 +128,10 @@ Design in `specs/formats.md`. F-1..F-11 are scheduled in Phase 6 (X-1, X-3, X-5,
 | F-7 | Gherkin format (`@cucumber/gherkin`): examples parse, each maps to a requirement ID | done (X-9) | F-3 |
 | F-8 | EBNF format (`ebnf`): grammar parses, examples accepted or rejected as declared | done (X-9) | F-3 |
 | F-9 | JUnit/TAP result mapping to requirement IDs feeding `done.json` (H-21, H-23) | done for TAP/spec-reporter (X-5); JUnit XML not parsed, split to F-9b | F-1 |
-| F-9b | JUnit XML result mapping to requirement IDs (`specs/formats.md` lists JUnit XML; `src/done.js` parses spec-reporter/TAP only) | todo | F-9 |
+| F-9b | JUnit XML result mapping to requirement IDs (`specs/formats.md` lists JUnit XML; `src/done.js` parses spec-reporter/TAP only) | Will not implement | F-9 |
 | F-10 | Prompts and objective kit: interview proposes formats, owner confirms; `INTERVIEW.md` and `READINESS.md` updated | done (X-4) | F-2 |
 | F-11 | Loop gate: a step whose spec declares a format is checked against it (format artifacts valid, output conforms) in addition to tests | done (X-8) | F-4 |
-| F-12 | Later formats: XState, fast-check property specs, TypeSpec, DBML, Pact, Quint, axe-core, SHACL, CDDL, GraphQL SDL, Protobuf | defer | F-3 |
+| F-12 | Later formats: XState, fast-check property specs, TypeSpec, DBML, Pact, Quint, axe-core, SHACL, CDDL, GraphQL SDL, Protobuf | implement later | F-3 |
 
 ## Integration glue (from the whole-plan review)
 | ID | Task | Status | Depends on |
@@ -167,7 +167,7 @@ Ordered; each task is tests-first and updates docs/specs/templates in the same s
 | X-13 | Regression end-to-end fixture exercising every new gate (scripted adapter) plus live trial after each stage | G-11 | done (scripted adapter, `podge` via CLI, `test/e2e-phase6.test.js`; no Docker, no live adapter; full `hodge` to `podge` loop not run) | X-12 |
 | X-14 | Reconcile the `podge` test gate with red-first interview tests: planning-only step skips the tests gate, later steps gate on no regressions, objective seed `package.json` gets a `test` script | P2-10 | done (scripted, unit level; live re-trial #2 on `p214b`: `hodge` then `podge` reached `done`, 11/11 target tests green) | |
 
-Deferred and unchanged: H-7, H-8, H-9, H-12, H-18, H-20, H-24, H-27, H-28, F-12.
+Implement later and unchanged: H-7, H-8, H-9, H-12, H-18, H-20, H-24, H-27, H-28, F-12.
 
 ## Phase 5: Cloud (AWS) — FUTURE GOAL, not the current focus
 The main goal for now is the Docker-based local implementation. P5-4b and P5-6 are `implement later` (deferred by the owner): never pick them or check for AWS credentials until the owner promotes them.
@@ -372,3 +372,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (blocked check, P5-4b, seventh): `aws` not on PATH, no AWS_* env vars, no ~/.aws. Blocked on AWS credentials (access key id + secret, or an SSO profile, for an account where the cloud-driver stack can be deployed). No code changes; nothing tested (full loop not run). Next best action unchanged. Sign: do not retry until the owner supplies AWS credentials.
 - Session (plan edit): marked P5-4b and P5-6 `implement later`; repointed Next best action to reconciling stale H-/F-/G- `implement` rows. No code changes; full loop not run.
 - Session (audit): re-checked the 18 stale `implement` rows against code, specs, prompts and wiring; `npm test` 550 pass, `npm run check` clean. 17 confirmed done (scripted/unit level; no live adapter/Docker; full loop not run). F-9 only half built: split JUnit XML into new todo F-9b, now the Next best action.
+- Session (plan edit): F-9b set to `Will not implement`; every `defer` status renamed `implement later` so there is one do-later status; Next best action is none (ask the owner). No code changes; full loop not run.
