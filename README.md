@@ -15,7 +15,8 @@ Hodgepodge holds the harness only. Delivery work always happens in a separate **
 
 ```sh
 npm install
-npx hodgepodge init --dir ~/sandboxes/demo --adapter copilot --model <model-id>
+npm link          # puts hodgepodge, hodge and podge on your PATH (or use ./bin/hodgepodge below)
+hodgepodge init --dir ~/sandboxes/demo --adapter copilot --model <model-id>
 ```
 
 `init` creates `~/sandboxes/demo/target` (a git repo seeded with a toy spec, red tests and an open plan), `~/sandboxes/demo/hodge.json` (config, kept outside the repo: target repo, roles, budgets, and a `hodgepodge` reference back to this tool) and and `hodgepodge`, `hodge` and `podge` launchers. After that, `cd` into the sandbox and run the commands from there; they take no config, repo or objective flags:
@@ -33,7 +34,7 @@ podge step       # one iteration only (hodge/podge/podge step share one lock per
 
 `podge` loops one iteration at a time until the target `plan.md` is fully checked, a step fails or is gated, or a budget runs out. A ticked plan is not enough when specs declare requirement IDs: the harness runs the suite and type check, requires every `R-<spec>-<n>` to be named by a passing test, and scans source for stubs. Gaps become unchecked `Verify:` items in `plan.md` and the loop continues. The harness (not the agent) derives each spec's `Implementation:` and `Evidence:`, and writes `runs/<run-id>/done.json` with per-requirement evidence. A step that fails or gates also writes `runs/<run-id>/iterations/NNN/diagnosis.json` (root cause, evidence, fix, test, prevention; the agent can override fields with a fenced `diagnosis` JSON block) and `reason` carries the root cause. With a `qa` role in config (normally a different adapter/model from `build`), a verified plan is done only after an independent, read-only QA cycle reports no findings. Findings (classified `violated-decision`, `unimplemented-requirement` or `decision-needing-replacement`, each with severity, spec, consequence and a root-cause/evidence/fix/test/prevention diagnosis) are appended to `plan.md` as unchecked `QA-<cycle>-<n>` items under `## QA findings`, the build agent fixes them, and QA re-checks, at most `maxQaCycles` (default 5) times; a QA reply without a `findings` block fails the loop. QA records go to `runs/<run-id>/qa-N/` and count toward the budgets. It prints JSON `{status, steps, reason?, qa?}` and exits 0 only when done.
 
-Use `--seed empty` to start from an empty target. Run `npx hodgepodge --help` for every command.
+Use `--seed empty` to start from an empty target. Run `hodgepodge --help` for every command.
 
 Specs may declare machine-checked formats in a `## Formats` section (`- <format>: <path>`), checked by `hodgepodge ready` and the loop's `formats` gate. Known formats: `asyncapi`, `ebnf`, `gherkin`, `json-schema`, `openapi`.
 
