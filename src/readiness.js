@@ -8,6 +8,23 @@ import { parseTestPlan } from './test-plan-gate.js';
 export const MIN_REQUIREMENTS = 3;
 
 const NEGATIVE = /\b(throws?|rejects?|errors?|invalid|fails?|refus(?:e|es|ed)|must not|never)\b/i;
+const VAGUE = /\b(fast|quick(?:ly)?|slow|secure|robust|user-friendly|easy|easily|simple|intuitive|scalable|efficient(?:ly)?|reliable|performant|flexible|seamless(?:ly)?|modern|clean|good|better|nice|appropriate(?:ly)?|reasonabl[ey]|sufficient(?:ly)?)\b/gi;
+const NON_FUNCTIONAL = /\b(latency|throughput|performance|memory|response time|uptime|availability|capacity|rate limits?|concurren(?:t|cy)|scalab\w+|timeouts?|encrypt\w*|retention)\b/i;
+
+/** The ten interview dimensions each spec records as `covered` or `n/a: <reason>` under `## Dimensions`. */
+export const DIMENSIONS = [
+  'Actors and goals',
+  'Behaviour',
+  'Inputs and outputs',
+  'Failure paths',
+  'Edge cases',
+  'Interfaces and data',
+  'Non-functional',
+  'Constraints',
+  'Acceptance',
+  'Out of scope',
+];
+
 const PLACEHOLDER = /\b(TBD|TODO|FIXME)\b|\?\?|<[^>\n]+>/;
 
 /**
@@ -38,6 +55,38 @@ function stripCode(text) {
 const brief = (s) => (s.length > 60 ? `${s.slice(0, 57)}...` : s);
 
 /**
+ * @param {string} path
+ * @param {string[]} bullets bullets of the `## Dimensions` section (undefined section = empty)
+ * @returns {string[]} gaps
+ */
+function checkDimensions(path, bullets) {
+  const gaps = [];
+  const known = new Map(DIMENSIONS.map((d) => [d.toLowerCase(), d]));
+  const seen = new Set();
+  for (const b of bullets) {
+    const m = /^([^:]+):\s*(.*)$/.exec(b);
+    const name = m ? known.get(m[1].trim().toLowerCase()) : undefined;
+    if (!m || !name) {
+      gaps.push(`${path}: unknown dimension "${brief(m ? m[1].trim() : b)}" (use ${DIMENSIONS.join(', ')})`);
+      continue;
+    }
+    if (seen.has(name)) {
+      gaps.push(`${path}: duplicate dimension ${name}`);
+      continue;
+    }
+    seen.add(name);
+    const status = m[2].trim();
+    if (/^covered$/i.test(status)) continue;
+    const na = /^n\/a\s*[:\-]\s*(.*)$/i.exec(status);
+    if (na && na[1].trim()) continue;
+    gaps.push(na || /^n\/a$/i.test(status) ? `${path}: dimension ${name} is n/a without a reason` : `${path}: dimension ${name} must be "covered" or "n/a: <reason>"`);
+  }
+  const missing = DIMENSIONS.filter((d) => !seen.has(d));
+  if (missing.length > 0) gaps.push(`${path}: dimension not recorded as covered or n/a (add under "## Dimensions"): ${missing.join(', ')}`);
+  return gaps;
+}
+
+/**
  * Deterministic "enough to leave the conversation" check: the requirements are captured at a fine grain.
  * Mirrors objective/READINESS.md.
  * @param {string} repoDir
@@ -63,6 +112,13 @@ export function checkReadiness(repoDir) {
       if (musts === 0) gaps.push(`${path}: requirement not testable (no "must"): "${brief(r)}"`);
       else if (musts > 1) gaps.push(`${path}: requirement is compound (${musts} "must"s), split it: "${brief(r)}"`);
     }
+    for (const r of reqs) {
+      const body = stripCode(r.replace(/^R-\S+?-\d+:\s*/, ''));
+      const vague = [...new Set((body.match(VAGUE) ?? []).map((w) => w.toLowerCase()))];
+      if (vague.length > 0) gaps.push(`${path}: vague word "${vague.join('", "')}" in requirement, give a measurable threshold or concrete behaviour: "${brief(r)}"`);
+      if (NON_FUNCTIONAL.test(body) && !/\d/.test(body)) gaps.push(`${path}: non-functional requirement has no measurable threshold (a number and unit): "${brief(r)}"`);
+    }
+    gaps.push(...checkDimensions(path, sections.get('dimensions') ?? []));
     if (![...reqs, ...examples].some((s) => NEGATIVE.test(s))) gaps.push(`${path}: no failure or negative path in requirements or examples`);
     if (scope.length === 0) gaps.push(`${path}: Out of scope is empty`);
   }

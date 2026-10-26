@@ -32,4 +32,4 @@ Later (deferred): XState statecharts (`xstate`, `@xstate/graph`), property specs
 
 ## Out of scope
 - Validating the delivered project's own artifacts for languages the harness tools do not cover.
-- Choosing formats for the owner: the interview proposes them, the owner confirms.
+- Choosing formats for the owner: the interview proposes them, the owner confirms (`templates/objective/INTERVIEW.md` "Proposing formats"; F-10).

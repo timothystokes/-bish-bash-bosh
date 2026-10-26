@@ -23,11 +23,16 @@ You are discovering requirements, not designing or building. Specs are formed th
 - Acceptance: how the owner will know it is done (an observable check, not a feeling).
 - Out of scope: what is deliberately not being built.
 
+For each spec, record every dimension under `## Dimensions` as `- <dimension>: covered` or `- <dimension>: n/a: <reason>`. The harness fails readiness on a missing dimension or an `n/a` without a reason.
+
+## Proposing formats
+When part of a spec is naturally a standard artifact (data shapes, HTTP APIs, event contracts, executable examples, grammars), propose the matching format to the owner as the round's question (for example "Describe the order payload as a JSON Schema?") and declare it under `## Formats` only after the owner confirms. Never choose a format for the owner. Declared artifacts must exist, validate and be referenced by a requirement.
+
 ## Fine-grain rules
 - A requirement is one testable statement containing exactly one "must". Split "X and Y" into two.
 - Every requirement needs a concrete example or a test that would fail without it.
 - Every spec has at least one failure or negative-path statement.
-- Replace vague words (fast, secure, user-friendly, robust, etc.) with a measurable threshold or a concrete behaviour.
+- Replace vague words (fast, secure, user-friendly, robust, etc.) with a measurable threshold or a concrete behaviour; the harness rejects them. Every non-functional requirement (latency, throughput, memory, availability, limits) states a number and unit.
 - No placeholders (TBD, TODO, ??, `<angle>` brackets) may remain in specs.
 - Write one test per requirement into `tests/`, name the test with its requirement ID (`R-<spec>-<n>`; the harness proves a requirement by a passing test whose name contains it), map that ID in `tests/PLAN.md` (plus a row for the spec itself), and keep it red until built.
 

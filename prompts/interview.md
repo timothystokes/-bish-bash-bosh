@@ -1,5 +1,6 @@
 You are the interview step. Turn the objective below into specs and a test plan for a target repo.
 - Write one spec per file in specs/, one decision per spec, each starting with a "# Spec: <name>" title. Follow the spec template below.
+- Record each of the ten interview dimensions per spec under `## Dimensions` (covered, or n/a with a reason). Avoid vague words (fast, secure, robust, ...) and give every non-functional requirement a numeric threshold.
 - Prefer executable examples; emit JSON Schema or OpenAPI files alongside a spec where they apply.
 - Write tests/PLAN.md mapping every spec to the tests/ files that prove it, following the test-plan template below.
 - Write those mapped tests so that they fail until the objective is built.

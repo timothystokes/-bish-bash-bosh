@@ -85,6 +85,18 @@ Implementation: none
 - \`greet('Ann')\` -> \`Hello, Ann!\`
 - \`greet(1)\` -> throws TypeError
 
+## Dimensions
+- Actors and goals: covered
+- Behaviour: covered
+- Inputs and outputs: covered
+- Failure paths: covered
+- Edge cases: n/a: single-purpose pure function
+- Interfaces and data: n/a: one in-process function
+- Non-functional: n/a: no runtime limits for a pure function
+- Constraints: n/a: no platform constraints
+- Acceptance: covered
+- Out of scope: covered
+
 ## Out of scope
 - Localisation.
 `;

@@ -27,7 +27,7 @@ test('instantiated templates pass spec-lint', () => {
 test('spec template has a Spec title and required sections', () => {
   const t = read('spec.md');
   assert.match(t, /^# Spec: \S/);
-  for (const h of ['## Purpose', '## Requirements', '## Examples', '## Out of scope']) assert.ok(t.includes(h), h);
+  for (const h of ['## Purpose', '## Requirements', '## Examples', '## Dimensions', '## Out of scope']) assert.ok(t.includes(h), h);
 });
 
 test('test-plan template maps the example spec to a test', () => {
