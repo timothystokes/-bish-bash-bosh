@@ -6,6 +6,8 @@ import Ajv from 'ajv';
 import Ajv04 from 'ajv-draft-04';
 import addFormats from 'ajv-formats';
 import { parse as parseYaml } from 'yaml';
+import { AstBuilder, GherkinClassicTokenMatcher, Parser as GherkinParser } from '@cucumber/gherkin';
+import { IdGenerator } from '@cucumber/messages';
 import { bulletsBySection } from './spec-lint.js';
 
 /**
@@ -351,6 +353,68 @@ FORMATS.asyncapi = {
         const first = seen.get(id);
         if (first !== undefined) problems.push(`duplicate operationId "${id}" in ${first} and ${p}`);
         else seen.set(id, p);
+      }
+    }
+    return problems;
+  },
+};
+
+const REQ_TAG = /^@R-[A-Za-z0-9._-]+-\d+$/;
+
+/**
+ * Parses a feature file and lists its scenarios with the tags they inherit.
+ * @param {string} path
+ * @returns {{scenarios: {name: string, tags: string[]}[]} | {error: string}}
+ */
+function readGherkin(path) {
+  let doc;
+  try {
+    const builder = new AstBuilder(IdGenerator.uuid());
+    doc = new GherkinParser(builder, new GherkinClassicTokenMatcher()).parse(readFileSync(path, 'utf8'));
+  } catch (e) {
+    return { error: `invalid Gherkin: ${message(e).replace(/\s*\n\s*/g, '; ')}` };
+  }
+  const feature = doc.feature;
+  if (!feature) return { error: 'invalid Gherkin: no Feature found' };
+  const base = feature.tags.map((t) => t.name);
+  /** @type {{name: string, tags: string[]}[]} */
+  const scenarios = [];
+  for (const child of feature.children) {
+    const rule = child.rule;
+    const inherited = rule ? [...base, ...rule.tags.map((t) => t.name)] : base;
+    const items = rule ? rule.children : [child];
+    for (const item of items) {
+      if (item.scenario) scenarios.push({ name: item.scenario.name, tags: [...inherited, ...item.scenario.tags.map((t) => t.name)] });
+    }
+  }
+  return { scenarios };
+}
+
+FORMATS.gherkin = {
+  validate(path) {
+    const r = readGherkin(path);
+    if ('error' in r) return [r.error];
+    if (r.scenarios.length === 0) return ['no scenarios: executable examples need at least one Scenario'];
+    const problems = [];
+    const seen = new Set();
+    for (const s of r.scenarios) {
+      if (!s.tags.some((t) => REQ_TAG.test(t))) problems.push(`scenario "${s.name}" has no requirement ID tag (@R-<spec>-<n>)`);
+      if (seen.has(s.name)) problems.push(`duplicate scenario "${s.name}"`);
+      seen.add(s.name);
+    }
+    return problems;
+  },
+  crossCheck(paths) {
+    /** @type {Map<string, string>} */
+    const seen = new Map();
+    const problems = [];
+    for (const p of paths) {
+      const r = readGherkin(p);
+      if ('error' in r) continue;
+      for (const name of new Set(r.scenarios.map((s) => s.name))) {
+        const first = seen.get(name);
+        if (first !== undefined) problems.push(`duplicate scenario "${name}" in ${first} and ${p}`);
+        else seen.set(name, p);
       }
     }
     return problems;

@@ -1,5 +1,5 @@
 # Spec: Spec formats (declared standards that constrain specs)
-Status: partly implemented (X-3: declaration parsing, registry, readiness gaps; X-8: `json-schema` on `ajv` (2020-12 + `ajv-formats`) with meta-schema validation, cross-file `$id`/`$ref` consistency, output conformance and the `formats` loop gate; X-9: `openapi` on `@seriousme/openapi-schema-validator` schemas + `ajv`, `asyncapi` on `@asyncapi/specs` + `ajv`; Gherkin and EBNF still to come; `@hyperjump/json-schema` is not used). plan.md "Spec formats", F-1..F-12.
+Status: partly implemented (X-3: declaration parsing, registry, readiness gaps; X-8: `json-schema` on `ajv` (2020-12 + `ajv-formats`) with meta-schema validation, cross-file `$id`/`$ref` consistency, output conformance and the `formats` loop gate; X-9: `openapi` on `@seriousme/openapi-schema-validator` schemas + `ajv`, `asyncapi` on `@asyncapi/specs` + `ajv`, `gherkin` on `@cucumber/gherkin`; EBNF still to come; `@hyperjump/json-schema` is not used). plan.md "Spec formats", F-1..F-12.
 
 - Purpose: free-form Markdown lets specs stay vague or contradict each other. A spec may declare that part of what it captures is expressed in an open standard format; the harness then validates that artifact and uses it as a gate wherever it bears on a step.
 - Declaration: a spec lists adopted formats in a `## Formats` section, one bullet per artifact: `- <format>: <path>` (for example `- json-schema: specs/schemas/order.json`). Declaring a format is a strong signal that every requirement it covers is verified through that format.
@@ -17,7 +17,7 @@ Status: partly implemented (X-3: declaration parsing, registry, readiness gaps; 
 | JSON Schema 2020-12 | `ajv`, `ajv-formats`, `@hyperjump/json-schema` | data shapes, cross-file `$ref` consistency |
 | OpenAPI 3.0/3.1/3.2 (JSON or YAML) | `@seriousme/openapi-schema-validator` (official schemas, run through `ajv`/`ajv-draft-04`), `yaml` | HTTP APIs; `validate` checks the document against the official schema for its `openapi` version, unresolved local `#/...` `$ref`s and duplicate `operationId`; `crossCheck` flags an `operationId` defined in two documents. No `-> output` conformance; Redocly/Spectral linting is not used (async CLIs, rulesets) |
 | AsyncAPI 2.x/3.x (JSON or YAML) | `@asyncapi/specs` (official schemas, run through `ajv`; `@asyncapi/parser` is async so is not used), `yaml` | event and message contracts; `validate` checks the document against the official schema for its `asyncapi` version, unresolved local `#/...` `$ref`s and duplicate operation ids (2.x `operationId`; 3.x operation keys); `crossCheck` flags an operation id defined in two documents. No `-> output` conformance |
-| Gherkin | `@cucumber/gherkin` | executable examples (replaces free-text `input -> output`) |
+| Gherkin (`.feature`) | `@cucumber/gherkin` (classic English parser, synchronous) | executable examples (replaces free-text `input -> output`); `validate` parses the file, requires at least one Scenario/Scenario Outline, requires every scenario to carry a requirement ID tag `@R-<spec>-<n>` (on the scenario, its Rule or the Feature) and flags a scenario name repeated within the file; `crossCheck` flags a scenario name used in two files. No `-> output` conformance; step definitions are not checked |
 | EBNF | `ebnf` | input and output grammars |
 | JUnit XML / TAP | `junit-report-merger`, `tap-parser` | map test results to requirement IDs |
 
@@ -30,6 +30,7 @@ Later (deferred): XState statecharts (`xstate`, `@xstate/graph`), property specs
 - Cross-file conflicts between artifacts (duplicate `$id`, unresolved `$ref`) must fail readiness.
 - An OpenAPI artifact that violates its official schema, has an unresolved local `$ref`, or repeats an `operationId` (within or across documents) must fail readiness.
 - An AsyncAPI artifact that violates its official schema, has an unresolved local `$ref`, or repeats an operation id (within or across documents) must fail readiness.
+- A Gherkin artifact that fails to parse, has no scenarios, has a scenario without a requirement ID tag, or reuses a scenario name (within or across files) must fail readiness.
 - A declared output that violates its schema must fail readiness and the `formats` loop gate.
 
 ## Out of scope

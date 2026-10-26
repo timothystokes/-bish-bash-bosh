@@ -18,6 +18,8 @@
   },
   "dependencies": {
     "@asyncapi/specs": "^6.11.1",
+    "@cucumber/gherkin": "^42.0.1",
+    "@cucumber/messages": "^34.2.1",
     "@seriousme/openapi-schema-validator": "^2.11.0",
     "ajv": "^8.20.0",
     "ajv-draft-04": "^1.0.0",
