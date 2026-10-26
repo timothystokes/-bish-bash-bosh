@@ -1,0 +1,70 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { nextItem } from '../src/next-item.js';
+import { buildPrompt, buildPlanPrompt } from '../src/step.js';
+import { MODES, loadModePrompt, loadQaPrompt } from '../src/prompts.js';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+test('L-1: nextItem returns the first unchecked item with its indented continuation and the open count', () => {
+  const plan = ['# plan', '- [x] done one', '- [ ] first open', '  detail line', '  - sub bullet', '', '- [ ] second open', '* [ ] third open'].join('\n');
+  const n = nextItem(plan);
+  assert.equal(n?.text, '- [ ] first open\n  detail line\n  - sub bullet');
+  assert.equal(n?.open, 3);
+});
+
+test('L-1: nextItem is null when nothing is unchecked or the plan is empty', () => {
+  assert.equal(nextItem('- [x] a\n- [x] b'), null);
+  assert.equal(nextItem(''), null);
+  assert.equal(nextItem('| ID | Task |\n| 1 | todo |'), null);
+});
+
+test('L-1: nextItem caps a runaway item', () => {
+  const n = nextItem(`- [ ] big\n${'  x\n'.repeat(2000)}`);
+  assert.ok(n && n.text.length <= 1500);
+});
+
+/** @param {string} plan */
+function repoWithPlan(plan) {
+  const dir = mkdtempSync(join(tmpdir(), 'hodge-next-'));
+  execFileSync('git', ['-C', dir, 'init', '-q', '-b', 'main']);
+  mkdirSync(join(dir, 'specs'));
+  writeFileSync(join(dir, 'specs', 'a.md'), '# Spec A\n- rule\n');
+  writeFileSync(join(dir, 'plan.md'), plan);
+  return dir;
+}
+
+const bigPlan = () => `# plan\n${Array.from({ length: 500 }, (_, i) => `- [${i < 100 ? 'x' : ' '}] ITEM-${i} ${'lorem ipsum '.repeat(20)}`).join('\n')}\n`;
+
+test('L-1: the loop prompt carries only the next item, never the rest of plan.md', () => {
+  const p = buildPrompt(repoWithPlan(bigPlan()));
+  assert.match(p, /ITEM-100\b/);
+  assert.doesNotMatch(p, /ITEM-99\b/);
+  assert.doesNotMatch(p, /ITEM-101\b/);
+  assert.match(p, /399 more/);
+});
+
+test('L-2: the assembled loop prompt stays under 4 KB however large plan.md grows', () => {
+  assert.ok(Buffer.byteLength(buildPrompt(repoWithPlan(bigPlan()))) < 4096);
+});
+
+test('L-2: plan and QA prompts do not inline plan.md', () => {
+  const dir = repoWithPlan(bigPlan());
+  assert.doesNotMatch(buildPlanPrompt(dir), /ITEM-/);
+});
+
+test('L-2: every mode prompt is at most 1.3 KB and the QA prompt at most 2 KB', () => {
+  for (const m of MODES) assert.ok(Buffer.byteLength(loadModePrompt(m)) <= 1300, `${m} prompt too large`);
+  assert.ok(Buffer.byteLength(loadQaPrompt()) <= 2000, 'qa prompt too large');
+});
+
+test('L-2: AGENTS.md and every objective-kit file stay small', () => {
+  assert.ok(statSync(join(root, 'AGENTS.md')).size <= 2800, 'AGENTS.md too large');
+  const kit = join(root, 'templates', 'objective');
+  for (const f of readdirSync(kit)) assert.ok(readFileSync(join(kit, f)).length <= 2200, `${f} too large`);
+});

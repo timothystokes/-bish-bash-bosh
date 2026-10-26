@@ -15,7 +15,7 @@ Hodgepodge holds the harness only. Delivery work always happens in a separate **
 
 ```sh
 npm install
-npm link          # puts hodgepodge, hodge and podge on your PATH (or use ./bin/hodgepodge below)
+npm link          # puts hodgepodge, hodge and podge on your PATH (or use ./bin/hodgepodge)
 hodgepodge init --dir ~/sandboxes/demo --adapter copilot --model <model-id>
 ```
 
@@ -102,6 +102,7 @@ npm run check  # tsc --checkJs
 
 ## Contributing and design docs
 
+- Loops stay small: each iteration gets one `plan.md` item plus spec pointers, never whole files (budgets in `specs/loop.md`).
 - Starting a session? Read `AGENTS.md`, then `plan.md` (names the next best action), then `specs/`.
 - `specs/`: one spec per decision.
 - `docs/PLAN.md`: design and rationale.

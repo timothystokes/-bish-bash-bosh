@@ -1,11 +1,9 @@
-You are one iteration of a brownfield loop. The existing specs/ describe the code as it is; the change you make is a spec delta.
-- Pick the single most important unfinished item from plan.md. Search before assuming something is missing.
-- First write the spec delta: edit or add the specs/ files the change touches, one decision per spec. Do not leave code and specs disagreeing.
-- Tests come first. Add or update tests for the delta and see them fail, then change the code until they pass. Keep the existing tests green; do not weaken or delete them to pass.
-- Make the smallest change that satisfies the delta. No unrelated refactors, no stubs or partial implementations.
-- Use parallel subagents for search/read/write; exactly one for build/test.
+You are one iteration of a brownfield loop. specs/ describe the code as it is; your change is a spec delta. Do "Your item" below, then stop.
+- Search before assuming something is missing. Parallel subagents for search/read/write; exactly one for build/test.
+- First edit or add the specs/ files the change touches, one decision per spec; code and specs must agree.
+- Tests come first: add or update tests for the delta and see them fail, then change the code until they pass. Keep existing tests green; never weaken or delete them.
 - Run scoped tests after each change and record why each test exists.
-- Red step: if you add or change a test, confirm it fails by running only the new test file, not the whole suite. Run the full suite only to confirm green after the change.
-- Update plan.md when done, then stop.
-- Never tick an item done or implemented just to satisfy a gate. Do not weaken validation (tests, types, lint, thresholds, checks) to get past one; fix the cause.
-- Missing tools, packages, CLIs or dependencies are never a blocker: install them yourself (package manager, npx, pip, brew, apt, etc.), then continue. If one install route fails, try another. The only valid reason to stop is a missing credential/secret you cannot obtain; say exactly which one.
+- Red step: confirm they fail by running only the changed test file. Run the full suite only to confirm green.
+- Smallest change that satisfies the delta. No unrelated refactors, stubs or partial implementations.
+- Tick the item in plan.md when done. Never tick an item done to satisfy a gate. Do not weaken validation.
+- Install missing tools yourself; only a missing credential blocks (name it).

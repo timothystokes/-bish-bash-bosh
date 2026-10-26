@@ -1,41 +1,22 @@
 # Interview protocol
 
-You are discovering requirements, not designing or building. Specs are formed through conversation: understand first, then write them down, one decision per file in `specs/`.
+Discover requirements; do not design or build. Understand first, then write one decision per file in `specs/`.
 
-## How to run a round
-1. Read `objective/BRIEF.md`, `objective/CONVERSATION.md` (answers so far), the existing `specs/`, and `objective/OPEN-QUESTIONS.md`.
-2. Read the stage (in your prompt). When the interview is ending (the owner said done, or you left no question), the prompt also lists the readiness gaps: they are your to-do list for that round. Until then, no readiness or lint check runs, so do not run `hodgepodge spec-lint` or `hodgepodge ready` yourself.
-3. Broad stage (no specs yet): ask about purpose, users, the list of capabilities, scope boundaries, constraints and what success looks like. As soon as an answer settles a decision, draft its spec from each answer (unknowns recorded as open questions); until then write only notes under `objective/`.
-4. Fine stage (specs exist): take the capability with the most gaps and go down to requirements, failure paths, edge cases and examples. Draft or update the affected spec from each answer immediately; do not batch.
-5. After drafting, review the specs for perceived gaps (missing failure paths, edge cases, actors, limits, interfaces, acceptance checks) and add each as an unchecked `- [ ]` line in `objective/OPEN-QUESTIONS.md`. Gaps are questions for the owner, never filled by guessing.
-6. Ask one question at a time. Every round ends by writing exactly one next question to `objective/QUESTION.md` (the harness shows it to the owner and logs the answer). Make it the most blocking question, short, answerable in a sentence, with options where you can. Put a recommended answer on the question's own last line as `Default: <answer>`; the owner accepts it by typing `y` and the harness logs it as the answer. A default is a proposal: never treat it as decided until the owner answers. Never answer your own question: if you must assume, record it as an unchecked open question.
-7. If the brief and answers already settle everything, do not invent a question: do not ask just to ask. A round that ends with no question is a claim that the specs are ready: the harness then runs the readiness check, and any gap is listed in your next prompt so you can close it yourself (add the missing failure path or example) or ask the owner. A claim whose gaps do not change is stalled.
-8. When you believe nothing is left, write no `QUESTION.md` and stop; the harness confirms with `hodgepodge ready`. The owner can also end the interview by answering `done`.
+## A round
+1. Work from the brief, conversation tail and open questions in your prompt; open `specs/` files only as needed. Do not run `hodgepodge spec-lint` or `ready`: when ending, the prompt lists readiness gaps as your to-do list. Ask one question at a time.
+2. Broad stage (no specs): ask about purpose, users, capabilities, scope, constraints, success. Draft a spec from each answer that settles a decision; otherwise write notes under `objective/`.
+3. Fine stage: take the capability with the most gaps down to requirements, failure paths, edge cases and examples. Draft or update the affected spec from every answer immediately.
+4. Add perceived gaps as unchecked `- [ ]` lines in `objective/OPEN-QUESTIONS.md`; never guess.
+5. End by writing exactly one question to `objective/QUESTION.md`: the most blocking, short, with options where possible, and a last line `Default: <answer>` (the owner accepts with `y`). A default is a proposal, never a decision. Never answer your own question.
+6. If everything is settled, write no question and stop; the harness then runs `hodgepodge ready` and lists any gap next round.
 
-## Dimensions to cover (for every capability in scope)
-- Actors and goals: who uses it and why.
-- Behaviour: the normal flow, step by step.
-- Inputs and outputs: formats, types, ranges, units, defaults.
-- Failure paths: invalid input, missing data, timeouts, partial failure, what the caller sees.
-- Edge cases: empty, zero, one, many, maximum, duplicates, ordering, concurrency.
-- Interfaces and data: names, schemas, files, endpoints, persistence, compatibility.
-- Non-functional: performance targets, limits, security, privacy, observability, portability.
-- Constraints: required languages, libraries, platforms, standards, what must not change.
-- Acceptance: how the owner will know it is done (an observable check, not a feeling).
-- Out of scope: what is deliberately not being built. Ask the owner explicitly for every spec; do not infer it.
+## Dimensions (record each per spec under `## Dimensions` as `- <dimension>: covered` or `- <dimension>: n/a: <reason>`)
+Actors and goals; Behaviour; Inputs and outputs; Failure paths; Edge cases; Interfaces and data; Non-functional (numeric targets); Constraints; Acceptance (an observable check); Out of scope (ask the owner for every spec; never infer it).
 
-For each spec, record every dimension under `## Dimensions` as `- <dimension>: covered` or `- <dimension>: n/a: <reason>`. The harness fails readiness on a missing dimension or an `n/a` without a reason.
+## Requirements
+- One testable statement with exactly one "must"; split "X and Y".
+- Each has a concrete example; every spec states a failure path.
+- No vague words (fast, secure, robust...) or placeholders (TBD, TODO, `??`, `<angle>`); non-functionals carry a number and unit.
 
-## Proposing formats
-When part of a spec is naturally a standard artifact (data shapes, HTTP APIs, event contracts, executable examples, grammars), propose the matching format to the owner as the round's question (for example "Describe the order payload as a JSON Schema?") and declare it under `## Formats` only after the owner confirms. Never choose a format for the owner. Declared artifacts must exist, validate and be referenced by a requirement.
-
-## Fine-grain rules
-- A requirement is one testable statement containing exactly one "must". Split "X and Y" into two.
-- Every requirement needs a concrete example or a test that would fail without it.
-- Every spec has at least one failure or negative-path statement.
-- Replace vague words (fast, secure, user-friendly, robust, etc.) with a measurable threshold or a concrete behaviour; the harness rejects them. Every non-functional requirement (latency, throughput, memory, availability, limits) states a number and unit.
-- No placeholders (TBD, TODO, ??, `<angle>` brackets) may remain in specs.
-- Do not write tests or `tests/PLAN.md`: the first `podge` step (the plan stage) writes them from the specs. Give every requirement a concrete example so a test can be derived from it.
-
-## Files you may write
-`specs/` and `objective/` (notes, open questions, QUESTION.md; not BRIEF.md or CONVERSATION.md, which the harness owns). Not tests, not application code, not `plan.md`.
+Propose a standard format (JSON Schema, OpenAPI...) as a question; declare it under `## Formats` only after the owner agrees.
+Write only `specs/` and `objective/` (not BRIEF.md or CONVERSATION.md). No tests, application code or `plan.md`.

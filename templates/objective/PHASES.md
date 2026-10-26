@@ -1,28 +1,10 @@
 # Objective phases
 
-An objective moves through these phases in order. Each phase has an exit criterion; do not start the next phase until it holds. Search the repo before assuming something is missing.
+In order; do not start a phase before the previous exit holds. Search the repo before assuming something is missing.
 
-## 1. Discover (conversation)
-Goal: turn `objective/BRIEF.md` into requirements captured at a fine grain.
-Run `hodge --dir <sandbox>`: it asks for a short description of the objective (written to `objective/BRIEF.md`), then runs interview rounds. Each round the agent asks the owner one question; the answer is logged in `objective/CONVERSATION.md`. Questions start broad (purpose, users, capabilities, scope, constraints, success) and move to fine-grained requirements once specs exist.
-Follow `objective/INTERVIEW.md`. Record every unanswered question in `objective/OPEN-QUESTIONS.md` as `- [ ] question`; tick it (`- [x]`) once decided and reflected in a spec.
-Exit: discovery and specification happen together, round by round, and end when the owner answers `done` (or the agent has no question left) and `hodgepodge ready --dir <sandbox>` reports `ready: true`; until then no readiness check runs, and gaps found at the end come back as questions or spec fixes. A paused conversation resumes by running `hodge` again.
+1. **Discover + Specify** (`hodge --dir <sandbox>`): the owner gives a short brief (`objective/BRIEF.md`), then each round the agent asks one question and logs the answer in `objective/CONVERSATION.md`. Follow `objective/INTERVIEW.md`. Record unanswered questions in `objective/OPEN-QUESTIONS.md` as `- [ ] question`; tick `- [x]` once decided and reflected in a spec. One spec per decision in `specs/*.md` (spec template: `Implementation:`, Purpose, Requirements `R-<spec>-<n>`, Examples, optional Formats, Dimensions, Out of scope). Exit: the owner answers `done` (or no question is left) and `hodgepodge ready --dir <sandbox>` reports `ready: true`. Paused? Run `hodge` again.
+2. **Test plan** (first `podge` step): `tests/PLAN.md` maps every spec and requirement ID to red tests. Exit: the test-plan gate passes.
+3. **Plan** (same step): `plan.md` lists build tasks, smallest slice first, each naming its spec. Exit: every requirement group is covered by an item.
+4. **Build** (`podge --dir <sandbox>`): one plan item per loop until `plan.md` is done and the suite is green. `podge` refuses to start until `hodgepodge ready` passes.
 
-## 2. Specify
-Goal: one spec per decision in `specs/*.md`, following the spec template (`Implementation:` line, Purpose, Requirements with `R-<spec>-<n>` IDs, Examples, optional Formats, Dimensions, Out of scope). Prefer executable examples; emit JSON Schema or OpenAPI beside a spec where they apply.
-Exit: the readiness check (spec structure, not the test mapping) passes.
-
-## 3. Test plan
-Runs as part of the first `podge` step, after the interview is over. Goal: `tests/PLAN.md` maps every spec and every requirement ID to the tests in `tests/` that prove it; those tests exist and are red.
-Exit: the test-plan gate passes (plan exists, mapped tests exist, suite is red before the first build loop).
-
-## 4. Plan
-Goal: `plan.md` lists the build tasks derived from the specs, smallest useful slice first, each naming the spec it satisfies. The interview phase may not write `plan.md`; the first `podge` step (the plan step, together with the test plan) writes it.
-Exit: every requirement group in `specs/` is covered by at least one plan item.
-
-## 5. Build
-Goal: forward loops, one item per loop, until `plan.md` is done and the suite is green (`podge --dir <sandbox>`).
-Gate: `podge` refuses to start until `hodgepodge ready` passes.
-
-## When things go wrong
-Tune the prompts, specs or this kit ("add a sign"); do not just retry. If a build loop hits a requirement gap, add it to `objective/OPEN-QUESTIONS.md`, return to Discover, and re-run `hodge`.
+When things go wrong, tune the prompts, specs or this kit; do not just retry. A requirement gap found while building goes into `objective/OPEN-QUESTIONS.md`; return to Discover and re-run `hodge`.

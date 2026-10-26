@@ -1,11 +1,9 @@
-You are one iteration of a clean-room loop. You are rebuilding a system from its spec bundle only: specs/ and tests/ are all you have. You have never seen the original source and must not look for it.
-- Do not search outside this repo, fetch the original code, or reconstruct it from memory of a similar project. If something is unclear, record the gap in plan.md instead of guessing from the original source.
-- Pick the single most important unfinished item from plan.md. Search before assuming something is missing.
-- The specs/ files define the behaviour and the tests/ files are the conformance suite. Implement from the spec; do not weaken, edit or delete specs/ or tests/ to pass.
-- Make the smallest change that moves a failing conformance test to green. No stubs or partial implementations.
-- Use parallel subagents for search/read/write; exactly one for build/test.
+You are one iteration of a clean-room loop. You rebuild a system from specs/ and tests/ only; you have never seen the original source and must not look for it. Do "Your item" below, then stop.
+- Do not search outside this repo or recall similar projects. If something is unclear, record the gap in plan.md.
+- Search before assuming something is missing. Parallel subagents for search/read/write; exactly one for build/test.
+- specs/ define behaviour; tests/ are the conformance suite. Never edit or delete them to pass.
+- Smallest change that moves a failing conformance test to green. No stubs or partial implementations.
 - Run scoped tests after each change and record why each test exists.
-- Red step: confirm it fails (the conformance test you are targeting) by running only the new test file, not the whole suite. Run the full suite only to confirm green after the change.
-- Update plan.md when done, then stop.
-- Never tick an item done or implemented just to satisfy a gate. Do not weaken validation (tests, types, lint, thresholds, checks) to get past one; fix the cause.
-- Missing tools, packages, CLIs or dependencies are never a blocker: install them yourself (package manager, npx, pip, brew, apt, etc.), then continue. If one install route fails, try another. The only valid reason to stop is a missing credential/secret you cannot obtain; say exactly which one.
+- Red step: confirm it fails by running only the new test file. Run the full suite only to confirm green.
+- Tick the item in plan.md when done. Never tick an item done to satisfy a gate. Do not weaken validation.
+- Install missing tools yourself; only a missing credential blocks (name it).

@@ -11,6 +11,7 @@ import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { writeIterationRecord } from './run-record.js';
 import { diagnose } from './diagnosis.js';
 import { loadModePrompt } from './prompts.js';
+import { nextItem } from './next-item.js';
 import { checkBrownfieldGate } from './brownfield-gate.js';
 import { checkHardeningGate } from './hardening-gate.js';
 import { checkCleanRoomGate } from './clean-room.js';
@@ -29,7 +30,7 @@ const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templa
 const readIfExists = (p) => (existsSync(p) ? readFileSync(p, 'utf8') : '');
 
 /**
- * Specs index + plan.md, the context shared by loop and QA prompts.
+ * Spec pointers only (path + title): the agent opens a spec when its item needs it.
  * @param {string} repoDir
  * @returns {string}
  */
@@ -42,11 +43,23 @@ export function buildContext(repoDir) {
     const title = readFileSync(join(specsDir, f), 'utf8').split('\n')[0];
     return `- specs/${f}: ${title}`;
   });
-  return ['## Specs index', index.join('\n'), '## plan.md', readIfExists(join(repoDir, 'plan.md'))].join('\n\n');
+  return ['## Specs (open only what you need)', index.join('\n')].join('\n\n');
 }
 
 /**
- * Fixed per-iteration context stack: loop prompt + specs index + plan.md.
+ * The one plan.md item this iteration works on, never the rest of the plan.
+ * @param {string} repoDir
+ * @returns {string}
+ */
+function itemSection(repoDir) {
+  const item = nextItem(readIfExists(join(repoDir, 'plan.md')));
+  if (!item) return '## Your item\n\nNone: plan.md has no unchecked item.';
+  const more = item.open > 1 ? ` (${item.open - 1} more open in plan.md; ignore them)` : '';
+  return `## Your item${more}\n\n${item.text}`;
+}
+
+/**
+ * Per-iteration context: loop prompt + your one plan item + spec pointers. Nothing grows with plan.md.
  * @param {string} repoDir
  * @param {string} [mode]
  * @param {string} [steer] operator note for this iteration only
@@ -55,13 +68,14 @@ export function buildContext(repoDir) {
 export function buildPrompt(repoDir, mode = 'forward', steer) {
   return [
     loadModePrompt(mode),
+    itemSection(repoDir),
     buildContext(repoDir),
     ...(steer ? ['## Steer note', steer] : []),
   ].join('\n\n');
 }
 
 /**
- * Prompt for the plan step: plan prompt + test-plan template + specs index + plan.md.
+ * Prompt for the plan step: plan prompt + test-plan template + spec pointers (plan.md is in the repo).
  * @param {string} repoDir
  * @param {string} [steer]
  * @returns {string}

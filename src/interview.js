@@ -68,9 +68,12 @@ export function stageOf(repoDir) {
   return existsSync(specsDir) && readdirSync(specsDir).some((f) => f.endsWith('.md')) ? 'fine' : 'broad';
 }
 
+const CONVERSATION_TAIL_CHARS = 1500;
+const OPEN_QUESTIONS_SHOWN = 10;
+
 /**
- * With an objective kit, the interview prompt also carries the protocol, the readiness signals,
- * the brief and the open questions (so each round starts where the last stopped). The readiness gaps are listed only
+ * With an objective kit, the interview prompt carries pointers to the protocol files plus only what changes per
+ * round: the brief, the open questions, the conversation tail and the stage. The readiness gaps are listed only
  * once the interview is closing (the owner said done, or the agent had no more questions).
  * @param {string} repoDir
  * @param {boolean} closing
@@ -80,26 +83,23 @@ function kitSections(repoDir, closing) {
   if (!hasObjectiveKit(repoDir)) return [];
   const read = (/** @type {string} */ f) => {
     const p = join(repoDir, 'objective', f);
-    return existsSync(p) ? readFileSync(p, 'utf8').trimEnd() : '(missing)';
+    return existsSync(p) ? readFileSync(p, 'utf8').trimEnd() : '';
   };
   const gaps = closing ? checkReadiness(repoDir).gaps : [];
+  const open = read('OPEN-QUESTIONS.md').split('\n').filter((l) => /^\s*[-*] \[ \] /.test(l));
+  const convo = read('CONVERSATION.md');
   return [
-    '## objective/PHASES.md',
-    read('PHASES.md'),
-    '## objective/INTERVIEW.md',
-    read('INTERVIEW.md'),
-    '## objective/READINESS.md',
-    read('READINESS.md'),
+    '## Kit (read when needed): objective/PHASES.md, objective/INTERVIEW.md (protocol), objective/READINESS.md (what `ready` checks)',
     '## objective/BRIEF.md',
     read('BRIEF.md'),
-    '## objective/OPEN-QUESTIONS.md',
-    read('OPEN-QUESTIONS.md'),
-    '## objective/CONVERSATION.md (questions asked and the owner\'s answers so far)',
-    read('CONVERSATION.md'),
+    `## Open questions (${open.length} unchecked; objective/OPEN-QUESTIONS.md)`,
+    open.slice(0, OPEN_QUESTIONS_SHOWN).join('\n') || '(none)',
+    `## objective/CONVERSATION.md (tail; the owner's answers so far)`,
+    convo.length > CONVERSATION_TAIL_CHARS ? `...${convo.slice(-CONVERSATION_TAIL_CHARS)}` : convo,
     `## Stage: ${stageOf(repoDir)}`,
     stageOf(repoDir) === 'broad'
-      ? 'No specs exist yet. Ask broad questions only (purpose, users, capabilities, scope, constraints, success). Once an answer settles a decision, draft its spec and tests from it and queue perceived gaps in objective/OPEN-QUESTIONS.md; otherwise write notes to objective/. Write the next question, with a `Default: <answer>` last line, to objective/QUESTION.md.'
-      : 'Specs exist. Go deeper on the capability with the most gaps, down to individual requirements, failure paths and examples. Draft or update specs/ and tests/ for everything already answered, add perceived gaps to objective/OPEN-QUESTIONS.md, then write the next question, with a `Default: <answer>` last line, to objective/QUESTION.md.',
+      ? 'No specs exist yet. Ask broad questions only (purpose, users, capabilities, scope, constraints, success). Once an answer settles a decision, draft its spec from it and queue perceived gaps in objective/OPEN-QUESTIONS.md; otherwise write notes to objective/. Write the next question, with a `Default: <answer>` last line, to objective/QUESTION.md.'
+      : 'Specs exist. Go deeper on the capability with the most gaps, down to requirements, failure paths and examples. Draft or update specs/ for everything already answered, add perceived gaps to objective/OPEN-QUESTIONS.md, then write the next question, with a `Default: <answer>` last line, to objective/QUESTION.md.',
     ...(closing
       ? [
           '## Readiness gaps (the interview is ending: close these this round)',

@@ -44,8 +44,9 @@ const pass = ['node', '-e', 'process.exit(0)'];
 const fail = ['node', '-e', 'console.log("boom");process.exit(1)'];
 const self = { root: '/nonexistent/hodgepodge', remotes: [] };
 
-test('buildPrompt stacks loop prompt, specs index and plan.md', () => {
+test('buildPrompt stacks loop prompt, your plan item and spec pointers', () => {
   const dir = makeRepo();
+  writeFileSync(join(dir, 'plan.md'), '# plan\n- [ ] Next: do a thing\n');
   const p = buildPrompt(dir);
   assert.match(p, /search before assuming/i);
   assert.match(p, /specs\/a\.md/);
