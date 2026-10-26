@@ -95,6 +95,20 @@ test('failing tests: work reverted, only the record is committed', async () => {
   assert.match(readFileSync(join(dir, 'runs/r1/iterations/001/test.json'), 'utf8'), /boom/);
 });
 
+test('failing step with runs/ git-ignored (nothing to commit) still returns failed and records a commit', async () => {
+  const dir = makeRepo();
+  writeFileSync(join(dir, '.gitignore'), 'runs/\n');
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-qm', 'ignore runs');
+  const res = await runStep({
+    config: config('o/target'), repoDir: dir, runId: 'r1',
+    adapter: adapter(), testCommand: fail, identity: self,
+  });
+  assert.equal(res.status, 'failed');
+  assert.match(git(dir, 'log', '-1', '--format=%s'), /podge step r1\/001: failed/);
+  assert.equal(git(dir, 'status', '--porcelain'), '');
+});
+
 test('adapter failure gives failed status and does not run tests', async () => {
   const dir = makeRepo();
   const res = await runStep({

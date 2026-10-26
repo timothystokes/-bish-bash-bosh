@@ -150,9 +150,22 @@ test('a target without the kit is gated', async () => {
 
 test('gaps but no question is stalled, not an endless loop', async () => {
   const { repo, config } = sandbox();
-  const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted([{ 'objective/notes.md': 'n\n' }]).adapter, ...owner(['desc']), identity });
+  const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted([{ 'objective/notes.md': 'n\n' }, { 'objective/notes.md': 'm\n' }]).adapter, ...owner(['desc']), identity });
   assert.equal(res.status, 'stalled');
-  assert.equal(res.rounds, 1);
+  assert.equal(res.rounds, 2);
+});
+
+test('gaps but no question retries once with the gaps in the prompt and can reach ok without asking the owner', async () => {
+  const { repo, config } = sandbox();
+  const a = scripted([
+    { 'specs/greet.md': coarse, 'tests/PLAN.md': plan.replace('| R-greet-3 | tests/greet.test.js |\n', ''), 'tests/greet.test.js': 'x\n' },
+    { 'specs/greet.md': goodSpec, 'tests/PLAN.md': plan },
+  ]);
+  const o = owner(['desc']);
+  const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ask: o.ask, say: o.say, identity });
+  assert.deepEqual(res, { status: 'ok', rounds: 2 });
+  assert.equal(o.asked.length, 1);
+  assert.match(a.prompts[1], /## Stage: fine/);
 });
 
 test('stops after maxRounds', async () => {

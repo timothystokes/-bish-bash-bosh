@@ -57,6 +57,7 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
   let round = (existsSync(runDir) ? readdirSync(runDir).filter((d) => /^interview(-\d+)?$/.test(d)).length : 0) + 1;
   const questionPath = join(repoDir, 'objective', 'QUESTION.md');
   let ran = 0;
+  let lastStall = '';
 
   /** @returns {Promise<boolean>} false when the owner stopped answering */
   const answerPending = async () => {
@@ -80,6 +81,11 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
     round++;
     if (res.status === 'ok') return { status: 'ok', rounds: ran };
     if (res.status !== 'incomplete') return { status: res.status, rounds: ran, ...(res.reason ? { reason: res.reason } : {}) };
-    if (!existsSync(questionPath)) return { status: 'stalled', rounds: ran, reason: `agent left gaps but asked no question (objective/QUESTION.md): ${res.reason ?? ''}` };
+    if (!existsSync(questionPath)) {
+      // gaps are in the next prompt; retry once, stall only when they did not change
+      const gaps = res.reason ?? '';
+      if (gaps === lastStall) return { status: 'stalled', rounds: ran, reason: `agent left gaps but asked no question (objective/QUESTION.md): ${gaps}` };
+      lastStall = gaps;
+    }
   }
 }
