@@ -1,7 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
+import Ajv04 from 'ajv-draft-04';
 import addFormats from 'ajv-formats';
+import { parse as parseYaml } from 'yaml';
 import { bulletsBySection } from './spec-lint.js';
 
 /**
@@ -66,6 +69,107 @@ function loadSchemas(paths) {
   return { ajv, duplicates, loaded };
 }
 
+const require = createRequire(import.meta.url);
+const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'];
+
+/** @type {Map<string, import('ajv/dist/core.js').ValidateFunction>} */
+const oasValidators = new Map();
+
+/**
+ * @param {string} version `3.0`, `3.1` or `3.2`
+ * @returns {import('ajv/dist/core.js').ValidateFunction}
+ */
+function oasValidator(version) {
+  let v = oasValidators.get(version);
+  if (!v) {
+    const schema = require(`@seriousme/openapi-schema-validator/schemas/v${version}/schema.json`);
+    const Ctor = /** @type {typeof import('ajv/dist/2020.js').default} */ (
+      version === '3.0' ? /** @type {any} */ (Ajv04).default ?? Ajv04 : Ajv2020.default
+    );
+    const ajv = new Ctor({ strict: false, allErrors: true, logger: false });
+    addFormats.default(ajv);
+    v = ajv.compile(schema);
+    oasValidators.set(version, v);
+  }
+  return v;
+}
+
+/**
+ * @param {string} path
+ * @returns {{doc: Record<string, unknown>} | {error: string}}
+ */
+function readOpenApi(path) {
+  let value;
+  try {
+    value = parseYaml(readFileSync(path, 'utf8'));
+  } catch (e) {
+    return { error: `invalid YAML/JSON: ${message(e)}` };
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return { error: 'document must be an object' };
+  return { doc: /** @type {Record<string, unknown>} */ (value) };
+}
+
+/**
+ * @param {Record<string, unknown>} doc
+ * @returns {{id: string, where: string}[]}
+ */
+function operationIds(doc) {
+  const out = [];
+  const paths = doc.paths;
+  if (typeof paths !== 'object' || paths === null) return [];
+  for (const [route, item] of Object.entries(paths)) {
+    if (typeof item !== 'object' || item === null) continue;
+    for (const m of HTTP_METHODS) {
+      const op = /** @type {Record<string, unknown>} */ (item)[m];
+      const id = typeof op === 'object' && op !== null ? /** @type {{operationId?: unknown}} */ (op).operationId : undefined;
+      if (typeof id === 'string') out.push({ id, where: `${m.toUpperCase()} ${route}` });
+    }
+  }
+  return out;
+}
+
+/**
+ * Local `$ref`s (`#/...`) that point nowhere.
+ * @param {unknown} node
+ * @param {unknown} root
+ * @param {Set<string>} bad
+ */
+function collectBadRefs(node, root, bad) {
+  if (Array.isArray(node)) {
+    for (const n of node) collectBadRefs(n, root, bad);
+    return;
+  }
+  if (typeof node !== 'object' || node === null) return;
+  for (const [k, v] of Object.entries(node)) {
+    if (k === 'example' || k === 'examples') continue;
+    if (k === '$ref' && typeof v === 'string' && v.startsWith('#')) {
+      if (!resolvePointer(root, v.slice(1))) bad.add(v);
+    } else collectBadRefs(v, root, bad);
+  }
+}
+
+/**
+ * @param {unknown} root
+ * @param {string} pointer
+ * @returns {boolean}
+ */
+function resolvePointer(root, pointer) {
+  if (pointer === '') return true;
+  if (!pointer.startsWith('/')) return false;
+  let cur = root;
+  for (const raw of pointer.slice(1).split('/')) {
+    let key;
+    try {
+      key = decodeURIComponent(raw).replaceAll('~1', '/').replaceAll('~0', '~');
+    } catch {
+      return false;
+    }
+    if (typeof cur !== 'object' || cur === null || !Object.hasOwn(cur, key)) return false;
+    cur = /** @type {Record<string, unknown>} */ (cur)[key];
+  }
+  return true;
+}
+
 /** @param {unknown} e */
 const message = (e) => (e instanceof Error ? e.message : String(e));
 
@@ -118,6 +222,48 @@ export const FORMATS = {
         return [`schema ${schemaPath} could not be compiled: ${message(e)}`];
       }
     },
+  },
+};
+
+FORMATS.openapi = {
+  validate(path) {
+    const r = readOpenApi(path);
+    if ('error' in r) return [r.error];
+    const doc = r.doc;
+    const version = typeof doc.openapi === 'string' ? /^3\.[012]\./.exec(`${doc.openapi}.`)?.[0].slice(0, 3) : undefined;
+    if (!version) return [`unsupported or missing openapi version ${JSON.stringify(doc.openapi)} (want 3.0, 3.1 or 3.2)`];
+    const check = oasValidator(version);
+    const problems = [];
+    if (!check(doc)) {
+      for (const e of check.errors ?? []) problems.push(`invalid OpenAPI: ${e.instancePath || '/'} ${e.message}`);
+      return [...new Set(problems)].slice(0, 20);
+    }
+    const bad = new Set();
+    collectBadRefs(doc, doc, bad);
+    for (const ref of bad) problems.push(`unresolved $ref "${ref}"`);
+    /** @type {Map<string, string>} */
+    const seen = new Map();
+    for (const { id, where } of operationIds(doc)) {
+      const first = seen.get(id);
+      if (first !== undefined) problems.push(`duplicate operationId "${id}" in ${first} and ${where}`);
+      else seen.set(id, where);
+    }
+    return problems;
+  },
+  crossCheck(paths) {
+    /** @type {Map<string, string>} */
+    const seen = new Map();
+    const problems = [];
+    for (const p of paths) {
+      const r = readOpenApi(p);
+      if ('error' in r) continue;
+      for (const id of new Set(operationIds(r.doc).map((o) => o.id))) {
+        const first = seen.get(id);
+        if (first !== undefined) problems.push(`duplicate operationId "${id}" in ${first} and ${p}`);
+        else seen.set(id, p);
+      }
+    }
+    return problems;
   },
 };
 

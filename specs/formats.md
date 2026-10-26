@@ -1,5 +1,5 @@
 # Spec: Spec formats (declared standards that constrain specs)
-Status: partly implemented (X-3: declaration parsing, registry, readiness gaps; X-8: `json-schema` on `ajv` (2020-12 + `ajv-formats`) with meta-schema validation, cross-file `$id`/`$ref` consistency, output conformance and the `formats` loop gate; the other formats come with X-9; `@hyperjump/json-schema` is not used). plan.md "Spec formats", F-1..F-12.
+Status: partly implemented (X-3: declaration parsing, registry, readiness gaps; X-8: `json-schema` on `ajv` (2020-12 + `ajv-formats`) with meta-schema validation, cross-file `$id`/`$ref` consistency, output conformance and the `formats` loop gate; X-9 (first slice): `openapi` on `@seriousme/openapi-schema-validator` schemas + `ajv`; AsyncAPI, Gherkin and EBNF still to come; `@hyperjump/json-schema` is not used). plan.md "Spec formats", F-1..F-12.
 
 - Purpose: free-form Markdown lets specs stay vague or contradict each other. A spec may declare that part of what it captures is expressed in an open standard format; the harness then validates that artifact and uses it as a gate wherever it bears on a step.
 - Declaration: a spec lists adopted formats in a `## Formats` section, one bullet per artifact: `- <format>: <path>` (for example `- json-schema: specs/schemas/order.json`). Declaring a format is a strong signal that every requirement it covers is verified through that format.
@@ -15,7 +15,7 @@ Status: partly implemented (X-3: declaration parsing, registry, readiness gaps; 
 | Format | Embedded tool | Role |
 |---|---|---|
 | JSON Schema 2020-12 | `ajv`, `ajv-formats`, `@hyperjump/json-schema` | data shapes, cross-file `$ref` consistency |
-| OpenAPI 3.x | `@redocly/cli`, `@stoplight/spectral-cli`, `@apidevtools/swagger-parser` | HTTP APIs; lint and consistency |
+| OpenAPI 3.0/3.1/3.2 (JSON or YAML) | `@seriousme/openapi-schema-validator` (official schemas, run through `ajv`/`ajv-draft-04`), `yaml` | HTTP APIs; `validate` checks the document against the official schema for its `openapi` version, unresolved local `#/...` `$ref`s and duplicate `operationId`; `crossCheck` flags an `operationId` defined in two documents. No `-> output` conformance; Redocly/Spectral linting is not used (async CLIs, rulesets) |
 | AsyncAPI | `@asyncapi/parser` | event and message contracts |
 | Gherkin | `@cucumber/gherkin` | executable examples (replaces free-text `input -> output`) |
 | EBNF | `ebnf` | input and output grammars |
@@ -28,6 +28,7 @@ Later (deferred): XState statecharts (`xstate`, `@xstate/graph`), property specs
 - An undeclared or unknown format name must fail readiness.
 - A tool must run inside the harness without the target project installing anything.
 - Cross-file conflicts between artifacts (duplicate `$id`, unresolved `$ref`) must fail readiness.
+- An OpenAPI artifact that violates its official schema, has an unresolved local `$ref`, or repeats an `operationId` (within or across documents) must fail readiness.
 - A declared output that violates its schema must fail readiness and the `formats` loop gate.
 
 ## Out of scope
