@@ -65,8 +65,8 @@ Brownfield and test-hardening loops are selected with config `mode` and run via 
 ## Watching and controlling a run
 
 ```sh
-hodgepodge status [--control <control.json>]                              # iterations, tokens, cost vs budgets
-hodgepodge tui    --control <control.json>                                # live view: p pause, r resume, s steer, x stop, q quit
+hodgepodge status [--control <control.json>]                              # iterations, tokens, cost vs budgets, formats, readiness, QA, done evidence
+hodgepodge tui    --control <control.json>                                # live view (incl. formats, readiness, QA, done): p pause, r resume, s steer, x stop, q quit
 hodgepodge control --file <control.json> pause|resume|stop|steer <note>   # start `podge` with --control <control.json>
 hodgepodge kill --container <name> --control <control.json>              # stop the run container
 ```

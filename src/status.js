@@ -1,14 +1,17 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { sumRunUsage } from './budget-gate.js';
+import { readRunDetails } from './run-details.js';
 
 /**
  * @typedef {import('./budget-gate.js').RunTotals} RunTotals
  * @typedef {import('./budget-gate.js').Budgets} Budgets
+ * @typedef {import('./run-details.js').RunDetails} RunDetails
  * @typedef {{
  *   totals(runId: string): RunTotals,
  *   lastStatus(runId: string): string | null,
  *   tail(runId: string, lines: number): string[],
+ *   details(runId: string): RunDetails,
  * }} StatusSource
  * @typedef {{
  *   runId: string,
@@ -17,6 +20,7 @@ import { sumRunUsage } from './budget-gate.js';
  *   totals: RunTotals,
  *   budgets: Budgets,
  *   remaining: RunTotals,
+ *   details: RunDetails,
  * }} RunStatus
  */
 
@@ -48,6 +52,7 @@ export function createLocalStatusSource(repoDir) {
       const last = lastIteration(repoDir, runId);
       return last ? JSON.parse(readFileSync(join(last, 'record.json'), 'utf8')).status : null;
     },
+    details: (runId) => readRunDetails(repoDir, runId),
     tail(runId, lines) {
       const last = lastIteration(repoDir, runId);
       if (!last || !existsSync(join(last, 'transcript'))) return [];
@@ -70,6 +75,7 @@ export function readRunStatus(source, runId, budgets) {
     lastStatus: source.lastStatus(runId),
     totals,
     budgets,
+    details: source.details(runId),
     remaining: {
       tokens: budgets.maxTokens - totals.tokens,
       cost: budgets.maxCostUsd - totals.cost,

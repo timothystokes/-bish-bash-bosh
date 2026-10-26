@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { writeIterationRecord } from '../src/run-record.js';
+import { readRunDetails } from '../src/run-details.js';
 import { createLocalStatusSource } from '../src/status.js';
 import { renderFrame, createTui, runTui } from '../src/tui.js';
 import { main } from '../src/cli.js';
@@ -56,7 +57,7 @@ test('renderFrame shows cost meter vs budget, control state, log tail and keys',
 });
 
 test('renderFrame flags over-budget and bad control file', () => {
-  const status = { runId: 'r', iterations: 6, lastStatus: 'ok', totals: { tokens: 0, cost: 3, seconds: 0, iterations: 6 }, budgets, remaining: { tokens: 1000, cost: -1, seconds: 100, iterations: -1 } };
+  const status = { runId: 'r', iterations: 6, lastStatus: 'ok', totals: { tokens: 0, cost: 3, seconds: 0, iterations: 6 }, budgets, remaining: { tokens: 1000, cost: -1, seconds: 100, iterations: -1 }, details: readRunDetails(makeRun(), 'r') };
   assert.match(renderFrame({ status, control: { ok: true, paused: false, stop: false }, tail: [], prompt: null }), /OVER BUDGET/);
   assert.match(renderFrame({ status, control: { ok: false, reason: 'invalid control file: x' }, tail: [], prompt: null }), /STOPPED.*invalid control file/);
 });

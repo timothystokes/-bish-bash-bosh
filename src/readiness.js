@@ -87,6 +87,26 @@ function checkDimensions(path, bullets) {
 }
 
 /**
+ * Per-dimension state of a spec's `## Dimensions` bullets: `covered`, `n/a` (with a reason),
+ * `gap` (recorded but not valid) or `missing` (not recorded).
+ * @param {string[]} bullets
+ * @returns {Record<string, 'covered' | 'n/a' | 'gap' | 'missing'>}
+ */
+export function dimensionStates(bullets) {
+  /** @type {Record<string, 'covered' | 'n/a' | 'gap' | 'missing'>} */
+  const states = Object.fromEntries(DIMENSIONS.map((d) => [d, 'missing']));
+  const known = new Map(DIMENSIONS.map((d) => [d.toLowerCase(), d]));
+  for (const b of bullets) {
+    const m = /^([^:]+):\s*(.*)$/.exec(b);
+    const name = m ? known.get(m[1].trim().toLowerCase()) : undefined;
+    if (!m || !name || states[name] !== 'missing') continue;
+    const status = m[2].trim();
+    states[name] = /^covered$/i.test(status) ? 'covered' : /^n\/a\s*[:\-]\s*\S/i.test(status) ? 'n/a' : 'gap';
+  }
+  return states;
+}
+
+/**
  * Deterministic "enough to leave the conversation" check: the requirements are captured at a fine grain.
  * Mirrors objective/READINESS.md.
  * @param {string} repoDir

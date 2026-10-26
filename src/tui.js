@@ -13,6 +13,40 @@ const KEYS = '[p]ause  [r]esume  [s]teer  [x] stop  [q]uit';
 /** @param {number} n */
 const usd = (n) => `$${n.toFixed(2)}`;
 
+/** @param {string} label @param {string} text */
+const row = (label, text) => `${label.padEnd(12)}${text}`;
+
+/**
+ * Declared formats, readiness by dimension, QA findings and done evidence.
+ * @param {import('./run-details.js').RunDetails} d
+ * @returns {string[]}
+ */
+export function renderDetails(d) {
+  const lines = [
+    d.formats.length === 0
+      ? row('formats', 'none declared')
+      : d.formats.map((f, i) => row(i === 0 ? 'formats' : '', `${f.format} ${f.path}${f.output ? ` -> ${f.output}` : ''}  (${f.spec})`)).join('\n'),
+    row('readiness', d.readiness.ready ? 'READY' : `NOT READY (${d.readiness.gaps} gaps)`),
+  ];
+  for (const s of d.readiness.specs) {
+    const entries = Object.entries(s.dimensions);
+    const open = entries.filter(([, v]) => v !== 'covered').map(([k, v]) => `${k} ${v === 'n/a' ? v : v.toUpperCase()}`);
+    lines.push(`  ${s.spec}  ${entries.length - open.length}/${entries.length} covered${open.length > 0 ? `; ${open.join(', ')}` : ''}`);
+  }
+  if (d.qa.length === 0) lines.push(row('qa', 'not run'));
+  for (const c of d.qa) {
+    lines.push(row('qa', `cycle ${c.cycle} ${c.status}${c.findings.length > 0 ? ` (${c.findings.length})` : ''}${c.reason ? `: ${c.reason}` : ''}`));
+    for (const f of c.findings) lines.push(`  ${f.severity} ${f.classification} ${f.spec}: ${f.consequence}`);
+  }
+  if (!d.done) lines.push(row('done', 'no report'));
+  else {
+    const passing = d.done.requirements.filter((r) => r.status === 'passing').length;
+    lines.push(row('done', `${d.done.ok ? 'DONE' : 'NOT DONE'}  ${passing}/${d.done.requirements.length} requirements passing`));
+    for (const g of d.done.gaps) lines.push(`  gap: ${g}`);
+  }
+  return lines.join('\n').split('\n');
+}
+
 /**
  * Pure renderer for one TUI frame.
  * @param {{status: RunStatus, control: ControlState, tail: string[], prompt: string | null, message?: string}} f
@@ -28,6 +62,7 @@ export function renderFrame({ status, control, tail, prompt, message }) {
     `tokens      ${t.tokens} / ${b.maxTokens}`,
     `seconds     ${t.seconds} / ${b.maxWallClockSeconds}`,
     `iterations  ${t.iterations} / ${b.maxIterations}`,
+    ...renderDetails(status.details),
     ...(control.ok && control.steer ? [`pending steer: ${control.steer}`] : []),
     '--- log ---',
     ...tail,
