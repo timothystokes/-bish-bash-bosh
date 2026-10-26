@@ -98,13 +98,13 @@ function kitSections(repoDir, closing) {
     convo.length > CONVERSATION_TAIL_CHARS ? `...${convo.slice(-CONVERSATION_TAIL_CHARS)}` : convo,
     `## Stage: ${stageOf(repoDir)}`,
     stageOf(repoDir) === 'broad'
-      ? 'No specs yet: ask broad questions (purpose, users, capabilities, scope, constraints, success); draft a spec once an answer settles a decision. Write the next question, ending `Default: <answer>`, to objective/QUESTION.md.'
-      : 'Specs exist: go deeper on the capability with the most gaps; update specs/ from the answers. Write the next question, ending `Default: <answer>`, to objective/QUESTION.md.',
+      ? 'No specs yet: ask broad questions (purpose, users, capabilities, scope, constraints, success); draft a spec once an answer settles a decision. Write the next question batch to objective/QUESTION.md.'
+      : 'Specs exist: go deeper on the capability with the most gaps; update specs/ from the answers. Write the next question batch to objective/QUESTION.md.',
     ...(closing
       ? [
           '## Readiness gaps (the interview is ending: close these this round)',
           gaps.length === 0 ? '(none: confirm and stop)' : gaps.map((g) => `- ${g}`).join('\n'),
-          'Fix gaps the answers already settle; ask the owner (with a `Default:` line) about the rest. Write no question only when no gap remains.',
+          'Fix gaps the answers already settle; ask the owner about the rest (batch with defaults). Write no question only when no gap remains.',
         ]
       : []),
   ];

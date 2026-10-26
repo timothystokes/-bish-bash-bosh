@@ -3,6 +3,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFil
 import { join } from 'node:path';
 import { hasObjectiveKit } from './readiness.js';
 import { runInterview } from './interview.js';
+import { BATCH_HINT, formatBatchLog, parseBatch, resolveAnswer } from './questions.js';
 
 /**
  * @typedef {{
@@ -68,6 +69,20 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
   const answerPending = async () => {
     if (!existsSync(questionPath)) return true;
     const question = readFileSync(questionPath, 'utf8').trim();
+    /** @type {ReturnType<typeof parseBatch>} */
+    let batch = null;
+    try {
+      batch = parseBatch(question);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      say(`\nDiscarded a malformed objective/QUESTION.md: ${reason}\n`);
+      appendFileSync(conversationPath, `\n## Round ${round - 1}\n\nYour QUESTION.md was malformed (${reason}); rewrite it as numbered \`N. <question> Default: <answer>\` lines under \`## <topic>\` headings.\n`);
+      rmSync(questionPath);
+      git(repoDir, 'add', '-A');
+      git(repoDir, 'commit', '-q', '-m', `hodge ${runId}: discard malformed question`);
+      return true;
+    }
+    if (batch) return answerBatch(question, batch);
     const proposed = /^Default:[ \t]*(.+)$/m.exec(question)?.[1]?.trim();
     say(`\n${question}\n(${proposed ? 'type y to accept the default, ' : ''}type done to end the interview)\n`);
     let answer = ((await ask('> ')) ?? '').trim();
@@ -80,6 +95,35 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
     rmSync(questionPath);
     git(repoDir, 'add', '-A');
     git(repoDir, 'commit', '-q', '-m', `hodge ${runId}: answer to round ${round - 1}`);
+    return true;
+  };
+
+  /**
+   * @param {string} question
+   * @param {NonNullable<ReturnType<typeof parseBatch>>} batch
+   * @returns {Promise<boolean>}
+   */
+  const answerBatch = async (question, batch) => {
+    say(`\n${question}\n(${BATCH_HINT})\n`);
+    for (;;) {
+      const reply = ((await ask('> ')) ?? '').trim();
+      if (reply === '') return false;
+      if (isDone(reply)) {
+        closing = true;
+        appendFileSync(conversationPath, `\n## Round ${round - 1}\n\n${ENDED}\n`);
+        break;
+      }
+      const r = resolveAnswer(batch, reply);
+      if (!r.ok) {
+        say(`${r.reason}\n`);
+        continue;
+      }
+      appendFileSync(conversationPath, `\n## Round ${round - 1}\n\n${formatBatchLog(batch, r.answers)}\n`);
+      break;
+    }
+    rmSync(questionPath);
+    git(repoDir, 'add', '-A');
+    git(repoDir, 'commit', '-q', '-m', `hodge ${runId}: answers to round ${round - 1}`);
     return true;
   };
 

@@ -39,7 +39,7 @@ test('the kit documents phases, the interview protocol and the readiness thresho
   const read = (/** @type {string} */ f) => readFileSync(join(dir, 'target', 'objective', f), 'utf8');
   assert.match(read('PHASES.md'), /hodge/);
   assert.match(read('PHASES.md'), /Discover[\s\S]*Specify[\s\S]*Test plan[\s\S]*Plan[\s\S]*Build/);
-  assert.match(read('INTERVIEW.md'), /one question at a time/i);
+  assert.match(read('INTERVIEW.md'), /topic batches/i);
   assert.match(read('READINESS.md'), /at least 3 requirements/i);
   assert.match(read('READINESS.md'), /hodgepodge ready/);
 });
