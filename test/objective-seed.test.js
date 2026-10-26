@@ -189,3 +189,10 @@ test('hodge in an objective-kit sandbox asks for the objective and is gated with
   assert.match(out, /Describe the objective/);
   assert.match(out, /no objective description given/);
 });
+
+test('objective seed package.json has a test script so the tests gate can run', () => {
+  const dir = fresh();
+  assert.equal(initSandbox({ dir, ...base }).ok, true);
+  const pkg = JSON.parse(readFileSync(join(dir, 'target', 'package.json'), 'utf8'));
+  assert.equal(pkg.scripts.test, 'node --test tests/*.test.js');
+});

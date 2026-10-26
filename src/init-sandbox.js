@@ -102,5 +102,5 @@ function seedObjective(repo) {
   copyTree(kit, join(repo, 'objective'));
   rmSync(join(repo, 'objective', 'plan.md'));
   copyFileSync(join(kit, 'plan.md'), join(repo, 'plan.md'));
-  writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'target', private: true, type: 'module' }, null, 2) + '\n');
+  writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'target', private: true, type: 'module', scripts: { test: 'node --test tests/*.test.js' } }, null, 2) + '\n');
 }

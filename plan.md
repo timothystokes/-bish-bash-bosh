@@ -3,9 +3,9 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**X-14: reconcile the `podge` test gate with red-first tests from the interview (seen live in P2-10).**
-Why: live `hodge` now reaches `ok`, but `podge step` on that sandbox fails every step: the gate demands a fully green `npm test`, yet the interview leaves one red test per requirement (and the seed `package.json` has no `test` script), so even the plan-derivation step is reverted. Decide in a spec (`specs/gates.md`, `specs/loop.md`): a planning-only step skips the tests gate, later steps gate on "no previously passing test regresses" (or scoped tests), and the objective seed gets a `test` script. Test first with the scripted adapter, then re-run the live trial (`cd ~/work/SANDBOXES/p210 && ./podge`).
-Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`. Regenerate a sandbox with `hodgepodge init --dir <dir> --adapter copilot --model <id>`.
+**Live re-trial of `podge` on the P2-10 sandbox after X-14.**
+Why: X-14 is only proven with the scripted adapter; the claim "podge derives a plan and passes later steps with red-first tests" needs the live check. Regenerate a sandbox (`hodgepodge init --dir ~/work/SANDBOXES/p214 --adapter copilot --model auto --seed objective`), run `./hodge` then `./podge`, and tune prompts/gates from what breaks. If it cannot run (no credential), fall back to X-13.
+Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -164,7 +164,7 @@ Ordered; each task is tests-first and updates docs/specs/templates in the same s
 | X-11 | Adapter smoke prompt (fizzbuzz) for live checks | H-17 | todo | |
 | X-12 | Integration: templates/seeds for new fields (G-5), JSON Schemas for our artifacts via `ajv` (G-6), `status`/`tui` surfacing (G-7), validators in the Docker image (G-8), per-format skill snippets (G-9), docs-consistency test (G-4) | G-4..G-9 | todo | X-1..X-9 |
 | X-13 | Regression end-to-end fixture exercising every new gate (scripted adapter) plus live trial after each stage | G-11 | todo | X-12 |
-| X-14 | Reconcile the `podge` test gate with red-first interview tests: planning-only step skips the tests gate, later steps gate on no regressions, objective seed `package.json` gets a `test` script | P2-10 | todo | |
+| X-14 | Reconcile the `podge` test gate with red-first interview tests: planning-only step skips the tests gate, later steps gate on no regressions, objective seed `package.json` gets a `test` script | P2-10 | done (scripted, unit level; live re-trial of `podge` pending) | |
 
 Deferred and unchanged: H-7, H-8, H-9, H-12, H-18, H-20, H-24, H-27, H-28, F-12.
 
@@ -313,3 +313,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - X-8 done (scripted, unit level; no live adapter/Docker): `json-schema` in `src/formats.js` now uses `ajv` 2020-12 + `ajv-formats` (new dependency): meta-schema validation, cross-file duplicate `$id` and unresolved `$ref` (one shared `ajv` instance), and a `conform` tool. `## Formats` bullets accept `- json-schema: <schema> -> <output path>`; an existing output that is not JSON or violates the schema is a readiness gap; missing output is skipped. `checkFormatGate` is wired into `runStep` as the `formats` gate (after scope/anti-stub, only when a spec declares formats): failing reverts the work. 398 tests pass, check clean. Updated `specs/formats.md`, `specs/gates.md`, `templates/spec.md`, `READINESS.md`. Not done: `@hyperjump/json-schema` (unneeded; dropped from spec), outputs as directories/globs, other formats (X-9). Sign: ajv CJS default imports need `.default` under `tsc --checkJs`. Next: P2-10.
 
 - P2-10 done (live `copilot` adapter, model `auto`, host, no Docker): `hodgepodge init --seed objective` then `./hodge` in `~/work/SANDBOXES/p210`. Found and fixed (test first, 400 pass, check clean): (1) a round that left readiness gaps but asked no question stalled at once; now retried once with the gaps in the prompt, stalled only if the same gaps remain (`src/objective.js`, `specs/modes.md`), and `INTERVIEW.md` tells the agent to close gaps itself rather than invent a question (live rerun reached `ok` in 1 round); (2) a failed `podge step` with a git-ignored `runs/` left nothing to commit, so `git commit` crashed the CLI; step commit is now `--allow-empty` (`src/step.js`). Found, not fixed: X-14 (fully green test gate vs red-first tests; seed lacks a `test` script), so `podge` live is unproven. Sign: live trials find gate/design mismatches scripted tests cannot; run one after each stage. Next: X-14.
+- X-14 done (scripted, unit level; no live adapter/Docker): new `src/test-gate.js`; `runStep` runs the suite at HEAD before the agent and gates after on no regression (green, or red with only baseline failures; unnameable failures fail), planning-only steps (plan.md, tests/PLAN.md, specs/) skip the gate; objective seed `package.json` gets `scripts.test`. 404 tests pass, check clean. Specs `gates.md`, `loop.md` updated. Sign: failing-test names are parsed from spec/TAP output; other reporters fall back to strict. Next: live re-trial.

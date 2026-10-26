@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateConfig } from './config.js';
@@ -11,6 +11,7 @@ import { loadModePrompt } from './prompts.js';
 import { checkBrownfieldGate } from './brownfield-gate.js';
 import { checkHardeningGate } from './hardening-gate.js';
 import { checkCleanRoomGate } from './clean-room.js';
+import { checkTestsNoRegression, isPlanningOnly, runTests } from './test-gate.js';
 import { checkFormatGate, declaresFormats } from './formats.js';
 
 /**
@@ -118,6 +119,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     const plan = checkTestPlanGate(repoDir, { testCommand, requireRed: iteration === 1 });
     if (!plan.ok) return gated(plan.reason ?? 'test-plan gate failed');
   }
+  const baseline = runTests(testCommand, repoDir);
   const prompt = buildPrompt(repoDir, cfg.mode, steer);
   const maxTokens = budget.remaining.tokens;
   const maxCostUsd = budget.remaining.cost;
@@ -160,11 +162,11 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     if (!diffOk) {
       status = 'failed';
     } else {
-      const [cmd, ...args] = testCommand;
-      const t = spawnSync(cmd, args, { cwd: repoDir, encoding: 'utf8' });
-      test = { exitStatus: t.status ?? 1, output: `${t.stdout ?? ''}${t.stderr ?? ''}` };
-      const testsOk = t.status === 0;
-      gates.push({ name: 'tests', ok: testsOk, detail: testsOk ? undefined : 'failed' });
+      const planning = isPlanningOnly(staged);
+      const t = planning ? null : checkTestsNoRegression(runTests(testCommand, repoDir), baseline);
+      test = t ? { exitStatus: t.exitStatus, output: t.output } : { skipped: true, reason: 'planning-only' };
+      const testsOk = t ? t.ok : true;
+      gates.push({ name: 'tests', ok: testsOk, detail: t ? t.detail : 'skipped (planning-only)' });
       const typesOk = record('types', checkTypeGate(repoDir, typeCommand));
       const hardenOk = !hardening || !testsOk || record('hardening', checkHardeningGate(repoDir, cfg.hardenCommand));
       if (!testsOk || !typesOk || !hardenOk) status = 'failed';

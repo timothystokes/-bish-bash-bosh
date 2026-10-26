@@ -253,3 +253,59 @@ test('format gate: absent when no spec declares formats', async () => {
   const rec = JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
   assert.ok(!rec.gates.some((/** @type {{name: string}} */ x) => x.name === 'formats'));
 });
+
+// Prints the spec-reporter failure line for "red one" until src/new.js exists, and always for "red two".
+const redSuite = ['node', '-e', `
+const fs = require('node:fs');
+const bad = [];
+if (!fs.existsSync('src/new.js')) bad.push('red one');
+if (fs.existsSync('src/worse.js')) bad.push('fresh red');
+bad.push('red two');
+for (const n of bad) console.log('✖ ' + n + ' (1.2ms)');
+process.exit(1);
+`];
+
+test('tests gate: a planning-only step skips the tests gate even when the suite is red', async () => {
+  const dir = makeRepo();
+  const res = await runStep({
+    config: config('o/target'), repoDir: dir, runId: 'r1',
+    adapter: adapter({ writes: { 'plan.md': '# plan\n- [ ] one\n' } }), testCommand: fail, identity: self,
+  });
+  assert.equal(res.status, 'ok');
+  const rec = JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
+  const g = rec.gates.find((/** @type {{name: string}} */ x) => x.name === 'tests');
+  assert.equal(g.ok, true);
+  assert.match(g.detail, /planning-only/);
+});
+
+test('tests gate: a step that touches code passes while only previously failing tests still fail', async () => {
+  const dir = makeRepo();
+  const res = await runStep({
+    config: config('o/target'), repoDir: dir, runId: 'r1',
+    adapter: adapter({ writes: { 'src/other.js': 'export const y = 2;\n' } }), testCommand: redSuite, identity: self,
+  });
+  assert.equal(res.status, 'ok');
+  const rec = JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
+  const g = rec.gates.find((/** @type {{name: string}} */ x) => x.name === 'tests');
+  assert.equal(g.ok, true);
+  assert.match(g.detail, /no regression/);
+});
+
+test('tests gate: a newly failing test fails the step and the work is reverted', async () => {
+  const dir = makeRepo();
+  const res = await runStep({
+    config: config('o/target'), repoDir: dir, runId: 'r1',
+    adapter: adapter({ writes: { 'src/worse.js': 'export const z = 3;\n' } }), testCommand: redSuite, identity: self,
+  });
+  assert.equal(res.status, 'failed');
+  assert.ok(!existsSync(join(dir, 'src', 'worse.js')));
+});
+
+test('tests gate: a failing suite whose failures cannot be named still fails the step', async () => {
+  const dir = makeRepo();
+  const res = await runStep({
+    config: config('o/target'), repoDir: dir, runId: 'r1',
+    adapter: adapter(), testCommand: fail, identity: self,
+  });
+  assert.equal(res.status, 'failed');
+});
