@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**Reconcile the stale `implement` rows in the H-/F-/G- tables (H-1, H-6, H-10, H-11, H-13..H-17, H-19, H-21..H-23, F-1..F-3, F-9, G-10): each is covered by a Phase 6 X-task already marked done. Verify each against its X-task's code/tests, mark it `done (X-n)` with the tested scope, and note anything genuinely unbuilt as a new `implement` task. Leave `defer` rows alone.**
-Why: all Docker tasks are done and P5-4b/P5-6 (AWS) are `implement later` (deferred by the owner: never pick them, never check for AWS credentials); the only remaining non-deferred items are these `implement` rows, whose statuses are out of date.
+**F-9b: parse JUnit XML test results and map them to requirement IDs in `src/done.js` (feeds `done.json`), tests first; update `specs/formats.md`, `specs/gates.md` and README if behaviour changes.**
+Why: the audit of the stale `implement` rows found everything built and tested except JUnit XML parsing; this is the only non-deferred, non-`implement later` item left.
 Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`. P0-5b, P0-6b, P5-4b and P5-6 are `implement later`: skip them.
 
 ## Phase 0: Foundations
@@ -86,29 +86,29 @@ Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not
 Status `implement` = decided to do; `defer` = noted, not now. Move to `todo`/`done` when picked up. Items covered by a Phase 6 task (see its "Covers" column) are built there: do not implement them separately, and mark them done when that task is done.
 | ID | Task | Status | Source |
 |---|---|---|---|
-| H-1 | Diagnosis output shape: when a step fails or gates, the agent (or a diagnosis role prompt) reports root cause, evidence, fix, test and prevention in a fixed structure, so failures become "signs" (prompt/spec/gate changes) instead of retries. Define the shape, prompt and where it is recorded (e.g. the run record); tests first | implement | monorepo-2026 `debugger` subagent |
+| H-1 | Diagnosis output shape: when a step fails or gates, the agent (or a diagnosis role prompt) reports root cause, evidence, fix, test and prevention in a fixed structure, so failures become "signs" (prompt/spec/gate changes) instead of retries. Define the shape, prompt and where it is recorded (e.g. the run record); tests first | done (X-6; `src/diagnosis.js`, `diagnosis.json`; scripted, unit level) | monorepo-2026 `debugger` subagent |
 | H-2 | `AGENTS.md` rule: no compatibility code. The harness is pre-release, so renames and removals are outright: no aliases, deprecation or pointer messages, no migration notes | done | overalls `repository-compatibility-lifetime` |
 | H-3 | `AGENTS.md` rule: claim boundary. A task is "done" only with the tested scope named (scripted adapter vs live adapter vs Docker); a passing structural check is not proof of runtime behaviour | done | overalls `repository-test-claim-boundary` |
 | H-4 | `AGENTS.md` rule: reconcile, don't rewrite. Fix code that violates a spec, or change the spec deliberately with rationale; never edit a spec to match accidental behaviour | done | overalls AGENTS.md |
 | H-5 | `AGENTS.md` sign: never `git stash` (shared across sessions); compare against a baseline with a detached `git worktree` | done | overalls AGENTS.md |
-| H-6 | Specs carry `Implementation: none/partial/implemented` plus evidence links (code, tests); `spec-lint` checks the field | implement | overalls ADR format |
+| H-6 | Specs carry `Implementation: none/partial/implemented` plus evidence links (code, tests); `spec-lint` checks the field | done (X-1; `spec-lint` checks `Implementation:` + `Evidence:`; scripted, unit level) | overalls ADR format |
 | H-7 | Verbose/diagnostic log mode (`--verbose` / env, to stderr) for `hodge`/`podge`, with a fixed event catalog and no free-form payloads so secrets cannot leak | defer | how-to-build-a-coding-agent, overalls Events catalog |
 | H-8 | Colocated `@cc`-style code contracts with a `--check` gate | defer | overalls code-contracts |
 | H-9 | Review receipts that fail precommit when docs go stale against source | defer | overalls HLDD maintenance |
-| H-10 | Single-run lock per sandbox: `podge`/`podge step`/`hodge` refuse to start when another live process holds the sandbox (lock file with PID, stale locks cleared), so two loops cannot corrupt one target repo | implement | ralph-to-ralph-prod `ralph-watchdog.sh` lockfile |
-| H-11 | Independent evaluator role (`qa`): a separate role, normally a different adapter/model from `build`, verifies the build's claims against specs/tests (and E2E where available), records bugs, and hands them back to `podge` as plan items; bounded build/qa fix cycles (e.g. max 5). Design the spec first (`specs/modes.md`), tests first | implement | ralph-to-ralph-prod Build to QA loop, Codex as evaluator |
+| H-10 | Single-run lock per sandbox: `podge`/`podge step`/`hodge` refuse to start when another live process holds the sandbox (lock file with PID, stale locks cleared), so two loops cannot corrupt one target repo | done (X-2; `src/run-lock.js`, wired in `src/cli.js` for hodge/podge/podge step; unit level) | ralph-to-ralph-prod `ralph-watchdog.sh` lockfile |
+| H-11 | Independent evaluator role (`qa`): a separate role, normally a different adapter/model from `build`, verifies the build's claims against specs/tests (and E2E where available), records bugs, and hands them back to `podge` as plan items; bounded build/qa fix cycles (e.g. max 5). Design the spec first (`specs/modes.md`), tests first | done (X-7; `src/qa.js`, driver QA cycles, `maxQaCycles` default 5; scripted, unit level) | ralph-to-ralph-prod Build to QA loop, Codex as evaluator |
 | H-12 | Append-only progress notes (what was built, test results, decisions, files) readable by each fresh-context iteration, in addition to `plan.md` and the run records | defer | ralph-to-ralph-prod `build-progress.txt` |
-| H-13 | Build prompts: scope the red step (run only the new test file to confirm failure; the full suite only for green) | implement | ralph-to-ralph-prod `build-prompt.md` |
-| H-14 | "Out of scope" section in the spec template; `hodge` captures it during the interview | implement | ralph-to-ralph-prod `CLAUDE.md` |
-| H-15 | QA prompt (part of H-11): skeptical "different agent" framing; findings classified as violated decision / unimplemented requirement / decision needing replacement, each with severity, evidence, spec, consequence, recommendation; structured bug report (shares the H-1 shape) | implement | ralph-to-ralph-prod `qa-prompt.md`; overalls `architecture-review` |
-| H-16 | Anti-gaming lines in gate-checked prompts: never mark done or implemented just to satisfy a gate; don't weaken validation | implement | overalls `adr-maintenance`; ralph-to-ralph-prod `build-prompt.md` |
-| H-17 | Tiny adapter smoke prompt (create and run a fizzbuzz file, check the output) for live checks and a future `hodgepodge doctor` | implement | how-to-build-a-coding-agent `04-edit_tool` |
+| H-13 | Build prompts: scope the red step (run only the new test file to confirm failure; the full suite only for green) | done (X-10; `prompts/forward.md` scoped red step, snapshot tested) | ralph-to-ralph-prod `build-prompt.md` |
+| H-14 | "Out of scope" section in the spec template; `hodge` captures it during the interview | done (X-10; `templates/spec.md`, `prompts/interview.md`, readiness gap on empty Out of scope) | ralph-to-ralph-prod `CLAUDE.md` |
+| H-15 | QA prompt (part of H-11): skeptical "different agent" framing; findings classified as violated decision / unimplemented requirement / decision needing replacement, each with severity, evidence, spec, consequence, recommendation; structured bug report (shares the H-1 shape) | done (X-7; `prompts/qa.md`, classified findings with X-6 shape; scripted, unit level) | ralph-to-ralph-prod `qa-prompt.md`; overalls `architecture-review` |
+| H-16 | Anti-gaming lines in gate-checked prompts: never mark done or implemented just to satisfy a gate; don't weaken validation | done (X-10; anti-gaming lines in `prompts/forward.md`) | overalls `adr-maintenance`; ralph-to-ralph-prod `build-prompt.md` |
+| H-17 | Tiny adapter smoke prompt (create and run a fizzbuzz file, check the output) for live checks and a future `hodgepodge doctor` | done (X-11; `src/smoke.js`, `test/smoke.test.js`; scripted adapter only) | how-to-build-a-coding-agent `04-edit_tool` |
 | H-18 | "Pre-configured, check first" notice for the sandbox toolchain; conditional prompt sections by item category | defer | ralph-to-ralph-prod `pre-setup.md`, `qa-prompt.md` |
-| H-19 | `test-hardening`: require a green baseline before the mutation gate; record each surviving mutant with a diagnosis (bad mutant / weak test / missing spec); apply mutants only in a throwaway worktree | implement | overalls `antithesis-mutation-testing` |
+| H-19 | `test-hardening`: require a green baseline before the mutation gate; record each surviving mutant with a diagnosis (bad mutant / weak test / missing spec); apply mutants only in a throwaway worktree | done (X-10; `prompts/test-hardening.md` baseline, throwaway worktree, mutant diagnosis; prompt-level, not machine-enforced) | overalls `antithesis-mutation-testing` |
 | H-20 | Gate self-test suite: feed each gate (anti-stub, scope, spec-lint, ready) a known-bad fixture and assert it fires for the predicted reason | defer | overalls `antithesis-mutation-testing` ("validate the oracle") |
-| H-21 | `podge` "done" is harness-derived, not agent-ticked: full suite green, types clean, every requirement mapped to a passing test, every spec `Implementation: implemented` (H-6), no open QA findings (H-11), no stubs; a ticked but unproven `plan.md` item is reverted | implement | ralph-to-ralph-prod `build-prompt.md`, `qa-prompt.md`; overalls `adr-maintenance` |
-| H-22 | Requirement-level traceability: `tests/PLAN.md` maps each requirement (not just each spec) to a test; readiness fails on a requirement with no executable example (replaces the 1-example-per-2-requirements ratio) | implement | ralph-to-ralph-prod `prd.json` (`tests` input/expected_output) |
-| H-23 | `podge` writes a `done.json` evidence report per requirement (test, result, implementation status, boundary verified) for owner review | implement | ralph-to-ralph-prod `qa-report.json`; overalls `covenant` |
+| H-21 | `podge` "done" is harness-derived, not agent-ticked: full suite green, types clean, every requirement mapped to a passing test, every spec `Implementation: implemented` (H-6), no open QA findings (H-11), no stubs; a ticked but unproven `plan.md` item is reverted | done (X-5; `verifyDone` in `src/done.js`, wired in `src/driver.js`; scripted, unit level) | ralph-to-ralph-prod `build-prompt.md`, `qa-prompt.md`; overalls `adr-maintenance` |
+| H-22 | Requirement-level traceability: `tests/PLAN.md` maps each requirement (not just each spec) to a test; readiness fails on a requirement with no executable example (replaces the 1-example-per-2-requirements ratio) | done (X-1; per-requirement mapping in spec-lint/readiness; scripted, unit level) | ralph-to-ralph-prod `prd.json` (`tests` input/expected_output) |
+| H-23 | `podge` writes a `done.json` evidence report per requirement (test, result, implementation status, boundary verified) for owner review | done (X-5; `done.json` via `writeDoneReport`; scripted, unit level) | ralph-to-ralph-prod `qa-report.json`; overalls `covenant` |
 | H-24 | Distinguish `done` (all verified) from `plan-empty` (all ticked but verification failed) as separate statuses and exit codes | defer | derived from H-21 |
 | H-25 | Readiness lint for vague words (fast, secure, robust, user-friendly, etc.) and non-functional requirements without a measurable threshold | done (X-4) | `INTERVIEW.md` fine-grain rules (currently unchecked) |
 | H-26 | Per-capability dimension coverage: each of the ten interview dimensions is recorded as covered or n/a with a reason, and `ready` fails on any missing | done (X-4) | `INTERVIEW.md` dimensions (currently judgement only) |
@@ -119,15 +119,16 @@ Status `implement` = decided to do; `defer` = noted, not now. Move to `todo`/`do
 Design in `specs/formats.md`. F-1..F-11 are scheduled in Phase 6 (X-1, X-3, X-5, X-8, X-9); F-10 is part of X-4. Embedded harness tools validate spec artifacts; declared formats also gate loop output where they apply.
 | ID | Task | Status | Depends on |
 |---|---|---|---|
-| F-1 | Stable requirement IDs in specs, `tests/PLAN.md` and test results (same work as H-22) | implement | |
-| F-2 | `## Formats` declaration parsed per spec; unknown or missing artifact is a readiness gap | implement | F-1 |
-| F-3 | Format registry in the harness: `name -> {validate(path), crossCheck(paths)}`; embedded tools only | implement | F-2 |
+| F-1 | Stable requirement IDs in specs, `tests/PLAN.md` and test results (same work as H-22) | done (X-1; requirement IDs in specs, `tests/PLAN.md`, test results) | |
+| F-2 | `## Formats` declaration parsed per spec; unknown or missing artifact is a readiness gap | done (X-3; `## Formats` parsed, readiness gap on unknown/missing) | F-1 |
+| F-3 | Format registry in the harness: `name -> {validate(path), crossCheck(paths)}`; embedded tools only | done (X-3; registry `validate`/`crossCheck` in `src/formats.js`) | F-2 |
 | F-4 | JSON Schema format (`ajv`, `@hyperjump/json-schema`): validity, cross-file `$ref` consistency, conformance of loop output to a declared schema as a step gate | done (X-8) | F-3 |
 | F-5 | OpenAPI format (official schema via `@seriousme/openapi-schema-validator` + `ajv`; local `$ref`, `operationId` checks) | done (X-9) | F-3 |
 | F-6 | AsyncAPI format (`@asyncapi/specs` + `ajv`; `@asyncapi/parser` is async) | done (X-9) | F-3 |
 | F-7 | Gherkin format (`@cucumber/gherkin`): examples parse, each maps to a requirement ID | done (X-9) | F-3 |
 | F-8 | EBNF format (`ebnf`): grammar parses, examples accepted or rejected as declared | done (X-9) | F-3 |
-| F-9 | JUnit/TAP result mapping to requirement IDs feeding `done.json` (H-21, H-23) | implement | F-1 |
+| F-9 | JUnit/TAP result mapping to requirement IDs feeding `done.json` (H-21, H-23) | done for TAP/spec-reporter (X-5); JUnit XML not parsed, split to F-9b | F-1 |
+| F-9b | JUnit XML result mapping to requirement IDs (`specs/formats.md` lists JUnit XML; `src/done.js` parses spec-reporter/TAP only) | todo | F-9 |
 | F-10 | Prompts and objective kit: interview proposes formats, owner confirms; `INTERVIEW.md` and `READINESS.md` updated | done (X-4) | F-2 |
 | F-11 | Loop gate: a step whose spec declares a format is checked against it (format artifacts valid, output conforms) in addition to tests | done (X-8) | F-4 |
 | F-12 | Later formats: XState, fast-check property specs, TypeSpec, DBML, Pact, Quint, axe-core, SHACL, CDDL, GraphQL SDL, Protobuf | defer | F-3 |
@@ -144,7 +145,7 @@ Design in `specs/formats.md`. F-1..F-11 are scheduled in Phase 6 (X-1, X-3, X-5,
 | G-7 | `hodgepodge status` / `tui` show declared formats, readiness by dimension, QA findings and done evidence | done (X-12; `src/run-details.js`, `test/run-details.test.js`; scripted/unit level, local source only) | G-1 |
 | G-8 | Docker image carries the embedded validators and runs them offline | done (X-12; structural: validator imports are runtime deps, image does `npm ci --omit=dev`, no network use in `src/formats.js`; image not rebuilt/run) | F-3 |
 | G-9 | One skill snippet per supported format, loaded by `hodge` when the format is declared | done (X-12; scripted, unit level: interview prompt only; `prompts/formats/`, `test/format-skills.test.js`) | F-3 |
-| G-10 | Single prompt revision pass (H-13, H-14, H-15, H-16, H-19) with snapshot tests | implement | G-1 |
+| G-10 | Single prompt revision pass (H-13, H-14, H-15, H-16, H-19) with snapshot tests | done (X-10; snapshot + content tests) | G-1 |
 | G-11 | Regression end-to-end fixture (scripted-adapter `hodge` to `podge` exercising every new gate) plus a live trial (P2-10) after each stage | done (X-13; scripted `podge` only; live trial is owner-run) | G-1 |
 
 ## Phase 6: hardening (consolidated from H-*, F-*, G-*)
@@ -370,3 +371,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (blocked check, P5-4b, sixth): `aws` not on PATH, no AWS_* env vars, no ~/.aws. Blocked on AWS credentials (access key id + secret, or an SSO profile, for an account where the cloud-driver stack can be deployed). No code changes; full loop not run. Next best action unchanged. Sign: do not retry until the owner supplies AWS credentials.
 - Session (blocked check, P5-4b, seventh): `aws` not on PATH, no AWS_* env vars, no ~/.aws. Blocked on AWS credentials (access key id + secret, or an SSO profile, for an account where the cloud-driver stack can be deployed). No code changes; nothing tested (full loop not run). Next best action unchanged. Sign: do not retry until the owner supplies AWS credentials.
 - Session (plan edit): marked P5-4b and P5-6 `implement later`; repointed Next best action to reconciling stale H-/F-/G- `implement` rows. No code changes; full loop not run.
+- Session (audit): re-checked the 18 stale `implement` rows against code, specs, prompts and wiring; `npm test` 550 pass, `npm run check` clean. 17 confirmed done (scripted/unit level; no live adapter/Docker; full loop not run). F-9 only half built: split JUnit XML into new todo F-9b, now the Next best action.
