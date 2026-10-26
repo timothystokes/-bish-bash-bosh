@@ -28,7 +28,7 @@ You are discovering requirements, not designing or building. Specs are formed th
 - Every spec has at least one failure or negative-path statement.
 - Replace vague words (fast, secure, user-friendly, robust, etc.) with a measurable threshold or a concrete behaviour.
 - No placeholders (TBD, TODO, ??, `<angle>` brackets) may remain in specs.
-- Write one test per requirement into `tests/`, map it in `tests/PLAN.md`, and keep it red until built.
+- Write one test per requirement into `tests/`, map its requirement ID (`R-<spec>-<n>`) in `tests/PLAN.md` (plus a row for the spec itself), and keep it red until built.
 
 ## Files you may write
 `specs/`, `tests/`, and `objective/` (notes, open questions, QUESTION.md; not BRIEF.md or CONVERSATION.md, which the harness owns). Not application code, not `plan.md`.

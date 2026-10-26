@@ -65,8 +65,8 @@ test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite pas
     transcript: 'wrote specs and characterization tests',
     usage,
     writes: {
-      'specs/greet.md': '# Spec: greet(name) returns a greeting\n\n## Purpose\nGreet a person.\n\n## Requirements\n- greet(name) returns "hello <name>"\n',
-      'tests/PLAN.md': '- specs/greet.md -> tests/greet.test.js: greeting text\n',
+      'specs/greet.md': '# Spec: greet(name) returns a greeting\nImplementation: none\n\n## Purpose\nGreet a person.\n\n## Requirements\n- R-greet-1: greet(name) returns "hello <name>"\n',
+      'tests/PLAN.md': '- specs/greet.md -> tests/greet.test.js: greeting text\n- R-greet-1 -> tests/greet.test.js\n',
       'tests/greet.test.js':
         "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { greet } from '../src/greet.js';\ntest('greet', () => assert.equal(greet('bob'), 'hello bob'));\n",
     },

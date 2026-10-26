@@ -33,4 +33,11 @@ test('spec template has a Spec title and required sections', () => {
 test('test-plan template maps the example spec to a test', () => {
   const m = parseTestPlan(read('tests-PLAN.md'));
   assert.ok((m.get('specs/example.md') ?? []).length > 0);
+  assert.ok((m.get('R-example-1') ?? []).length > 0);
+});
+
+test('spec template declares Implementation and an ID-prefixed requirement', () => {
+  const t = read('spec.md');
+  assert.match(t, /^Implementation: none$/m);
+  assert.match(t, /^- R-example-1: /m);
 });

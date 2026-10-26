@@ -1,12 +1,13 @@
 # Spec: add(a, b) returns the sum of two numbers
+Implementation: none
 
 ## Purpose
 Provide a tiny pure function used to trial the harness end to end.
 
 ## Requirements
-- `src/add.js` must export a named function `add(a, b)`.
-- `add` must return the numeric sum of its two arguments.
-- `add` must throw a `TypeError` when either argument is not a finite number.
+- R-add-1: `src/add.js` must export a named function `add(a, b)`.
+- R-add-2: `add` must return the numeric sum of its two arguments.
+- R-add-3: `add` must throw a `TypeError` when either argument is not a finite number.
 
 ## Examples
 - `add(2, 3)` -> `5`

@@ -17,9 +17,9 @@ function target(files) {
 }
 
 const GOOD = {
-  'specs/a.md': '# Spec: Alpha\n- does a\n',
-  'specs/b.md': '# Spec: Beta\n- does b\n',
-  'tests/PLAN.md': '| specs/a.md | tests/a.test.js |\n| specs/b.md | tests/b.test.js |\n',
+  'specs/a.md': '# Spec: Alpha\nImplementation: none\n\n## Requirements\n- R-a-1: a must do a.\n',
+  'specs/b.md': '# Spec: Beta\nImplementation: none\n\n## Requirements\n- R-b-1: b must do b.\n',
+  'tests/PLAN.md': '| specs/a.md | tests/a.test.js |\n| specs/b.md | tests/b.test.js |\n| R-a-1 | tests/a.test.js |\n| R-b-1 | tests/b.test.js |\n',
 };
 
 test('passes for well-formed, mapped specs', () => {
@@ -38,24 +38,24 @@ test('fails on an empty spec file', () => {
 });
 
 test('fails when the title is not "# Spec: ..."', () => {
-  const r = lintSpecs(target({ ...GOOD, 'specs/b.md': '# Beta\n- b\n' }));
+  const r = lintSpecs(target({ ...GOOD, 'specs/b.md': '# Beta\nImplementation: none\n- b\n' }));
   assert.equal(r.ok, false);
   assert.match(r.problems.join('\n'), /specs\/b\.md.*# Spec:/);
 });
 
 test('fails when a spec holds more than one decision (several top-level titles)', () => {
-  const r = lintSpecs(target({ ...GOOD, 'specs/b.md': '# Spec: Beta\n- b\n# Spec: Gamma\n- g\n' }));
+  const r = lintSpecs(target({ ...GOOD, 'specs/b.md': '# Spec: Beta\nImplementation: none\n- b\n# Spec: Gamma\n- g\n' }));
   assert.equal(r.ok, false);
   assert.match(r.problems.join('\n'), /specs\/b\.md.*one decision/);
 });
 
 test('ignores "#" lines inside code fences when counting titles', () => {
-  const r = lintSpecs(target({ ...GOOD, 'specs/b.md': '# Spec: Beta\n```sh\n# comment\n```\n' }));
+  const r = lintSpecs(target({ ...GOOD, 'specs/b.md': '# Spec: Beta\nImplementation: none\n```sh\n# comment\n```\n\n## Requirements\n- R-b-1: b must do b.\n' }));
   assert.deepEqual(r, { ok: true, problems: [] });
 });
 
 test('fails on duplicate titles across specs', () => {
-  const r = lintSpecs(target({ ...GOOD, 'specs/b.md': '# Spec: alpha\n- b\n' }));
+  const r = lintSpecs(target({ ...GOOD, 'specs/b.md': '# Spec: alpha\nImplementation: none\n- b\n' }));
   assert.equal(r.ok, false);
   assert.match(r.problems.join('\n'), /duplicate title.*specs\/a\.md.*specs\/b\.md/);
 });
@@ -79,6 +79,54 @@ test('reports every problem, deterministically ordered', () => {
   assert.equal(r1.ok, false);
   assert.ok(r1.problems.length >= 4);
   assert.deepEqual(r1, r2);
+});
+
+const withPlanRows = (/** @type {string} */ rows) => `| specs/a.md | tests/a.test.js |\n| specs/b.md | tests/b.test.js |\n${rows}`;
+
+test('fails when a spec has no Implementation field', () => {
+  const r = lintSpecs(target({ ...GOOD, 'specs/b.md': '# Spec: Beta\n\n## Requirements\n- R-b-1: b must do b.\n' }));
+  assert.match(r.problems.join('\n'), /specs\/b\.md.*Implementation/);
+});
+
+test('fails on an Implementation value other than none|partial|implemented', () => {
+  const r = lintSpecs(target({ ...GOOD, 'specs/b.md': GOOD['specs/b.md'].replace('none', 'done') }));
+  assert.match(r.problems.join('\n'), /specs\/b\.md.*Implementation.*none\|partial\|implemented/);
+});
+
+test('partial or implemented needs evidence links that exist; none needs none', () => {
+  const noEv = lintSpecs(target({ ...GOOD, 'specs/b.md': GOOD['specs/b.md'].replace('none', 'partial') }));
+  assert.match(noEv.problems.join('\n'), /specs\/b\.md.*Evidence/);
+  const missing = lintSpecs(target({ ...GOOD, 'tests/b.test.js': 'x', 'specs/b.md': GOOD['specs/b.md'].replace('none', 'implemented\nEvidence: `src/b.js`, tests/b.test.js') }));
+  assert.match(missing.problems.join('\n'), /specs\/b\.md.*evidence file missing: src\/b\.js/);
+  assert.doesNotMatch(missing.problems.join('\n'), /tests\/b\.test\.js/);
+  const ok = lintSpecs(target({ ...GOOD, 'src/b.js': 'x', 'tests/b.test.js': 'x', 'specs/b.md': GOOD['specs/b.md'].replace('none', 'implemented\nEvidence: `src/b.js`, tests/b.test.js') }));
+  assert.deepEqual(ok, { ok: true, problems: [] });
+});
+
+test('Implementation lines inside code fences do not count', () => {
+  const r = lintSpecs(target({ ...GOOD, 'specs/b.md': '# Spec: Beta\n```\nImplementation: none\n```\n' }));
+  assert.match(r.problems.join('\n'), /specs\/b\.md.*Implementation/);
+});
+
+test('requirements need IDs of the form R-<spec>-<n>, unique within the spec', () => {
+  const bare = lintSpecs(target({ ...GOOD, 'specs/b.md': GOOD['specs/b.md'].replace('R-b-1: ', '') }));
+  assert.match(bare.problems.join('\n'), /specs\/b\.md.*requirement.*R-b-<n>/);
+  const wrong = lintSpecs(target({ ...GOOD, 'specs/b.md': GOOD['specs/b.md'].replace('R-b-1', 'R-a-1') }));
+  assert.match(wrong.problems.join('\n'), /specs\/b\.md.*R-b-<n>/);
+  const dup = lintSpecs(target({ ...GOOD, 'specs/b.md': `${GOOD['specs/b.md']}- R-b-1: b must also do c.\n` }));
+  assert.match(dup.problems.join('\n'), /specs\/b\.md.*duplicate.*R-b-1/);
+});
+
+test('every requirement ID must be mapped to an executable test in tests/PLAN.md', () => {
+  const r = lintSpecs(target({ ...GOOD, 'tests/PLAN.md': withPlanRows('| R-a-1 | tests/a.test.js |\n') }));
+  assert.match(r.problems.join('\n'), /R-b-1.*not mapped/);
+  const noTest = lintSpecs(target({ ...GOOD, 'tests/PLAN.md': withPlanRows('| R-a-1 | tests/a.test.js |\n| R-b-1 | |\n') }));
+  assert.match(noTest.problems.join('\n'), /R-b-1.*not mapped/);
+});
+
+test('a PLAN.md requirement ID that no spec declares is a problem', () => {
+  const r = lintSpecs(target({ ...GOOD, 'tests/PLAN.md': withPlanRows('| R-a-1 | tests/a.test.js |\n| R-b-1 | tests/b.test.js |\n| R-z-9 | tests/a.test.js |\n') }));
+  assert.match(r.problems.join('\n'), /R-z-9.*no spec/);
 });
 
 test('hodgepodge spec-lint: exit 0 and JSON when clean', async () => {

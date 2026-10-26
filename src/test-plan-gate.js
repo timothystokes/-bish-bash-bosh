@@ -5,7 +5,7 @@ import { join } from 'node:path';
 /** @typedef {import('./diff-gates.js').GateCheck} GateCheck */
 
 /**
- * Parse `tests/PLAN.md` text into spec path -> mapped test paths.
+ * Parse `tests/PLAN.md` text into spec path or requirement ID (`R-<spec>-<n>`) -> mapped test paths.
  * @param {string} text
  * @returns {Map<string, string[]>}
  */
@@ -13,7 +13,7 @@ export function parseTestPlan(text) {
   /** @type {Map<string, string[]>} */
   const mapped = new Map();
   for (const line of text.split('\n')) {
-    const specs = line.match(/specs\/[\w./-]+\.md/g) ?? [];
+    const specs = line.match(/specs\/[\w./-]+\.md|\bR-[\w-]+-\d+\b/g) ?? [];
     const tests = (line.match(/tests\/[\w./-]+/g) ?? []).filter((t) => t !== 'tests/PLAN.md');
     for (const s of specs) mapped.set(s, [...(mapped.get(s) ?? []), ...tests]);
   }

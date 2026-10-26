@@ -14,11 +14,12 @@ const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
 
 const goodSpec = `# Spec: Greeter
+Implementation: none
 
 ## Requirements
-- \`greet(name)\` must return "Hello, name!".
-- \`greet\` must throw a TypeError when name is not a string.
-- \`greet\` must trim surrounding whitespace from name.
+- R-greet-1: \`greet(name)\` must return "Hello, name!".
+- R-greet-2: \`greet\` must throw a TypeError when name is not a string.
+- R-greet-3: \`greet\` must trim surrounding whitespace from name.
 
 ## Examples
 - \`greet('Ann')\` -> \`Hello, Ann!\`
@@ -27,8 +28,8 @@ const goodSpec = `# Spec: Greeter
 ## Out of scope
 - Localisation.
 `;
-const coarse = goodSpec.replace(/- `greet` must trim.*\n/, '');
-const plan = '| Spec | Tests |\n|---|---|\n| specs/greet.md | tests/greet.test.js |\n';
+const coarse = goodSpec.replace(/- R-greet-3: .*\n/, '');
+const plan = '| Spec | Tests |\n|---|---|\n| specs/greet.md | tests/greet.test.js |\n| R-greet-1 | tests/greet.test.js |\n| R-greet-2 | tests/greet.test.js |\n| R-greet-3 | tests/greet.test.js |\n';
 
 /** @param {string} cwd @param {Record<string, string | null>} writes null deletes */
 function write(cwd, writes) {
@@ -78,8 +79,8 @@ function owner(answers) {
 /** @type {Record<string, string | null>[]} */
 const fullRounds = [
   { 'objective/QUESTION.md': 'Who uses the greeter?\n', 'objective/notes.md': 'n\n' },
-  { 'specs/greet.md': coarse, 'tests/PLAN.md': plan, 'tests/greet.test.js': 'x\n', 'objective/QUESTION.md': 'Should names be trimmed?\n' },
-  { 'specs/greet.md': goodSpec, 'objective/QUESTION.md': null },
+  { 'specs/greet.md': coarse, 'tests/PLAN.md': plan.replace('| R-greet-3 | tests/greet.test.js |\n', ''), 'tests/greet.test.js': 'x\n', 'objective/QUESTION.md': 'Should names be trimmed?\n' },
+  { 'specs/greet.md': goodSpec, 'tests/PLAN.md': plan, 'objective/QUESTION.md': null },
 ];
 
 test('asks for the description first, then alternates rounds and answers broad to fine until ready', async () => {

@@ -55,7 +55,7 @@ Adapters: `copilot`, `claude-code`, `codex`, `openai-http` (endpoint and key com
 | One iteration only | `podge step` |
 | Derive specs and tests from existing code | `hodge --reverse` |
 | Rebuild from specs and tests only | `hodgepodge clean-room --source <dir> --repo <builder-dir>`, then `podge` with mode `clean-room` |
-| Check spec structure | `hodgepodge spec-lint` |
+| Check spec structure, requirement IDs and Implementation status | `hodgepodge spec-lint` |
 
 Brownfield and test-hardening loops are selected with config `mode` and run via `podge`.
 

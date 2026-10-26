@@ -6,14 +6,15 @@ import { join, dirname } from 'node:path';
 import { checkReadiness, hasObjectiveKit, MIN_REQUIREMENTS } from '../src/readiness.js';
 
 const goodSpec = `# Spec: Greeter
+Implementation: none
 
 ## Purpose
 Greets people.
 
 ## Requirements
-- \`greet(name)\` must return "Hello, name!".
-- \`greet\` must throw a TypeError when name is not a string.
-- \`greet\` must trim surrounding whitespace from name.
+- R-greet-1: \`greet(name)\` must return "Hello, name!".
+- R-greet-2: \`greet\` must throw a TypeError when name is not a string.
+- R-greet-3: \`greet\` must trim surrounding whitespace from name.
 
 ## Examples
 - \`greet('Ann')\` -> \`Hello, Ann!\`
@@ -33,7 +34,7 @@ function repo(files) {
   return dir;
 }
 
-const plan = '| Spec | Tests |\n|---|---|\n| specs/greet.md | tests/greet.test.js |\n';
+const plan = '| Spec | Tests |\n|---|---|\n| specs/greet.md | tests/greet.test.js |\n| R-greet-1 | tests/greet.test.js |\n| R-greet-2 | tests/greet.test.js |\n| R-greet-3 | tests/greet.test.js |\n';
 const ready = { 'specs/greet.md': goodSpec, 'tests/PLAN.md': plan, 'tests/greet.test.js': 'x\n' };
 
 test('a fine-grained, mapped, lint-clean spec set is ready', () => {
@@ -47,7 +48,7 @@ test('spec-lint problems are readiness gaps', () => {
 });
 
 test(`fewer than ${MIN_REQUIREMENTS} requirements is too coarse`, () => {
-  const spec = goodSpec.replace(/- `greet` must trim.*\n/, '');
+  const spec = goodSpec.replace(/- R-greet-3: .*\n/, '');
   const r = checkReadiness(repo({ ...ready, 'specs/greet.md': spec }));
   assert.ok(r.gaps.some((g) => /specs\/greet\.md: 2 requirements/.test(g)), r.gaps.join('|'));
 });
@@ -64,10 +65,19 @@ test('a compound requirement (two musts) must be split', () => {
   assert.ok(r.gaps.some((g) => /compound/.test(g)), r.gaps.join('|'));
 });
 
-test('too few examples for the requirements', () => {
+test('examples are not counted: traceability comes from requirement-to-test mapping', () => {
   const spec = goodSpec.replace(/- `greet\(1\)`.*\n/, '').replace(/- `greet\('Ann'\)`.*\n/, '');
-  const r = checkReadiness(repo({ ...ready, 'specs/greet.md': spec }));
-  assert.ok(r.gaps.some((g) => /examples/.test(g)), r.gaps.join('|'));
+  assert.deepEqual(checkReadiness(repo({ ...ready, 'specs/greet.md': spec })), { ready: true, gaps: [] });
+});
+
+test('a requirement with no mapped test is a gap', () => {
+  const r = checkReadiness(repo({ ...ready, 'tests/PLAN.md': plan.replace('| R-greet-3 | tests/greet.test.js |\n', '') }));
+  assert.ok(r.gaps.some((g) => /R-greet-3.*not mapped/.test(g)), r.gaps.join('|'));
+});
+
+test('a requirement mapped only to a missing test file is a gap', () => {
+  const r = checkReadiness(repo({ 'specs/greet.md': goodSpec, 'tests/PLAN.md': plan.replace('| R-greet-3 | tests/greet.test.js', '| R-greet-3 | tests/other.test.js'), 'tests/greet.test.js': 'x\n' }));
+  assert.ok(r.gaps.some((g) => /tests\/other\.test\.js.*missing/.test(g)), r.gaps.join('|'));
 });
 
 test('a spec with no failure or negative path is incomplete', () => {

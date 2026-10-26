@@ -74,11 +74,12 @@ test('the kit is part of the interview prompt together with stage and current re
 });
 
 const goodSpec = `# Spec: Greeter
+Implementation: none
 
 ## Requirements
-- \`greet(name)\` must return "Hello, name!".
-- \`greet\` must throw a TypeError when name is not a string.
-- \`greet\` must trim surrounding whitespace from name.
+- R-greet-1: \`greet(name)\` must return "Hello, name!".
+- R-greet-2: \`greet\` must throw a TypeError when name is not a string.
+- R-greet-3: \`greet\` must trim surrounding whitespace from name.
 
 ## Examples
 - \`greet('Ann')\` -> \`Hello, Ann!\`
@@ -87,7 +88,7 @@ const goodSpec = `# Spec: Greeter
 ## Out of scope
 - Localisation.
 `;
-const plan = '| Spec | Tests |\n|---|---|\n| specs/greet.md | tests/greet.test.js |\n';
+const plan = '| Spec | Tests |\n|---|---|\n| specs/greet.md | tests/greet.test.js |\n| R-greet-1 | tests/greet.test.js |\n| R-greet-2 | tests/greet.test.js |\n| R-greet-3 | tests/greet.test.js |\n';
 
 /** @param {Record<string, string>} writes */
 const agent = (writes) => ({
@@ -111,10 +112,10 @@ const sandbox = (/** @type {string} */ objective) => {
 
 test('interview with a kit: lint-clean but not ready is kept as incomplete (a round), not discarded', async () => {
   const { repo, config } = sandbox('Build a greeter');
-  const coarse = goodSpec.replace(/- `greet` must trim.*\n/, '');
+  const coarse = goodSpec.replace(/- R-greet-3: .*\n/, '');
   const res = await runInterview({
     config, repoDir: repo, runId: 'r1', identity, objective: 'Build a greeter',
-    adapter: agent({ 'specs/greet.md': coarse, 'tests/PLAN.md': plan, 'tests/greet.test.js': 'x\n' }),
+    adapter: agent({ 'specs/greet.md': coarse, 'tests/PLAN.md': plan.replace('| R-greet-3 | tests/greet.test.js |\n', ''), 'tests/greet.test.js': 'x\n' }),
   });
   assert.equal(res.status, 'incomplete');
   assert.match(res.reason ?? '', /2 requirements/);

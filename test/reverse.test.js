@@ -35,8 +35,8 @@ const config = (/** @type {Record<string, {adapter: string, model: string}>} */ 
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 
 const goodWrites = {
-  'specs/greet.md': '# Spec: Greeter\n\n## Requirements\n- greet returns "hello <name>"\n',
-  'tests/PLAN.md': '| Spec | Tests |\n|---|---|\n| specs/greet.md | tests/greet.test.js |\n',
+  'specs/greet.md': '# Spec: Greeter\nImplementation: none\n\n## Requirements\n- R-greet-1: greet returns "hello <name>"\n',
+  'tests/PLAN.md': '| Spec | Tests |\n|---|---|\n| specs/greet.md | tests/greet.test.js |\n| R-greet-1 | tests/greet.test.js |\n',
   'tests/greet.test.js': 'ok\n',
 };
 

@@ -6,7 +6,7 @@ Status: planned, nothing implemented yet (plan.md "Spec formats", F-1..F-12).
 - Tools live inside the harness (`package.json` dependencies) and validate the specs and their format artifacts. They are not used on, and need not support the language of, the delivered project. Where a declared format constrains a step's output (for example a JSON Schema for a file the loop produces), the harness runs the same embedded tool as a gate on that output.
 - Readiness (`hodgepodge ready`) gains format checks: a declared artifact must exist, parse, pass its tool's validation, and be referenced by at least one requirement ID; a format-covered requirement without a conformance case is a gap.
 - Consistency: artifacts are checked across specs, not only per file (unresolved or conflicting `$ref`s, duplicate operation IDs, clashing definitions).
-- Requirement IDs: each requirement carries a stable ID (`<spec>-<n>`) used by `tests/PLAN.md`, test results and the `done.json` evidence report (H-21..H-23).
+- Requirement IDs: each requirement carries a stable ID (`R-<spec>-<n>`, enforced by spec-lint) used by `tests/PLAN.md`, test results and the `done.json` evidence report (H-21..H-23).
 
 ## Format set (first iteration)
 | Format | Embedded tool | Role |

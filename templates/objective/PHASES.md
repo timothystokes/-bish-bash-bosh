@@ -13,7 +13,7 @@ Goal: one spec per decision in `specs/*.md`, following the spec template (Purpos
 Exit: `hodgepodge spec-lint` passes.
 
 ## 3. Test plan
-Goal: `tests/PLAN.md` maps every spec to the tests in `tests/` that prove it; those tests exist and are red.
+Goal: `tests/PLAN.md` maps every spec and every requirement ID to the tests in `tests/` that prove it; those tests exist and are red.
 Exit: the test-plan gate passes (plan exists, mapped tests exist, suite is red before the first build loop).
 
 ## 4. Plan
