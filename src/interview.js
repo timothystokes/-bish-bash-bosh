@@ -6,7 +6,8 @@ import { validateConfig } from './config.js';
 import { checkBudgetGate } from './budget-gate.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { lintSpecs } from './spec-lint.js';
-import { loadModePrompt } from './prompts.js';
+import { loadFormatSkill, loadModePrompt } from './prompts.js';
+import { FORMATS, parseFormats } from './formats.js';
 import { checkReadiness, hasObjectiveKit } from './readiness.js';
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
@@ -31,6 +32,7 @@ export function buildInterviewPrompt(repoDir, objective) {
     '## Objective',
     objective.trim(),
     ...kitSections(repoDir),
+    ...formatSkillSections(repoDir),
     '## Existing specs',
     existing.length === 0 ? '(none)' : existing.map((f) => `- specs/${f}`).join('\n'),
     '## Spec template (templates/spec.md)',
@@ -38,6 +40,23 @@ export function buildInterviewPrompt(repoDir, objective) {
     '## Test-plan template (templates/tests-PLAN.md)',
     readFileSync(join(templatesDir, 'tests-PLAN.md'), 'utf8').trimEnd(),
   ].join('\n\n');
+}
+
+/**
+ * One skill snippet per known format that any spec declares.
+ * @param {string} repoDir
+ * @returns {string[]}
+ */
+function formatSkillSections(repoDir) {
+  const specsDir = join(repoDir, 'specs');
+  if (!existsSync(specsDir)) return [];
+  const names = new Set();
+  for (const f of readdirSync(specsDir).filter((x) => x.endsWith('.md')).sort()) {
+    for (const d of parseFormats(readFileSync(join(specsDir, f), 'utf8')).declared) {
+      if (Object.hasOwn(FORMATS, d.format)) names.add(d.format);
+    }
+  }
+  return [...names].sort().flatMap((n) => [`## Format skill: ${n}`, loadFormatSkill(n)]);
 }
 
 /**

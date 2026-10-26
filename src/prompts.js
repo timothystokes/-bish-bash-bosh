@@ -22,3 +22,14 @@ export function loadModePrompt(mode) {
 export function loadQaPrompt() {
   return readFileSync(join(promptsDir, 'qa.md'), 'utf8').trimEnd();
 }
+
+/**
+ * Guidance for one declared spec format (`prompts/formats/<format>.md`).
+ * @param {string} format
+ * @returns {string}
+ */
+export function loadFormatSkill(format) {
+  const file = join(promptsDir, 'formats', `${format}.md`);
+  if (!/^[A-Za-z0-9-]+$/.test(format) || !existsSync(file)) throw new Error(`no skill snippet for format: ${format}`);
+  return readFileSync(file, 'utf8').trimEnd();
+}

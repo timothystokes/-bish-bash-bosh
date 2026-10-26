@@ -37,6 +37,8 @@ Use `--seed empty` to start from an empty target. Run `npx hodgepodge --help` fo
 
 Specs may declare machine-checked formats in a `## Formats` section (`- <format>: <path>`), checked by `hodgepodge ready` and the loop's `formats` gate. Known formats: `asyncapi`, `ebnf`, `gherkin`, `json-schema`, `openapi`.
 
+When a spec declares a format, `hodge` adds that format's skill snippet (`prompts/formats/<format>.md`) to the interview prompt.
+
 ## Configuration
 
 `hodge.json` is validated against `src/config.schema.json`. The key parts (run artifacts `record.json`, `usage.json`, `diagnosis.json` and `done.json` have schemas in `src/schemas/`):
