@@ -23,6 +23,8 @@ The main goal is the **Docker-based implementation** (local driver + per-run con
 - Do not watch or poll CI after pushing.
 - Keep `plan.md` truthful: update task status and the "Next best action" at the end of every session.
 - Missing tools, packages, CLIs or dependencies are never a blocker: install them yourself (package manager, npx, pip, brew, apt, etc.) and continue; if one route fails, try another. The only valid blocker is a missing credential/secret you cannot obtain; state exactly which.
+- Tasks marked `implement later` in `plan.md` (e.g. P0-5b, P0-6b live-verifies needing a CLI login or API key) are deferred by the owner: never pick them, never check for their CLIs/keys, never stop on them.
+- Development-time only (not harness behaviour): the agent may install tools it needs to build the harness (brew, npm, pip, apt, etc.) without asking. Missing credentials remain the only blocker.
 - When something goes wrong, tune the prompts/specs/gates ("add a sign"); don't just retry.
 - No compatibility code: the harness is pre-release, so renames and removals are outright. No aliases, deprecation or pointer messages, no migration notes.
 - Name the claim boundary: a task is "done" only with the tested scope stated (scripted adapter, live adapter, Docker). A passing structural check is not proof of runtime behaviour.

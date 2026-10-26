@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**Owner-blocked: P0-6b live-verify (Codex `exec --json`). P0-5b (Claude Code live-verify) is marked "implement later" by the owner: skip it.**
-Why: Phase 6 and all Docker tasks are done; what remains needs a Codex install and `OPENAI_API_KEY`. Once available, also run `runSmoke` (X-11) against each live adapter. Check `which claude codex` and the env keys first; if none, log and stop.
+**No unblocked Docker work remains. Ask the owner what to do next (e.g. promote Phase 5, or new work). Do NOT check for `codex`/`claude`/`OPENAI_API_KEY`: P0-5b and P0-6b are "implement later" (deferred by the owner); skip them.**
+Why: Phase 0-4 and 6 and all Docker tasks are done; the only `todo` items are Phase 5 (AWS, not the current focus) and the deferred live-verifies.
 Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`.
 
 ## Phase 0: Foundations
@@ -17,7 +17,7 @@ Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not
 | P0-5 | Adapter: Claude Code | done | P0-3 |
 | P0-5b | Live-verify Claude Code output shape (`claude` 2.1.310 installed; error-result shape verified, success shape needs `ANTHROPIC_API_KEY`/login) | implement later | P0-5 |
 | P0-6 | Adapter: Codex | done | P0-3 |
-| P0-6b | Live-verify Codex `exec --json` output shape (`codex` not installed in P0-6 session) | todo | P0-6 |
+| P0-6b | Live-verify Codex `exec --json` output shape (`codex` not installed in P0-6 session; needs `OPENAI_API_KEY`) | implement later | P0-6 |
 | P0-7 | Adapter: generic OpenAI-compatible HTTP | done | P0-3 |
 | P0-8 | Run-record format + writer (`specs/loop.md`) | done | P0-1 |
 
@@ -344,3 +344,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (blocked check, fifty-fifth): `claude` on PATH; `codex`, `aws` absent; no ANTHROPIC_API_KEY/OPENAI_API_KEY. No code changes. Next best action unchanged; awaits owner OPENAI_API_KEY for P0-6b.
 - Session (blocked check, twenty-seventh): `codex` not on PATH and no `OPENAI_API_KEY` or `~/.codex` login; `claude` present but P0-5b is owner-deferred. The only blocker is the missing OpenAI credential (installing the CLI alone would not allow live verification). No code changes. Next best action unchanged. Sign: don't retry until the owner provides `OPENAI_API_KEY` or a Codex login.
 - Session (blocked check, forty-ninth): `codex`, `aws` absent; `claude` present (P0-5b deferred); no OPENAI_API_KEY/ANTHROPIC_API_KEY. Only blocker for P0-6b: OpenAI credential. No code changes. Next best action unchanged. Sign: don't retry until the owner provides `OPENAI_API_KEY` or a Codex login.
+- Session (no-work check): Next best action says no unblocked Docker work remains (Phase 5 not promoted; P0-5b/P0-6b deferred). No code changes; committed the owner's pending AGENTS.md/lap.sh/plan.md edits. Awaits owner direction. Claim boundary: nothing implemented or run.
