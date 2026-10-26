@@ -3,12 +3,9 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**G-1: consolidation pass over the Harness hardening (H-*), Spec formats (F-*) and Integration glue (G-*) tables.** Merge the overlapping items (H-6/H-21/H-22/F-1; H-1/H-11/H-15/H-23; prompt edits H-13/H-14/H-15/H-16/H-19), then order what remains into a new "Phase 6: hardening" table with IDs, dependencies and a first implementation task, and rewrite this section to point at that first task. Planning and docs only: no code.
-Why: roughly 50 new items overlap and have no order, so implementing them as written would build duplicates; G-5, G-6, G-7, G-10 and G-11 all depend on this pass. Then continue with P2-10, which is still valid:
-**P2-10: create a sandbox with `hodgepodge init --dir ~/work/SANDBOXES/obj --adapter copilot --model <id> --seed objective`, `cd ~/work/SANDBOXES/obj`, run `hodge` for a small real objective, then `podge`. Record what breaks (does the agent write QUESTION.md, are rounds too coarse/fine, does readiness gate too hard) as signs. Then the toy trial below.**
-Why: requirements gathering was the missing front phase; it is unit-tested with scripted adapters only. Previous next action (still valid after P2-10):
-**Trial run: `cd ~/work/SANDBOXES/toy && podge step` with the real `copilot` adapter (sandbox already created by `hodge init`), then `podge`. Record what breaks (usage parsing, gates, prompts) as signs/tasks. P0-5b/P0-6b stay owner-blocked on credentials.**
-Why: the Docker path and `hodge init` exist, so a live end-to-end trial is now the most valuable signal. Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`. Regenerate a sandbox with `hodgepodge init --dir <dir> --adapter copilot --model <id>`.
+**X-1: requirement IDs and `Implementation:` status (first Phase 6 task).** Specs get stable requirement IDs (`R-<spec>-<n>`) and an `Implementation: none|partial|implemented` field with evidence links; `tests/PLAN.md` maps each requirement ID to a test; `spec-lint` and `hodge ready` check both (replaces the 1-example-per-2-requirements ratio). Tests first (scripted, unit level); update `specs/`, templates and kit docs.
+Why: X-1 is the foundation that X-3, X-4, X-5, X-8 and X-10 depend on (H-6, H-22, F-1 merged). Then continue with P2-10 (live-verify `hodge init --seed objective`, `hodge objective`, `hodge run` with the real `copilot` adapter; record what breaks as signs), then the toy trial (`cd ~/work/SANDBOXES/toy && podge step`, then `podge`). P0-5b/P0-6b stay owner-blocked on credentials.
+Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`. Regenerate a sandbox with `hodgepodge init --dir <dir> --adapter copilot --model <id>`.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -86,7 +83,7 @@ Why: the Docker path and `hodge init` exist, so a live end-to-end trial is now t
 | P1-10 | Derived Docker image with agent CLIs (`copilot`, `claude`, `codex`) installed, smoke-tested in the container | done | P1-8b |
 
 ## Harness hardening (from the ghuntley repo assessment)
-Status `implement` = decided to do; `defer` = noted, not now. Move to `todo`/`done` when picked up.
+Status `implement` = decided to do; `defer` = noted, not now. Move to `todo`/`done` when picked up. Items covered by a Phase 6 task (see its "Covers" column) are built there: do not implement them separately, and mark them done when that task is done.
 | ID | Task | Status | Source |
 |---|---|---|---|
 | H-1 | Diagnosis output shape: when a step fails or gates, the agent (or a diagnosis role prompt) reports root cause, evidence, fix, test and prevention in a fixed structure, so failures become "signs" (prompt/spec/gate changes) instead of retries. Define the shape, prompt and where it is recorded (e.g. the run record); tests first | implement | monorepo-2026 `debugger` subagent |
@@ -119,7 +116,7 @@ Status `implement` = decided to do; `defer` = noted, not now. Move to `todo`/`do
 | H-28 | Independent spec-review pass (H-11 evaluator idea) looks for gaps and contradictions before `ready` can pass | defer | ralph-to-ralph-prod `qa-prompt.md` |
 
 ## Spec formats (declared standards that constrain specs)
-Design in `specs/formats.md`. Embedded harness tools validate spec artifacts; declared formats also gate loop output where they apply.
+Design in `specs/formats.md`. F-1..F-11 are scheduled in Phase 6 (X-1, X-3, X-5, X-8, X-9); F-10 is part of X-4. Embedded harness tools validate spec artifacts; declared formats also gate loop output where they apply.
 | ID | Task | Status | Depends on |
 |---|---|---|---|
 | F-1 | Stable requirement IDs in specs, `tests/PLAN.md` and test results (same work as H-22) | implement | |
@@ -138,7 +135,7 @@ Design in `specs/formats.md`. Embedded harness tools validate spec artifacts; de
 ## Integration glue (from the whole-plan review)
 | ID | Task | Status | Depends on |
 |---|---|---|---|
-| G-1 | Consolidation pass: merge overlapping H/F items (H-6/H-21/H-22/F-1; H-1/H-11/H-15/H-23; prompt edits H-13/H-14/H-15/H-16/H-19), order them into a "Phase 6: hardening" with dependencies | implement | |
+| G-1 | Consolidation pass: merge overlapping H/F items (H-6/H-21/H-22/F-1; H-1/H-11/H-15/H-23; prompt edits H-13/H-14/H-15/H-16/H-19), order them into a "Phase 6: hardening" with dependencies | done (see Phase 6) | |
 | G-2 | Write the H-2..H-5 rules into `AGENTS.md` | done | |
 | G-3 | Docs are part of done: `AGENTS.md` rule and checklist step 4 cover `README.md`, specs, CLI help and kit docs | done | |
 | G-4 | Docs-consistency test: every command in README and specs exists in the CLI help, and every CLI command is documented | implement | |
@@ -149,6 +146,26 @@ Design in `specs/formats.md`. Embedded harness tools validate spec artifacts; de
 | G-9 | One skill snippet per supported format, loaded by `hodge` when the format is declared | implement | F-3 |
 | G-10 | Single prompt revision pass (H-13, H-14, H-15, H-16, H-19) with snapshot tests | implement | G-1 |
 | G-11 | Regression end-to-end fixture (scripted-adapter `hodge` to `podge` exercising every new gate) plus a live trial (P2-10) after each stage | implement | G-1 |
+
+## Phase 6: hardening (consolidated from H-*, F-*, G-*)
+Ordered; each task is tests-first and updates docs/specs/templates in the same session. Merges: H-6+H-22+F-1 (X-1); H-21+H-23+F-9 (X-5); H-1 shape shared by H-11/H-15 (X-6, X-7); prompt edits H-13/H-14/H-15/H-16/H-19 (X-10, one pass).
+| ID | Task | Covers | Status | Depends on |
+|---|---|---|---|---|
+| X-1 | Requirement IDs (`R-<spec>-<n>`) + `Implementation:` field with evidence links; `tests/PLAN.md` maps each requirement to a test; `spec-lint` and `ready` check both | H-6, H-22, F-1 | todo | |
+| X-2 | Single-run lock per sandbox (PID lock file, stale locks cleared) for `hodge`/`podge`/`podge step` | H-10 | todo | |
+| X-3 | `## Formats` declaration per spec + embedded format registry (`validate`, `crossCheck`); unknown/missing format is a readiness gap | F-2, F-3 | todo | X-1 |
+| X-4 | Readiness: vague-word and unmeasured non-functional lint; per-capability dimension coverage (covered or n/a with reason); interview proposes formats; `INTERVIEW.md`/`READINESS.md` updated | H-25, H-26, F-10 | todo | X-1, X-3 |
+| X-5 | Harness-derived "done" for `podge` (suite green, types clean, every requirement has a passing test, specs `implemented`, no stubs; ticked-but-unproven items reverted) and `done.json` evidence per requirement; JUnit/TAP mapping to requirement IDs | H-21, H-23, F-9 | todo | X-1 |
+| X-6 | Diagnosis shape (root cause, evidence, fix, test, prevention) in the run record; failing step/gate reports it | H-1 | todo | |
+| X-7 | `qa` role: independent evaluator (own adapter/model), skeptical prompt, classified findings using the X-6 shape, bounded build/qa cycles, findings handed back as plan items | H-11, H-15 | todo | X-5, X-6 |
+| X-8 | JSON Schema format (`ajv`) and loop gate: format artifacts valid, output conforms | F-4, F-11 | todo | X-3 |
+| X-9 | Remaining embedded formats, one session each: OpenAPI, AsyncAPI, Gherkin, EBNF | F-5, F-6, F-7, F-8 | todo | X-3 |
+| X-10 | Single prompt revision pass with snapshot tests: scoped red step, "Out of scope" in spec template and interview, anti-gaming lines, test-hardening baseline and surviving-mutant diagnosis in a throwaway worktree | H-13, H-14, H-16, H-19, G-10 | todo | X-1, X-7 |
+| X-11 | Adapter smoke prompt (fizzbuzz) for live checks | H-17 | todo | |
+| X-12 | Integration: templates/seeds for new fields (G-5), JSON Schemas for our artifacts via `ajv` (G-6), `status`/`tui` surfacing (G-7), validators in the Docker image (G-8), per-format skill snippets (G-9), docs-consistency test (G-4) | G-4..G-9 | todo | X-1..X-9 |
+| X-13 | Regression end-to-end fixture exercising every new gate (scripted adapter) plus live trial after each stage | G-11 | todo | X-12 |
+
+Deferred and unchanged: H-7, H-8, H-9, H-12, H-18, H-20, H-24, H-27, H-28, F-12.
 
 ## Phase 5: Cloud (AWS) — FUTURE GOAL, not the current focus
 The main goal for now is the Docker-based local implementation. Do not pick P5-* tasks as the next best action until the owner promotes this phase.
@@ -288,3 +305,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (ghuntley assessment): reviewed `how-to-build-a-coding-agent` and `monorepo-2026` for reusable concepts; candidates recorded in the "Harness hardening" table (H-1..H-9, implement or defer). `overalls` assessed too; `ralph-to-ralph-prod` assessed (H-10..H-12). All four repos assessed. Not adopted: auto-restart watchdog (contradicts "tune, don't retry"), `--dangerously-skip-permissions` with the host's cloud credentials (we sandbox), promise-token parsing (gates and structured status do this).
 - Session (spec formats): owner decided specs may declare adopted open-standard formats (JSON Schema, OpenAPI, AsyncAPI, Gherkin, EBNF, JUnit/TAP first) validated by tools embedded in the harness, and used as loop gates where they apply. Added `specs/formats.md` and plan section F-1..F-12 (implement F-1..F-11, defer F-12). F-1 shares work with H-22. No code changes.
 - Session (integration glue): reviewed the plan as a whole; added "Integration glue" G-1..G-11. Done now: G-2 (H-2..H-5 written into `AGENTS.md`, marked done) and G-3 (docs are part of done, checklist step 4 widened). Sign: the CLI rename left stale names in specs, so docs updates are part of every item.
+- Session (G-1 consolidation, planning only): merged ~50 overlapping H/F/G items into Phase 6 (X-1..X-13) with a Covers column and dependencies; G-1 done. Next best action is X-1 (foundation for X-3/X-4/X-5/X-8/X-10). Claim boundary: plan edits only, no code or tests run. Sign: schedule overlapping items under one task with a Covers column instead of implementing each H-* row separately.
