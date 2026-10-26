@@ -9,7 +9,7 @@ Follow `objective/INTERVIEW.md`. Record every unanswered question in `objective/
 Exit: discovery and specification happen together, round by round, and end when `hodgepodge ready --dir <sandbox>` reports `ready: true`. A paused conversation resumes by running `hodge` again.
 
 ## 2. Specify
-Goal: one spec per decision in `specs/*.md`, following the spec template (Purpose, Requirements, Examples, Out of scope). Prefer executable examples; emit JSON Schema or OpenAPI beside a spec where they apply.
+Goal: one spec per decision in `specs/*.md`, following the spec template (`Implementation:` line, Purpose, Requirements with `R-<spec>-<n>` IDs, Examples, optional Formats, Dimensions, Out of scope). Prefer executable examples; emit JSON Schema or OpenAPI beside a spec where they apply.
 Exit: `hodgepodge spec-lint` passes.
 
 ## 3. Test plan

@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**X-12 (fifth slice): G-5, audit and update templates and `init` seeds (`templates/spec.md`, objective kit, `tests-PLAN.md`, toy) for requirement IDs, `Implementation:`, `## Formats`, "Out of scope".**
-Why: G-9 was the last other implement task in X-12; G-5 closes it so X-13 (regression fixture) can start. Test first. No full loop.
+**X-13 (G-11): regression end-to-end fixture (scripted-adapter `hodge` to `podge`) exercising every new gate.**
+Why: X-12 is complete, so X-13 is unblocked and is the last Phase 6 integration task. Test first. Scripted adapter only; the live trial stays owner-gated.
 Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`.
 
 ## Phase 0: Foundations
@@ -139,7 +139,7 @@ Design in `specs/formats.md`. F-1..F-11 are scheduled in Phase 6 (X-1, X-3, X-5,
 | G-2 | Write the H-2..H-5 rules into `AGENTS.md` | done | |
 | G-3 | Docs are part of done: `AGENTS.md` rule and checklist step 4 cover `README.md`, specs, CLI help and kit docs | done | |
 | G-4 | Docs-consistency test: every command in README and specs exists in the CLI help, and every CLI command is documented; README, `specs/formats.md`, `READINESS.md` and CLI help list exactly the registered formats | done (X-12; `test/docs-consistency.test.js`) | |
-| G-5 | Update templates and `init` seeds (`templates/spec.md`, objective kit, `tests-PLAN.md`, toy) for requirement IDs, `Implementation:`, `## Formats`, "Out of scope" | implement | G-1 |
+| G-5 | Update templates and `init` seeds (`templates/spec.md`, objective kit, `tests-PLAN.md`, toy) for requirement IDs, `Implementation:`, `## Formats`, "Out of scope" | done (X-12; `test/templates.test.js`) | G-1 |
 | G-6 | JSON Schemas for our own artifacts: config (incl. `qa` role), run record (diagnosis, lock), `done.json`, validated with `ajv` | done (X-12; config, `record.json`, `usage.json`, `diagnosis.json`, `done.json`; lock is a PID text file so has no schema; `test/artifact-schemas.test.js`) | G-1 |
 | G-7 | `hodgepodge status` / `tui` show declared formats, readiness by dimension, QA findings and done evidence | done (X-12; `src/run-details.js`, `test/run-details.test.js`; scripted/unit level, local source only) | G-1 |
 | G-8 | Docker image carries the embedded validators and runs them offline | done (X-12; structural: validator imports are runtime deps, image does `npm ci --omit=dev`, no network use in `src/formats.js`; image not rebuilt/run) | F-3 |
@@ -162,7 +162,7 @@ Ordered; each task is tests-first and updates docs/specs/templates in the same s
 | X-9 | Remaining embedded formats, one session each: OpenAPI, AsyncAPI, Gherkin, EBNF | F-5, F-6, F-7, F-8 | done (OpenAPI, AsyncAPI, Gherkin, EBNF; scripted, unit level) | X-3 |
 | X-10 | Single prompt revision pass with snapshot tests: scoped red step, "Out of scope" in spec template and interview, anti-gaming lines, test-hardening baseline and surviving-mutant diagnosis in a throwaway worktree | H-13, H-14, H-16, H-19, G-10 | done (scripted, unit level; snapshot + content tests; no live adapter/Docker; full loop not run) | X-1, X-7 |
 | X-11 | Adapter smoke prompt (fizzbuzz) for live checks | H-17 | todo | |
-| X-12 | Integration: templates/seeds for new fields (G-5), JSON Schemas for our artifacts via `ajv` (G-6), `status`/`tui` surfacing (G-7), validators in the Docker image (G-8), per-format skill snippets (G-9), docs-consistency test (G-4) | G-4..G-9 | partial: G-4, G-6, G-7, G-8, G-9 done; G-5 (audit) todo | X-1..X-9 |
+| X-12 | Integration: templates/seeds for new fields (G-5), JSON Schemas for our artifacts via `ajv` (G-6), `status`/`tui` surfacing (G-7), validators in the Docker image (G-8), per-format skill snippets (G-9), docs-consistency test (G-4) | G-4..G-9 | done (G-4..G-9; scripted, unit level) | X-1..X-9 |
 | X-13 | Regression end-to-end fixture exercising every new gate (scripted adapter) plus live trial after each stage | G-11 | todo | X-12 |
 | X-14 | Reconcile the `podge` test gate with red-first interview tests: planning-only step skips the tests gate, later steps gate on no regressions, objective seed `package.json` gets a `test` script | P2-10 | done (scripted, unit level; live re-trial #2 on `p214b`: `hodge` then `podge` reached `done`, 11/11 target tests green) | |
 
@@ -331,3 +331,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - X-12 second slice done (G-6; scripted, unit level; Docker not run; full loop not run): `src/schemas/{record,usage,diagnosis,done}.schema.json` plus explicit `build`/`qa` roles in `src/config.schema.json`; new `test/artifact-schemas.test.js` (red first, now 524 pass, check clean) validates files written by `writeIterationRecord`/`writeDoneReport` with strict `ajv`. The lock is a PID text file, so no schema. README and `specs/loop.md` updated. Sign: schema tests validate writer output on disk, not hand-made fixtures. Next: G-7.
 - X-12 third slice done (G-7; scripted, unit level, local status source only; cloud source not done; full loop not run): new `src/run-details.js` (`readRunDetails`: declared formats per spec, per-dimension state covered/n/a/gap/missing via new `dimensionStates` in `src/readiness.js`, QA cycles and findings from `qa-N/`, `done.json` evidence; unreadable files ignored). `StatusSource.details` feeds `status` JSON (`details`) and `renderFrame` (`renderDetails`). `test/run-details.test.js` (red first; 534 pass, check clean). README, `specs/control-and-safety.md` and CLI help updated. Sign: new surfaces read artifacts through one read-only module, never re-derive them in the renderer. Next: G-9.
 - X-12 fourth slice done (G-9; scripted, unit level, interview prompt only; Docker not rebuilt; full loop not run): `prompts/formats/{json-schema,openapi,asyncapi,gherkin,ebnf}.md`, `loadFormatSkill` in `src/prompts.js`, `buildInterviewPrompt` appends `## Format skill: <format>` per declared known format. `test/format-skills.test.js` (red first; 537 pass, check clean). `specs/formats.md` and README updated. Sign: a new format needs its snippet or the G-9 test fails. Next: G-5.
+- X-12 fifth slice done (G-5; scripted, unit level; full loop not run): audited `templates/spec.md`, `tests-PLAN.md`, objective kit and toy seed. Toy tests now carry `R-add-N` in test names (the done gate needs this) and `PHASES.md` names every spec section; `test/templates.test.js` gained 3 tests (red first; 540 pass, check clean). X-12 complete. Sign: seeds must satisfy the same gates they teach, so lint and name-check them in tests. Next: X-13.

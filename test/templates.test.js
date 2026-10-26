@@ -41,3 +41,24 @@ test('spec template declares Implementation and an ID-prefixed requirement', () 
   assert.match(t, /^Implementation: none$/m);
   assert.match(t, /^- R-example-1: /m);
 });
+
+test('spec template carries the Formats section and Out of scope bullet', () => {
+  const t = read('spec.md');
+  assert.match(t, /^## Formats$/m);
+  assert.match(t, /^- <format>: <path>|`- <format>: <path>`/m);
+  assert.match(t, /^## Out of scope\n- \S/m);
+});
+
+test('toy seed passes spec-lint and every requirement ID is in a test name', () => {
+  assert.deepEqual(lintSpecs(join(root, 'templates', 'toy')), { ok: true, problems: [] });
+  const spec = read('toy/specs/add.md');
+  const ids = [...spec.matchAll(/^- (R-add-\d+):/gm)].map((m) => m[1]);
+  assert.ok(ids.length > 0);
+  const tests = read('toy/tests/add.test.js');
+  for (const id of ids) assert.match(tests, new RegExp(`test\\('[^']*${id}\\b`), id);
+});
+
+test('objective PHASES names every spec template section', () => {
+  const t = read('objective/PHASES.md');
+  for (const s of ['Implementation:', 'Requirements', 'Dimensions', 'Formats', 'Out of scope']) assert.ok(t.includes(s), s);
+});
