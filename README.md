@@ -24,7 +24,7 @@ npx hodgepodge init --dir ~/sandboxes/demo --adapter copilot --model <model-id>
 cd ~/sandboxes/demo
 hodge            # requirements and specs: asks for the objective, then interviews you until specs are ready (or `hodge --reverse` to derive them from code)
 podge            # plan and implementation: loops until plan.md is done (use ./hodge and ./podge if they are not on your PATH)
-hodgepodge step  # one iteration only
+podge step       # one iteration only
 ```
 
 `hodge` then `podge` is the whole flow: hodge, then podge, aka hodgepodge.
@@ -52,7 +52,7 @@ Adapters: `copilot`, `claude-code`, `codex`, `openai-http` (endpoint and key com
 |---|---|
 | Capture specs from an objective (the objective is asked for, not passed) | `hodge` |
 | Build from specs (forward) | `podge` |
-| One iteration only | `hodgepodge step` |
+| One iteration only | `podge step` |
 | Derive specs and tests from existing code | `hodge --reverse` |
 | Rebuild from specs and tests only | `hodgepodge clean-room --source <dir> --repo <builder-dir>`, then `podge` with mode `clean-room` |
 | Check spec structure | `hodgepodge spec-lint` |
