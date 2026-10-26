@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
+import Ajv from 'ajv';
 import Ajv04 from 'ajv-draft-04';
 import addFormats from 'ajv-formats';
 import { parse as parseYaml } from 'yaml';
@@ -258,6 +259,95 @@ FORMATS.openapi = {
       const r = readOpenApi(p);
       if ('error' in r) continue;
       for (const id of new Set(operationIds(r.doc).map((o) => o.id))) {
+        const first = seen.get(id);
+        if (first !== undefined) problems.push(`duplicate operationId "${id}" in ${first} and ${p}`);
+        else seen.set(id, p);
+      }
+    }
+    return problems;
+  },
+};
+
+/** @type {Map<string, import('ajv').ValidateFunction>} */
+const asyncValidators = new Map();
+
+/**
+ * @param {string} version e.g. `3.0.0`
+ * @returns {import('ajv').ValidateFunction | undefined} undefined when the release is unknown
+ */
+function asyncValidator(version) {
+  let v = asyncValidators.get(version);
+  if (!v) {
+    /** @type {Record<string, object>} */
+    const schemas = require('@asyncapi/specs').schemasWithoutId;
+    if (!Object.hasOwn(schemas, version)) return undefined;
+    const schema = schemas[version];
+    const ajv = new Ajv.default({ strict: false, allErrors: true, logger: false });
+    addFormats.default(ajv);
+    v = ajv.compile(schema);
+    asyncValidators.set(version, v);
+  }
+  return v;
+}
+
+/**
+ * Operation ids: 2.x `operationId`s on publish/subscribe; 3.x operations are keyed by their id.
+ * @param {Record<string, unknown>} doc
+ * @returns {{id: string, where: string}[]}
+ */
+function asyncOperationIds(doc) {
+  const out = [];
+  const ops = doc.operations;
+  if (typeof ops === 'object' && ops !== null && !Array.isArray(ops)) {
+    for (const id of Object.keys(ops)) out.push({ id, where: `operation ${id}` });
+  }
+  const channels = doc.channels;
+  if (typeof channels === 'object' && channels !== null && !Array.isArray(channels)) {
+    for (const [name, item] of Object.entries(channels)) {
+      if (typeof item !== 'object' || item === null) continue;
+      for (const k of ['publish', 'subscribe']) {
+        const op = /** @type {Record<string, unknown>} */ (item)[k];
+        const id = typeof op === 'object' && op !== null ? /** @type {{operationId?: unknown}} */ (op).operationId : undefined;
+        if (typeof id === 'string') out.push({ id, where: `${k} ${name}` });
+      }
+    }
+  }
+  return out;
+}
+
+FORMATS.asyncapi = {
+  validate(path) {
+    const r = readOpenApi(path);
+    if ('error' in r) return [r.error];
+    const doc = r.doc;
+    const version = typeof doc.asyncapi === 'string' ? doc.asyncapi : undefined;
+    const check = version === undefined ? undefined : asyncValidator(version);
+    if (!check) return [`unsupported or missing asyncapi version ${JSON.stringify(doc.asyncapi)} (want a released 2.x or 3.x version)`];
+    if (!check(doc)) {
+      const problems = (check.errors ?? []).map((e) => `invalid AsyncAPI: ${e.instancePath || '/'} ${e.message}`);
+      return [...new Set(problems)].slice(0, 20);
+    }
+    const problems = [];
+    const bad = new Set();
+    collectBadRefs(doc, doc, bad);
+    for (const ref of bad) problems.push(`unresolved $ref "${ref}"`);
+    /** @type {Map<string, string>} */
+    const seen = new Map();
+    for (const { id, where } of asyncOperationIds(doc)) {
+      const first = seen.get(id);
+      if (first !== undefined) problems.push(`duplicate operationId "${id}" in ${first} and ${where}`);
+      else seen.set(id, where);
+    }
+    return problems;
+  },
+  crossCheck(paths) {
+    /** @type {Map<string, string>} */
+    const seen = new Map();
+    const problems = [];
+    for (const p of paths) {
+      const r = readOpenApi(p);
+      if ('error' in r) continue;
+      for (const id of new Set(asyncOperationIds(r.doc).map((o) => o.id))) {
         const first = seen.get(id);
         if (first !== undefined) problems.push(`duplicate operationId "${id}" in ${first} and ${p}`);
         else seen.set(id, p);
