@@ -3,6 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
+**G-1: consolidation pass over the Harness hardening (H-*), Spec formats (F-*) and Integration glue (G-*) tables.** Merge the overlapping items (H-6/H-21/H-22/F-1; H-1/H-11/H-15/H-23; prompt edits H-13/H-14/H-15/H-16/H-19), then order what remains into a new "Phase 6: hardening" table with IDs, dependencies and a first implementation task, and rewrite this section to point at that first task. Planning and docs only: no code.
+Why: roughly 50 new items overlap and have no order, so implementing them as written would build duplicates; G-5, G-6, G-7, G-10 and G-11 all depend on this pass. Then continue with P2-10, which is still valid:
 **P2-10: create a sandbox with `hodgepodge init --dir ~/work/SANDBOXES/obj --adapter copilot --model <id> --seed objective`, `cd ~/work/SANDBOXES/obj`, run `hodge` for a small real objective, then `podge`. Record what breaks (does the agent write QUESTION.md, are rounds too coarse/fine, does readiness gate too hard) as signs. Then the toy trial below.**
 Why: requirements gathering was the missing front phase; it is unit-tested with scripted adapters only. Previous next action (still valid after P2-10):
 **Trial run: `cd ~/work/SANDBOXES/toy && podge step` with the real `copilot` adapter (sandbox already created by `hodge init`), then `podge`. Record what breaks (usage parsing, gates, prompts) as signs/tasks. P0-5b/P0-6b stay owner-blocked on credentials.**
