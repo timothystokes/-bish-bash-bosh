@@ -39,7 +39,7 @@ Specs may declare machine-checked formats in a `## Formats` section (`- <format>
 
 ## Configuration
 
-`hodge.json` is validated against `src/config.schema.json`. The key parts:
+`hodge.json` is validated against `src/config.schema.json`. The key parts (run artifacts `record.json`, `usage.json`, `diagnosis.json` and `done.json` have schemas in `src/schemas/`):
 
 - `targetRepo` (relative to the sandbox dir), `hodgepodge` (written by `init`: where the tool lives), `allowedPaths`: where the agent works and what it may write (`init` defaults to `src/`; `--seed objective` also allows `bin/`, `lib/` and `package.json`, since a CLI entry point and its `bin` mapping are not solution-specific).
 - `roles`: map roles (`build`, `interview`, `reverse`, optional `qa`, ...) to an adapter and model. Models live in config only. `init` does not add `qa`; add it by hand to enable the evaluator.

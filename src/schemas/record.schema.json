@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hodgepodge-record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["iteration", "status", "changedFiles", "gates"],
+  "properties": {
+    "iteration": { "type": "integer", "minimum": 1 },
+    "status": { "enum": ["ok", "failed", "gated", "over-budget"] },
+    "changedFiles": { "type": "array", "items": { "type": "string" } },
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "ok"],
+        "properties": {
+          "name": { "type": "string" },
+          "ok": { "type": "boolean" },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

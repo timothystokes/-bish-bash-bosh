@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hodgepodge-diagnosis",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["rootCause", "evidence", "fix", "test", "prevention"],
+  "properties": {
+    "rootCause": { "type": "string", "pattern": "\\S" },
+    "evidence": { "type": "string", "pattern": "\\S" },
+    "fix": { "type": "string", "pattern": "\\S" },
+    "test": { "type": "string", "pattern": "\\S" },
+    "prevention": { "type": "string", "pattern": "\\S" }
+  }
+}

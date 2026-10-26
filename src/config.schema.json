@@ -10,6 +10,10 @@
     "roles": {
       "type": "object",
       "required": ["build"],
+      "properties": {
+        "build": { "$ref": "#/definitions/role" },
+        "qa": { "$ref": "#/definitions/role" }
+      },
       "additionalProperties": { "$ref": "#/definitions/role" }
     },
     "budgets": {
