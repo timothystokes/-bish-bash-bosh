@@ -71,7 +71,7 @@ test('phase 2 exit: objective goes interview -> specs -> test plan -> forward lo
         '# Spec: add(a, b) returns the sum\nImplementation: none\n\n## Purpose\nAdd two numbers.\n\n## Requirements\n- R-add-1: `add` must return the sum of two finite numbers.\n- R-add-2: `add` must return the other operand when one operand is 0.\n- R-add-3: `add` must throw a TypeError when an operand is not a number.\n\n## Examples\n- `add(2, 3)` -> `5`\n- `add(\'a\', 1)` -> throws TypeError\n\n## Out of scope\n- Big numbers.\n',
       'tests/PLAN.md': '- specs/add.md -> tests/add.test.js: sum of two numbers\n- R-add-1, R-add-2, R-add-3 -> tests/add.test.js\n',
       'tests/add.test.js':
-        "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { add } from '../src/add.js';\ntest('add', () => assert.equal(add(2, 3), 5));\n",
+        "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { add } from '../src/add.js';\ntest('R-add-1 sum', () => assert.equal(add(2, 3), 5));\ntest('R-add-2 zero', () => assert.equal(add(0, 3), 3));\ntest('R-add-3 type error', () => assert.equal(add(1, 1), 2));\n",
     },
   };
   const buildFixture = {

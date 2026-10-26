@@ -49,7 +49,7 @@ export function bulletsBySection(text) {
  * @param {string} name
  * @returns {string | null}
  */
-function field(text, name) {
+export function field(text, name) {
   let fenced = false;
   for (const line of text.split('\n')) {
     if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;

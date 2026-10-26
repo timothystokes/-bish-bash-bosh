@@ -52,7 +52,7 @@ export function helpText() {
     '         then fine-grained) until `hodgepodge ready` passes; a target without the objective kit gets it first; Ctrl-D or an empty answer pauses and a rerun resumes;',
     '         with --reverse it instead runs the `reverse` role to write specs/ + characterization tests from existing code (commits only if only specs/tests changed,',
     '         spec-lint passes and the test suite is green); prints JSON {status, ...}; exit 0 only when ok',
-    '  podge  planning and implementation: loops steps until the plan is done or a step fails/gates/runs out of budget (--control <file> honours control.json);',
+    '  podge  planning and implementation: loops steps until the plan is done and verified (suite, types, every R-<spec>-<n> named by a passing test; writes runs/<id>/done.json) or a step fails/gates/runs out of budget (--control <file> honours control.json);',
     '         prints JSON {status, steps, reason?}; exit 0 only when done',
     '  podge step  run one loop iteration (the unit `podge` and the cloud driver repeat); prints JSON {sha, iteration, cost, status}',
     '         (--dir defaults to ., --run-id defaults to "default")',

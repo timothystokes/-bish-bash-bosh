@@ -1,6 +1,8 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { runStep } from './step.js';
+import { verifyDone, applyGaps, syncImplementation, requirementsOf, writeDoneReport } from './done.js';
 import { lintSpecs } from './spec-lint.js';
 import { checkReadiness, hasObjectiveKit } from './readiness.js';
 import { readControl, consumeSteer } from './control.js';
@@ -64,8 +66,30 @@ export async function runLoop(opts) {
     const plan = existsSync(planPath) ? readFileSync(planPath, 'utf8') : '';
     const conflict = findConflict(plan);
     if (conflict) return { status: 'gated', steps, reason: `unresolved ${conflict}: fix the spec or tests (\`hodge\`), then resolve it in plan.md` };
-    if (isPlanDone(plan)) return { status: 'done', steps };
+    if (isPlanDone(plan)) {
+      const unproven = verifyPlanDone(stepOpts, plan);
+      if (!unproven) return { status: 'done', steps };
+    }
   }
+}
+
+/**
+ * When specs declare requirement IDs, a ticked plan is only done if `verifyDone` agrees; otherwise
+ * the plan gets unchecked verification items (committed) and the loop continues.
+ * @param {{repoDir: string, runId: string, testCommand?: string[], typeCommand?: string[]}} o
+ * @param {string} plan
+ * @returns {boolean} true when verification disproved the plan
+ */
+function verifyPlanDone({ repoDir, runId, testCommand = ['npm', 'test'], typeCommand }, plan) {
+  if (requirementsOf(repoDir).length === 0) return false;
+  const v = verifyDone(repoDir, { testCommand, typeCommand });
+  syncImplementation(repoDir, v.report.requirements);
+  writeDoneReport(repoDir, runId, v.report);
+  if (!v.ok) writeFileSync(join(repoDir, 'plan.md'), applyGaps(plan, v.gaps));
+  const git = (/** @type {string[]} */ ...a) => execFileSync('git', ['-C', repoDir, ...a], { encoding: 'utf8' });
+  git('add', '-A');
+  if (git('status', '--porcelain').trim() !== '') git('commit', '-q', '-m', `podge verify ${runId}: ${v.ok ? 'done' : 'gaps'}`);
+  return !v.ok;
 }
 
 /**

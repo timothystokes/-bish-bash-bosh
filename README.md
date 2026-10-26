@@ -31,7 +31,7 @@ podge step       # one iteration only
 
 `hodge`, `podge`, `step`, `status` and `tui` work on the sandbox in `--dir <sandbox>`, which defaults to the current directory (`--run-id`, and `--control` for `podge`/`status`/`tui`, are the only other flags). `spec-lint`, `ready`, `sync` and `promote` also default to the sandbox in the current directory.
 
-`podge` loops one iteration at a time until the target `plan.md` is fully checked, a step fails or is gated, or a budget runs out. It prints JSON `{status, steps, reason?}` and exits 0 only when done.
+`podge` loops one iteration at a time until the target `plan.md` is fully checked, a step fails or is gated, or a budget runs out. A ticked plan is not enough when specs declare requirement IDs: the harness runs the suite and type check, requires every `R-<spec>-<n>` to be named by a passing test, and scans source for stubs. Gaps become unchecked `Verify:` items in `plan.md` and the loop continues. The harness (not the agent) derives each spec's `Implementation:` and `Evidence:`, and writes `runs/<run-id>/done.json` with per-requirement evidence. It prints JSON `{status, steps, reason?}` and exits 0 only when done.
 
 Use `--seed empty` to start from an empty target. Run `npx hodgepodge --help` for every command.
 
