@@ -4,6 +4,7 @@ import { loadSandbox, CONFIG_FILE } from './sandbox.js';
 import { resolveAdapter, defaultRegistry } from './adapters/index.js';
 import { runStep } from './step.js';
 import { runLoop } from './driver.js';
+import { acquireRunLock } from './run-lock.js';
 import { lintSpecs } from './spec-lint.js';
 import { checkReadiness, hasObjectiveKit } from './readiness.js';
 import { createInterface } from 'node:readline';
@@ -33,6 +34,7 @@ export function helpText() {
     '  podge  [--dir <sandbox>] [--run-id <id>] [--control <control.json>]',
     '  podge step [--dir <sandbox>] [--run-id <id>]',
     '  hodgepodge <command> ...   (the commands below)',
+    '  hodge, podge and podge step hold a single-run lock (<sandbox>/.hodge.lock, PID; stale locks are cleared) and refuse to start while another live run holds the sandbox.',
     '  Sandbox commands take --dir <sandbox> (default: the current directory). `hodgepodge init` writes <sandbox>/hodge.json holding the target repo,',
     '  roles, budgets and the path back to hodgepodge, plus hodgepodge/hodge/podge launchers, so after `cd <sandbox>` just run `./hodge` then `./podge`.',
     '  hodgepodge clean-room --source <dir> --repo <builder-dir>',
@@ -457,6 +459,11 @@ export async function main(argv, deps = {}) {
     out(`${JSON.stringify(control ? { ...status, control } : status)}\n`);
     return 0;
   }
+  const lock = acquireRunLock(sandbox.dir);
+  if (!lock.ok) {
+    err(`${label}: ${lock.error}\n`);
+    return 2;
+  }
   try {
     const role = cmd === 'hodge' ? (reverse ? 'reverse' : 'interview') : 'build';
     const adapter = resolveAdapter(config, role, deps.registry ?? defaultRegistry);
@@ -544,5 +551,7 @@ export async function main(argv, deps = {}) {
   } catch (e) {
     err(`${label}: ${/** @type {Error} */ (e).message}\n`);
     return 2;
+  } finally {
+    lock.release();
   }
 }
