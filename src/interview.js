@@ -98,13 +98,13 @@ function kitSections(repoDir, closing) {
     convo.length > CONVERSATION_TAIL_CHARS ? `...${convo.slice(-CONVERSATION_TAIL_CHARS)}` : convo,
     `## Stage: ${stageOf(repoDir)}`,
     stageOf(repoDir) === 'broad'
-      ? 'No specs exist yet. Ask broad questions only (purpose, users, capabilities, scope, constraints, success). Once an answer settles a decision, draft its spec from it and queue perceived gaps in objective/OPEN-QUESTIONS.md; otherwise write notes to objective/. Write the next question, with a `Default: <answer>` last line, to objective/QUESTION.md.'
-      : 'Specs exist. Go deeper on the capability with the most gaps, down to requirements, failure paths and examples. Draft or update specs/ for everything already answered, add perceived gaps to objective/OPEN-QUESTIONS.md, then write the next question, with a `Default: <answer>` last line, to objective/QUESTION.md.',
+      ? 'No specs yet: ask broad questions (purpose, users, capabilities, scope, constraints, success); draft a spec once an answer settles a decision. Write the next question, ending `Default: <answer>`, to objective/QUESTION.md.'
+      : 'Specs exist: go deeper on the capability with the most gaps; update specs/ from the answers. Write the next question, ending `Default: <answer>`, to objective/QUESTION.md.',
     ...(closing
       ? [
           '## Readiness gaps (the interview is ending: close these this round)',
           gaps.length === 0 ? '(none: confirm and stop)' : gaps.map((g) => `- ${g}`).join('\n'),
-          'Fix each gap in specs/ yourself where the answers already settle it. Where it needs a decision from the owner, ask that as the round\'s question (with a `Default: <answer>` last line). Write no question only when no gap remains.',
+          'Fix gaps the answers already settle; ask the owner (with a `Default:` line) about the rest. Write no question only when no gap remains.',
         ]
       : []),
   ];

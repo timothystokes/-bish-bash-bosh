@@ -58,13 +58,14 @@ test('L-2: plan and QA prompts do not inline plan.md', () => {
   assert.doesNotMatch(buildPlanPrompt(dir), /ITEM-/);
 });
 
-test('L-2: every mode prompt is at most 1.3 KB and the QA prompt at most 2 KB', () => {
-  for (const m of MODES) assert.ok(Buffer.byteLength(loadModePrompt(m)) <= 1300, `${m} prompt too large`);
-  assert.ok(Buffer.byteLength(loadQaPrompt()) <= 2000, 'qa prompt too large');
+test('L-2: build and plan prompts are at most 120 words, others at most 150', () => {
+  const words = (/** @type {string} */ p) => p.trim().split(/\s+/).length;
+  for (const m of MODES) assert.ok(words(loadModePrompt(m)) <= (['interview', 'test-hardening'].includes(m) ? 150 : 120), `${m} prompt too long`);
+  assert.ok(words(loadQaPrompt()) <= 150, 'qa prompt too long');
 });
 
 test('L-2: AGENTS.md and every objective-kit file stay small', () => {
   assert.ok(statSync(join(root, 'AGENTS.md')).size <= 2800, 'AGENTS.md too large');
   const kit = join(root, 'templates', 'objective');
-  for (const f of readdirSync(kit)) assert.ok(readFileSync(join(kit, f)).length <= 2200, `${f} too large`);
+  for (const f of readdirSync(kit)) assert.ok(readFileSync(join(kit, f)).length <= 1800, `${f} too large`);
 });

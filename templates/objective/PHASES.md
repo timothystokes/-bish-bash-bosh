@@ -1,10 +1,10 @@
 # Objective phases
 
-In order; do not start a phase before the previous exit holds. Search the repo before assuming something is missing.
+In order; don't start a phase before the previous exit holds.
 
-1. **Discover + Specify** (`hodge --dir <sandbox>`): the owner gives a short brief (`objective/BRIEF.md`), then each round the agent asks one question and logs the answer in `objective/CONVERSATION.md`. Follow `objective/INTERVIEW.md`. Record unanswered questions in `objective/OPEN-QUESTIONS.md` as `- [ ] question`; tick `- [x]` once decided and reflected in a spec. One spec per decision in `specs/*.md` (spec template: `Implementation:`, Purpose, Requirements `R-<spec>-<n>`, Examples, optional Formats, Dimensions, Out of scope). Exit: the owner answers `done` (or no question is left) and `hodgepodge ready --dir <sandbox>` reports `ready: true`. Paused? Run `hodge` again.
-2. **Test plan** (first `podge` step): `tests/PLAN.md` maps every spec and requirement ID to red tests. Exit: the test-plan gate passes.
-3. **Plan** (same step): `plan.md` lists build tasks, smallest slice first, each naming its spec. Exit: every requirement group is covered by an item.
-4. **Build** (`podge --dir <sandbox>`): one plan item per loop until `plan.md` is done and the suite is green. `podge` refuses to start until `hodgepodge ready` passes.
+1. **Discover + Specify** (`hodge --dir <sandbox>`): from `objective/BRIEF.md`, each round asks the owner one question (`objective/INTERVIEW.md`), logs the answer in `objective/CONVERSATION.md` and drafts specs in `specs/*.md` (`Implementation:`, Purpose, Requirements `R-<spec>-<n>`, Examples, optional Formats, Dimensions, Out of scope). Unanswered questions go in `objective/OPEN-QUESTIONS.md` as `- [ ]`; tick `- [x]` once reflected in a spec. Exit: the owner says `done` (or no question is left) and `hodgepodge ready --dir <sandbox>` reports `ready: true`. Run `hodge` again to resume.
+2. **Test plan** (first `podge` step): `tests/PLAN.md` maps every requirement to red tests.
+3. **Plan** (same step): `plan.md` lists build tasks, smallest slice first, each naming its spec.
+4. **Build** (`podge --dir <sandbox>`): one plan item per loop until `plan.md` is done and the suite is green.
 
-When things go wrong, tune the prompts, specs or this kit; do not just retry. A requirement gap found while building goes into `objective/OPEN-QUESTIONS.md`; return to Discover and re-run `hodge`.
+When something goes wrong, tune the prompts, specs or this kit; don't just retry. A gap found while building goes in `objective/OPEN-QUESTIONS.md`; return to Discover.
