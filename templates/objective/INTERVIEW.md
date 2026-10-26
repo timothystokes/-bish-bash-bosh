@@ -5,11 +5,12 @@ You are discovering requirements, not designing or building. Specs are formed th
 ## How to run a round
 1. Read `objective/BRIEF.md`, `objective/CONVERSATION.md` (answers so far), the existing `specs/`, and `objective/OPEN-QUESTIONS.md`.
 2. Read the stage and the current readiness gaps (in your prompt). They are your to-do list for this round.
-3. Broad stage (no specs yet): ask about purpose, users, the list of capabilities, scope boundaries, constraints and what success looks like. Write only notes under `objective/`. Move on when the capabilities are clear enough to name one spec per decision.
-4. Fine stage (specs exist): take the capability with the most gaps and go down to requirements, failure paths, edge cases and examples. After each answer update the affected spec and its tests immediately; do not batch.
-5. Ask one question at a time. Every round ends by writing exactly one next question to `objective/QUESTION.md` (the harness shows it to the owner and logs the answer). Make it the most blocking question, short, answerable in a sentence, with options where you can. Never answer your own question: if you must assume, record it as an unchecked open question.
-6. If the brief and answers already settle everything, do not invent a question: close every listed gap yourself (add the missing failure path, example or test mapping) before ending the round. A round that ends with gaps and no question is retried once, then stalls.
-7. When the gaps are empty, write no `QUESTION.md` and stop; the harness confirms with `hodgepodge ready`.
+3. Broad stage (no specs yet): ask about purpose, users, the list of capabilities, scope boundaries, constraints and what success looks like. As soon as an answer settles a decision, draft its spec and tests from each answer (unknowns recorded as open questions); until then write only notes under `objective/`.
+4. Fine stage (specs exist): take the capability with the most gaps and go down to requirements, failure paths, edge cases and examples. Draft or update the affected spec and its tests from each answer immediately; do not batch.
+5. After drafting, review the specs for perceived gaps (missing failure paths, edge cases, actors, limits, interfaces, acceptance checks) and add each as an unchecked `- [ ]` line in `objective/OPEN-QUESTIONS.md`. Gaps are questions for the owner, never filled by guessing.
+6. Ask one question at a time. Every round ends by writing exactly one next question to `objective/QUESTION.md` (the harness shows it to the owner and logs the answer). Make it the most blocking question, short, answerable in a sentence, with options where you can. Put a recommended answer on the question's own last line as `Default: <answer>`; the owner accepts it by typing `y` and the harness logs it as the answer. A default is a proposal: never treat it as decided until the owner answers. Never answer your own question: if you must assume, record it as an unchecked open question.
+7. If the brief and answers already settle everything, do not invent a question: close every listed gap yourself (add the missing failure path, example or test mapping) before ending the round. A round that ends with gaps and no question is retried once, then stalls.
+8. When the gaps are empty, write no `QUESTION.md` and stop; the harness confirms with `hodgepodge ready`.
 
 ## Dimensions to cover (for every capability in scope)
 - Actors and goals: who uses it and why.

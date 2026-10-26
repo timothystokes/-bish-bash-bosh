@@ -97,8 +97,8 @@ function kitSections(repoDir) {
     read('CONVERSATION.md'),
     `## Stage: ${stageOf(repoDir)}`,
     stageOf(repoDir) === 'broad'
-      ? 'No specs exist yet. Ask broad questions only (purpose, users, capabilities, scope, constraints, success). Write notes to objective/ and the next question to objective/QUESTION.md. Do not write specs/ or tests/ until the capabilities are clear.'
-      : 'Specs exist. Go deeper on the capability with the most gaps, down to individual requirements, failure paths and examples. Update specs/ and tests/ for everything already answered, then write the next question to objective/QUESTION.md.',
+      ? 'No specs exist yet. Ask broad questions only (purpose, users, capabilities, scope, constraints, success). Once an answer settles a decision, draft its spec and tests from it and queue perceived gaps in objective/OPEN-QUESTIONS.md; otherwise write notes to objective/. Write the next question, with a `Default: <answer>` last line, to objective/QUESTION.md.'
+      : 'Specs exist. Go deeper on the capability with the most gaps, down to individual requirements, failure paths and examples. Draft or update specs/ and tests/ for everything already answered, add perceived gaps to objective/OPEN-QUESTIONS.md, then write the next question, with a `Default: <answer>` last line, to objective/QUESTION.md.',
     '## Readiness gaps (close these this round)',
     gaps.length === 0 ? '(none: confirm and stop)' : gaps.map((g) => `- ${g}`).join('\n'),
   ];

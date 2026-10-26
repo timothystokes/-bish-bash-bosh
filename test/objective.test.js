@@ -119,6 +119,28 @@ test('asks for the description first, then alternates rounds and answers broad t
   assert.match(a.prompts[2], /2 requirements/);
 });
 
+test('a question with a Default line can be accepted with "y"; the logged answer carries the default text', async () => {
+  const { repo, config } = sandbox();
+  const rounds = [
+    { 'objective/QUESTION.md': 'Who uses the greeter?\nDefault: Developers calling it from Node.\n' },
+    ...fullRounds.slice(1),
+  ];
+  const o = owner(['desc', 'Y', 'Yes']);
+  const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted(rounds).adapter, ask: o.ask, say: o.say, identity });
+  assert.equal(res.status, 'ok');
+  const convo = readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8');
+  assert.match(convo, /\*\*Answer:\*\* Accepted the proposed default: Developers calling it from Node\./);
+  assert.match(o.said[0], /type y to accept the default/i);
+  assert.doesNotMatch(o.said[1], /type y to accept/i, 'no hint without a Default line');
+});
+
+test('"y" without a Default line is an ordinary answer', async () => {
+  const { repo, config } = sandbox();
+  const o = owner(['desc', 'y', 'Yes']);
+  await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted(fullRounds).adapter, ask: o.ask, say: o.say, identity });
+  assert.match(readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8'), /\*\*Answer:\*\* y\n/);
+});
+
 test('each round has its own record and all rounds count toward the run budget', async () => {
   const { repo, config } = sandbox();
   await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted(fullRounds).adapter, ...owner(['d', 'a', 'b']), identity });

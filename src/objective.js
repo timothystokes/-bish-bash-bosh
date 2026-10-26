@@ -63,9 +63,11 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
   const answerPending = async () => {
     if (!existsSync(questionPath)) return true;
     const question = readFileSync(questionPath, 'utf8').trim();
-    say(`\n${question}\n`);
-    const answer = ((await ask('> ')) ?? '').trim();
+    const proposed = /^Default:[ \t]*(.+)$/m.exec(question)?.[1]?.trim();
+    say(`\n${question}\n${proposed ? '(type y to accept the default)\n' : ''}`);
+    let answer = ((await ask('> ')) ?? '').trim();
     if (answer === '') return false;
+    if (proposed && /^(y|yes)$/i.test(answer)) answer = `Accepted the proposed default: ${proposed}`;
     appendFileSync(join(repoDir, 'objective', 'CONVERSATION.md'), `\n## Round ${round - 1}\n\n**Question:** ${question}\n\n**Answer:** ${answer}\n`);
     rmSync(questionPath);
     git(repoDir, 'add', '-A');

@@ -49,6 +49,15 @@ test('H-14: objective interview protocol asks for Out of scope per spec', () => 
   assert.match(kit, /Out of scope/);
 });
 
+test('interview drafts specs from each answer, queues perceived gaps and proposes defaults', () => {
+  const kit = readFileSync(join(snapDir, '..', '..', 'templates', 'objective', 'INTERVIEW.md'), 'utf8');
+  for (const text of [loadModePrompt('interview'), kit]) {
+    assert.match(text, /draft[^.\n]*spec[^.\n]*(each|every) answer/i);
+    assert.match(text, /perceived gaps?[^.\n]*OPEN-QUESTIONS/i);
+    assert.match(text, /Default: /);
+  }
+});
+
 test('H-16: gate-checked prompts forbid gaming the gate', () => {
   for (const mode of [...BUILD_MODES, 'test-hardening']) {
     const p = loadModePrompt(mode);
