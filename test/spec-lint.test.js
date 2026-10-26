@@ -26,6 +26,13 @@ test('passes for well-formed, mapped specs', () => {
   assert.deepEqual(lintSpecs(target(GOOD)), { ok: true, problems: [] });
 });
 
+test('testPlan: false checks structure only: no tests/PLAN.md needed, bad structure still fails', () => {
+  const { 'tests/PLAN.md': _plan, ...specsOnly } = GOOD;
+  assert.equal(lintSpecs(target(specsOnly)).ok, false);
+  assert.deepEqual(lintSpecs(target(specsOnly), { testPlan: false }), { ok: true, problems: [] });
+  assert.equal(lintSpecs(target({ 'specs/a.md': 'no title\n' }), { testPlan: false }).ok, false);
+});
+
 test('fails when there is no specs directory or it has no specs', () => {
   assert.equal(lintSpecs(target({ 'tests/PLAN.md': '' })).ok, false);
   assert.equal(lintSpecs(target({ 'specs/README.txt': 'x' })).ok, false);

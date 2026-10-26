@@ -36,8 +36,6 @@ const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 
 const goodWrites = {
   'specs/greet.md': '# Spec: Greeter\nImplementation: none\n\n## Requirements\n- R-greet-1: must greet\n',
-  'tests/PLAN.md': '| Spec | Tests |\n|---|---|\n| specs/greet.md | tests/greet.test.js |\n| R-greet-1 | tests/greet.test.js |\n',
-  'tests/greet.test.js': 'throw new Error("red");\n',
 };
 
 /** @param {Record<string, string>} writes @param {number} [exitStatus] */
@@ -57,57 +55,77 @@ const agent = (writes, exitStatus = 0) => {
   };
 };
 
-test('interview prompt exists, carries the objective, both templates and the lint rules', () => {
+test('interview prompt exists, carries the objective and the spec template, not the test-plan template', () => {
   assert.match(loadModePrompt('interview'), /one spec per file/i);
   const dir = makeRepo();
   const p = buildInterviewPrompt(dir, 'Build a greeter');
   assert.match(p, /Build a greeter/);
   assert.match(p, /# Spec: <name/);
-  assert.match(p, /\| Spec \| Tests \|/);
+  assert.doesNotMatch(p, /\| Spec \| Tests \|/);
+  assert.doesNotMatch(loadModePrompt('interview'), /write tests\/PLAN\.md/i);
 });
 
-test('a lint-clean interview is committed with a record', async () => {
+test('a single-shot interview (no question left) that is lint-clean is committed with a record', async () => {
   const dir = makeRepo();
   const a = agent(goodWrites);
   const res = await runInterview({ config: config(), repoDir: dir, runId: 'r1', adapter: a.adapter, objective: 'Build a greeter', identity });
   assert.equal(res.status, 'ok');
   assert.equal(res.sha, git(dir, 'rev-parse', 'HEAD'));
   assert.equal(git(dir, 'status', '--porcelain'), '');
-  assert.equal(lintSpecs(dir).ok, true);
+  assert.equal(lintSpecs(dir, { testPlan: false }).ok, true);
   assert.ok(existsSync(join(dir, 'runs', 'r1', 'interview', 'record.json')));
   assert.equal(JSON.parse(readFileSync(join(dir, 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'ok');
   assert.match(a.prompts[0], /Build a greeter/);
 });
 
-test('refuses to finish when spec-lint fails: work discarded, problems reported', async () => {
+test('spec-lint problems at the end of the interview keep the work and are reported as gaps', async () => {
   const dir = makeRepo();
   const res = await runInterview({
     config: config(),
     repoDir: dir,
     runId: 'r1',
-    adapter: agent({ 'specs/bad.md': 'no title\n', 'tests/PLAN.md': '| Spec | Tests |\n' }).adapter,
+    adapter: agent({ 'specs/bad.md': 'no title\n' }).adapter,
     objective: 'x',
     identity,
   });
-  assert.equal(res.status, 'failed');
-  assert.match(res.reason ?? '', /spec-lint failed/);
-  assert.equal(existsSync(join(dir, 'specs')), false);
-  assert.equal(JSON.parse(readFileSync(join(dir, 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'failed');
+  assert.equal(res.status, 'incomplete');
+  assert.match(res.reason ?? '', /must start with a "# Spec: <name>" title/);
+  assert.equal(existsSync(join(dir, 'specs', 'bad.md')), true);
+  assert.equal(JSON.parse(readFileSync(join(dir, 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'incomplete');
   assert.equal(git(dir, 'status', '--porcelain'), '');
 });
 
-test('refuses when the agent writes outside specs/ and tests/', async () => {
+test('the test-plan mapping is not an interview check: specs without tests/PLAN.md are lint-clean for the interview', async () => {
+  const dir = makeRepo();
+  const res = await runInterview({ config: config(), repoDir: dir, runId: 'r1', adapter: agent(goodWrites).adapter, objective: 'x', identity });
+  assert.equal(res.status, 'ok');
+  assert.equal(existsSync(join(dir, 'tests')), false);
+  assert.equal(lintSpecs(dir).ok, false, 'the full lint (plan stage) still needs the mapping');
+  assert.equal(lintSpecs(dir, { testPlan: false }).ok, true);
+});
+
+test('a round that leaves a question runs no spec-lint, even with a broken spec', async () => {
+  const dir = makeRepo();
+  const res = await runInterview({
+    config: config(), repoDir: dir, runId: 'r1', objective: 'x', identity,
+    adapter: agent({ 'specs/bad.md': 'no title\n', 'objective/QUESTION.md': 'Who?\n' }).adapter,
+  });
+  assert.equal(res.status, 'incomplete');
+  assert.match(res.reason ?? '', /waiting for the owner/);
+});
+
+test('refuses when the agent writes outside specs/ and objective/ (tests are the plan stage)', async () => {
   const dir = makeRepo();
   const res = await runInterview({
     config: config(),
     repoDir: dir,
     runId: 'r1',
-    adapter: agent({ ...goodWrites, 'src/app.js': 'x\n' }).adapter,
+    adapter: agent({ ...goodWrites, 'src/app.js': 'x\n', 'tests/a.test.js': 'x\n' }).adapter,
     objective: 'x',
     identity,
   });
   assert.equal(res.status, 'failed');
-  assert.match(res.reason ?? '', /src\/app\.js/);
+  assert.match(res.reason ?? '', /src\/app\.js.*tests\/a\.test\.js|tests\/a\.test\.js.*src\/app\.js/);
   assert.equal(existsSync(join(dir, 'src')), false);
 });
 
@@ -116,6 +134,13 @@ test('agent failure is failed and discarded', async () => {
   const res = await runInterview({ config: config(), repoDir: dir, runId: 'r1', adapter: agent(goodWrites, 1).adapter, objective: 'x', identity });
   assert.equal(res.status, 'failed');
   assert.equal(existsSync(join(dir, 'specs')), false);
+});
+
+test('an agent that exits 0 but changes nothing is failed, not ok', async () => {
+  const dir = makeRepo();
+  const res = await runInterview({ config: config(), repoDir: dir, runId: 'r1', adapter: agent({}).adapter, objective: 'x', identity });
+  assert.equal(res.status, 'failed');
+  assert.match(res.reason ?? '', /no changes/);
 });
 
 test('gates: empty objective, dirty tree, harness repo, missing role make no agent call', async () => {

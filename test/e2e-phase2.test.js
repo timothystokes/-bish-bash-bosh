@@ -41,7 +41,7 @@ async function hodge(argv, registry, input) {
   return { code, res: JSON.parse(outs.join('').slice(outs.join('').indexOf('{'))) };
 }
 
-test('phase 2 exit: objective goes interview -> specs -> test plan -> forward loop -> green', async () => {
+test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, red tests, plan.md) -> forward loop -> green', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'hodge-p2-'));
   git(dir, 'init', '-q', '-b', 'main');
   git(dir, 'config', 'user.email', 't@example.com');
@@ -64,15 +64,18 @@ test('phase 2 exit: objective goes interview -> specs -> test plan -> forward lo
 
   const interviewFixture = {
     exitStatus: 0,
-    transcript: 'wrote specs and tests',
+    transcript: 'wrote specs',
     usage: { tokens: 10, cost: 0.01 },
     writes: {
       'specs/add.md':
         '# Spec: add(a, b) returns the sum\nImplementation: none\n\n## Purpose\nAdd two numbers.\n\n## Requirements\n- R-add-1: `add` must return the sum of two finite numbers.\n- R-add-2: `add` must return the other operand when one operand is 0.\n- R-add-3: `add` must throw a TypeError when an operand is not a number.\n\n## Examples\n- `add(2, 3)` -> `5`\n- `add(\'a\', 1)` -> throws TypeError\n\n## Dimensions\n- Actors and goals: covered\n- Behaviour: covered\n- Inputs and outputs: covered\n- Failure paths: covered\n- Edge cases: n/a: single-purpose pure function\n- Interfaces and data: n/a: one in-process function\n- Non-functional: n/a: no runtime limits for a pure function\n- Constraints: n/a: no platform constraints\n- Acceptance: covered\n- Out of scope: covered\n\n## Out of scope\n- Big numbers.\n',
-      'tests/PLAN.md': '- specs/add.md -> tests/add.test.js: sum of two numbers\n- R-add-1, R-add-2, R-add-3 -> tests/add.test.js\n',
-      'tests/add.test.js':
-        "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { add } from '../src/add.js';\ntest('R-add-1 sum', () => assert.equal(add(2, 3), 5));\ntest('R-add-2 zero', () => assert.equal(add(0, 3), 3));\ntest('R-add-3 type error', () => assert.equal(add(1, 1), 2));\n",
     },
+  };
+  const planWrites = {
+    'tests/PLAN.md': '- specs/add.md -> tests/add.test.js: sum of two numbers\n- R-add-1, R-add-2, R-add-3 -> tests/add.test.js\n',
+    'tests/add.test.js':
+      "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { add } from '../src/add.js';\ntest('R-add-1 sum', () => assert.equal(add(2, 3), 5));\ntest('R-add-2 zero', () => assert.equal(add(0, 3), 3));\ntest('R-add-3 type error', () => assert.equal(add(1, 1), 2));\n",
+    'plan.md': '- [ ] implement add\n',
   };
   const buildFixture = {
     exitStatus: 0,
@@ -83,31 +86,30 @@ test('phase 2 exit: objective goes interview -> specs -> test plan -> forward lo
       'plan.md': '- [x] implement add\n',
     },
   };
-  const registry = { interviewer: scripted(interviewFixture), builder: scripted(buildFixture) };
+  const build = scripted(buildFixture)();
+  const plan = scripted({ ...buildFixture, transcript: 'planned', writes: planWrites })();
+  // the first podge step is the plan step (its prompt says so); later steps build
+  const builder = { run: (/** @type {import('../src/adapter.js').AdapterRequest} */ req) => (req.prompt.startsWith('You are the plan step') ? plan : build).run(req) };
+  const registry = { interviewer: scripted(interviewFixture), builder: () => builder };
 
-  // 1. interview: specs + red tests committed, spec-lint passes
+  // 1. interview: specs only (no tests, no test plan); structure lint passes
   const iv = await hodge(['hodge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'p2'], registry, Readable.from(['add two numbers\n']));
   assert.equal(iv.res.status, 'ok', JSON.stringify(iv.res));
   assert.equal(iv.code, 0);
   assert.ok(existsSync(join(dir, 'specs', 'add.md')));
-  assert.ok(existsSync(join(dir, 'tests', 'PLAN.md')));
-  const lint = await hodge(['spec-lint', '--repo', dir], registry);
-  assert.equal(lint.res.ok, true);
+  assert.equal(existsSync(join(dir, 'tests')), false, 'tests come from the plan step');
   assert.equal(git(dir, 'status', '--porcelain'), '');
 
-  // 2. the plan is the owner's/orchestrator's; interview may not write it
-  writeFileSync(join(dir, 'plan.md'), '- [ ] implement add\n');
-  git(dir, 'add', '-A');
-  git(dir, 'commit', '-qm', 'plan');
-
-  // 3. forward loops: tests red first, then green
+  // 2. podge: plan step (test plan + red tests + plan.md), then the build step turns them green
   const run = await hodge(['podge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'p2'], registry);
   assert.equal(run.res.status, 'done', JSON.stringify(run.res));
   assert.equal(run.code, 0);
-  assert.equal(run.res.steps.length, 1);
+  assert.equal(run.res.steps.length, 2);
+  const lint = await hodge(['spec-lint', '--repo', dir], registry);
+  assert.equal(lint.res.ok, true, 'the full lint (with the test mapping) passes after the plan step');
 
   execFileSync('npm', ['test', '--silent'], { cwd: dir, stdio: 'pipe' });
   assert.equal(git(dir, 'status', '--porcelain'), '');
-  const rec = JSON.parse(readFileSync(join(dir, 'runs', 'p2', 'iterations', '001', 'record.json'), 'utf8'));
+  const rec = JSON.parse(readFileSync(join(dir, 'runs', 'p2', 'iterations', '002', 'record.json'), 'utf8'));
   assert.equal(rec.status, 'ok');
 });

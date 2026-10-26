@@ -41,7 +41,6 @@ Implementation: none
 - Localisation.
 `;
 const coarse = goodSpec.replace(/- R-greet-3: .*\n/, '');
-const plan = '| Spec | Tests |\n|---|---|\n| specs/greet.md | tests/greet.test.js |\n| R-greet-1 | tests/greet.test.js |\n| R-greet-2 | tests/greet.test.js |\n| R-greet-3 | tests/greet.test.js |\n';
 
 /** @param {string} cwd @param {Record<string, string | null>} writes null deletes */
 function write(cwd, writes) {
@@ -91,8 +90,8 @@ function owner(answers) {
 /** @type {Record<string, string | null>[]} */
 const fullRounds = [
   { 'objective/QUESTION.md': 'Who uses the greeter?\n', 'objective/notes.md': 'n\n' },
-  { 'specs/greet.md': coarse, 'tests/PLAN.md': plan.replace('| R-greet-3 | tests/greet.test.js |\n', ''), 'tests/greet.test.js': 'x\n', 'objective/QUESTION.md': 'Should names be trimmed?\n' },
-  { 'specs/greet.md': goodSpec, 'tests/PLAN.md': plan, 'objective/QUESTION.md': null },
+  { 'specs/greet.md': coarse, 'objective/QUESTION.md': 'Should names be trimmed?\n' },
+  { 'specs/greet.md': goodSpec, 'objective/QUESTION.md': null },
 ];
 
 test('asks for the description first, then alternates rounds and answers broad to fine until ready', async () => {
@@ -102,7 +101,7 @@ test('asks for the description first, then alternates rounds and answers broad t
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ask: o.ask, say: o.say, identity });
   assert.deepEqual(res, { status: 'ok', rounds: 3 });
   assert.match(o.asked[0], /Describe the objective/);
-  assert.deepEqual(o.said.map((t) => t.trim()), ['Who uses the greeter?', 'Should names be trimmed?']);
+  assert.deepEqual(o.said.map((t) => t.trim().split('\n')[0]), ['Who uses the greeter?', 'Should names be trimmed?']);
   assert.match(readFileSync(join(repo, 'objective', 'BRIEF.md'), 'utf8'), /A greeter library for Ann/);
   const convo = readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8');
   assert.match(convo, /Who uses the greeter\?[\s\S]*Developers/);
@@ -116,7 +115,8 @@ test('asks for the description first, then alternates rounds and answers broad t
   assert.match(a.prompts[1], /Developers/);
   assert.match(a.prompts[2], /## Stage: fine/);
   assert.match(a.prompts[2], /Yes, trim/);
-  assert.match(a.prompts[2], /2 requirements/);
+  assert.doesNotMatch(a.prompts[2], /## Readiness gaps/, 'gaps are listed only once the interview is ending');
+  assert.doesNotMatch(a.prompts[2], /Test-plan template/, 'tests are the plan stage, not the interview');
 });
 
 test('a question with a Default line can be accepted with "y"; the logged answer carries the default text', async () => {
@@ -192,14 +192,15 @@ test('gaps but no question is stalled, not an endless loop', async () => {
 test('gaps but no question retries once with the gaps in the prompt and can reach ok without asking the owner', async () => {
   const { repo, config } = sandbox();
   const a = scripted([
-    { 'specs/greet.md': coarse, 'tests/PLAN.md': plan.replace('| R-greet-3 | tests/greet.test.js |\n', ''), 'tests/greet.test.js': 'x\n' },
-    { 'specs/greet.md': goodSpec, 'tests/PLAN.md': plan },
+    { 'specs/greet.md': coarse },
+    { 'specs/greet.md': goodSpec },
   ]);
   const o = owner(['desc']);
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ask: o.ask, say: o.say, identity });
   assert.deepEqual(res, { status: 'ok', rounds: 2 });
   assert.equal(o.asked.length, 1);
   assert.match(a.prompts[1], /## Stage: fine/);
+  assert.match(a.prompts[1], /## Readiness gaps[\s\S]*2 requirements/, 'a claim with gaps starts the closing rounds');
 });
 
 test('stops after maxRounds', async () => {
@@ -210,11 +211,50 @@ test('stops after maxRounds', async () => {
   assert.equal(res.rounds, 2);
 });
 
-test('a failed round (spec-lint) ends the conversation with the reason', async () => {
+test('spec problems come back as the next round gaps; the work is kept, not discarded', async () => {
   const { repo, config } = sandbox();
-  const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted([{ 'specs/bad.md': 'no title\n' }]).adapter, ...owner(['desc']), identity });
+  const a = scripted([{ 'specs/greet.md': 'no title\n' }, { 'specs/greet.md': goodSpec }]);
+  const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc']), identity });
+  assert.deepEqual(res, { status: 'ok', rounds: 2 });
+  assert.match(a.prompts[1], /must start with a "# Spec: <name>" title/);
+});
+
+test('writing tests during the interview fails the round: tests belong to the plan stage', async () => {
+  const { repo, config } = sandbox();
+  const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted([{ 'tests/greet.test.js': 'x\n' }]).adapter, ...owner(['desc']), identity });
   assert.equal(res.status, 'failed');
-  assert.match(res.reason ?? '', /spec-lint failed/);
+  assert.match(res.reason ?? '', /tests\/greet\.test\.js/);
+});
+
+test('rounds with a question never run readiness; "done" ends the interview and lists the gaps', async () => {
+  const { repo, config } = sandbox();
+  const a = scripted([
+    { 'specs/greet.md': coarse, 'objective/QUESTION.md': 'Should names be trimmed?\n' },
+    { 'specs/greet.md': goodSpec, 'objective/QUESTION.md': null },
+  ]);
+  const o = owner(['desc', 'done']);
+  const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ask: o.ask, say: o.say, identity });
+  assert.deepEqual(res, { status: 'ok', rounds: 2 });
+  assert.match(o.said[0], /type done to end the interview/i);
+  assert.doesNotMatch(a.prompts[0], /## Readiness gaps/);
+  assert.match(a.prompts[1], /## Readiness gaps[\s\S]*2 requirements/);
+  const rec = JSON.parse(readFileSync(join(repo, 'runs', 'r1', 'interview', 'record.json'), 'utf8'));
+  assert.equal(rec.status, 'incomplete');
+  assert.match(rec.reason, /waiting for the owner/);
+  assert.match(readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8'), /Ended the interview/);
+});
+
+test('"done" is remembered: a resumed conversation keeps closing', async () => {
+  const { repo, config } = sandbox();
+  const a = scripted([
+    { 'specs/greet.md': coarse, 'objective/QUESTION.md': 'Should names be trimmed?\n' },
+    { 'specs/greet.md': coarse, 'objective/QUESTION.md': 'Trim names?\nDefault: yes\n' },
+    { 'specs/greet.md': goodSpec, 'objective/QUESTION.md': null },
+  ]);
+  await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc', 'done', '']), identity });
+  const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['y']), identity });
+  assert.equal(res.status, 'ok');
+  assert.match(a.prompts[2], /## Readiness gaps/);
 });
 
 test('hodge --dir drives the conversation from stdin', async () => {

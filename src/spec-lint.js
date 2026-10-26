@@ -62,11 +62,13 @@ export function field(text, name) {
  * Deterministic structure check of `specs/*.md`: non-empty, one `# Spec: ...` title
  * (one decision per file), unique titles, an `Implementation: none|partial|implemented` field (with existing
  * `Evidence:` paths unless `none`), requirement IDs `R-<spec>-<n>` that are unique, and every spec and
- * requirement mapped to a test in `tests/PLAN.md`.
+ * requirement mapped to a test in `tests/PLAN.md`. The mapping is the plan stage's output, so the interview
+ * checks with `testPlan: false` (structure only).
  * @param {string} repoDir
+ * @param {{testPlan?: boolean}} [opts] `testPlan` defaults to true
  * @returns {LintResult}
  */
-export function lintSpecs(repoDir) {
+export function lintSpecs(repoDir, { testPlan = true } = {}) {
   /** @type {string[]} */
   const problems = [];
   const specsDir = join(repoDir, 'specs');
@@ -120,6 +122,7 @@ export function lintSpecs(repoDir) {
   }
 
   const planPath = join(repoDir, 'tests', 'PLAN.md');
+  if (!testPlan) return { ok: problems.length === 0, problems };
   if (!existsSync(planPath)) problems.push('tests/PLAN.md is missing');
   else {
     const mapped = parseTestPlan(readFileSync(planPath, 'utf8'));

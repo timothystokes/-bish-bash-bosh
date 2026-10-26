@@ -67,10 +67,12 @@ test('the kit is part of the interview prompt together with stage and current re
   const p = buildInterviewPrompt(join(dir, 'target'), 'Build a greeter CLI');
   assert.match(p, /INTERVIEW\.md/);
   assert.match(p, /READINESS\.md/);
-  assert.match(p, /## Readiness gaps/);
+  assert.doesNotMatch(p, /## Readiness gaps/, 'no readiness check until the interview is ending');
   assert.match(p, /## Stage: broad/);
   assert.match(p, /CONVERSATION\.md/);
-  assert.match(p, /specs\/ has no \*\.md specs/);
+  const closing = buildInterviewPrompt(join(dir, 'target'), 'Build a greeter CLI', true);
+  assert.match(closing, /## Readiness gaps/);
+  assert.match(closing, /specs\/ has no \*\.md specs/);
 });
 
 const goodSpec = `# Spec: Greeter
@@ -100,7 +102,6 @@ Implementation: none
 ## Out of scope
 - Localisation.
 `;
-const plan = '| Spec | Tests |\n|---|---|\n| specs/greet.md | tests/greet.test.js |\n| R-greet-1 | tests/greet.test.js |\n| R-greet-2 | tests/greet.test.js |\n| R-greet-3 | tests/greet.test.js |\n';
 
 /** @param {Record<string, string>} writes */
 const agent = (writes) => ({
@@ -126,8 +127,8 @@ test('interview with a kit: lint-clean but not ready is kept as incomplete (a ro
   const { repo, config } = sandbox('Build a greeter');
   const coarse = goodSpec.replace(/- R-greet-3: .*\n/, '');
   const res = await runInterview({
-    config, repoDir: repo, runId: 'r1', identity, objective: 'Build a greeter',
-    adapter: agent({ 'specs/greet.md': coarse, 'tests/PLAN.md': plan.replace('| R-greet-3 | tests/greet.test.js |\n', ''), 'tests/greet.test.js': 'x\n' }),
+    config, repoDir: repo, runId: 'r1', identity, objective: 'Build a greeter', closing: true,
+    adapter: agent({ 'specs/greet.md': coarse }),
   });
   assert.equal(res.status, 'incomplete');
   assert.match(res.reason ?? '', /2 requirements/);
@@ -141,7 +142,7 @@ test('interview with a kit: a ready result is ok; it may write objective/', asyn
   const res = await runInterview({
     config, repoDir: repo, runId: 'r1', identity, objective: 'Build a greeter',
     adapter: agent({
-      'specs/greet.md': goodSpec, 'tests/PLAN.md': plan, 'tests/greet.test.js': 'x\n',
+      'specs/greet.md': goodSpec,
       'objective/OPEN-QUESTIONS.md': '# Open questions\n\n- [x] Locale? Out of scope.\n',
     }),
   });
@@ -174,10 +175,7 @@ test('hodgepodge ready reports gaps then ready', async () => {
   assert.equal(JSON.parse(notReady.out).ready, false);
   const repo = join(dir, 'target');
   mkdirSync(join(repo, 'specs'));
-  mkdirSync(join(repo, 'tests'));
   writeFileSync(join(repo, 'specs', 'greet.md'), goodSpec);
-  writeFileSync(join(repo, 'tests', 'PLAN.md'), plan);
-  writeFileSync(join(repo, 'tests', 'greet.test.js'), 'x\n');
   const ok = await run(['ready', '--dir', dir]);
   assert.equal(ok.code, 0, ok.out);
   assert.deepEqual(JSON.parse(ok.out), { ready: true, gaps: [] });

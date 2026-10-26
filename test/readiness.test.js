@@ -46,50 +46,16 @@ function repo(files) {
   return dir;
 }
 
-const plan = '| Spec | Tests |\n|---|---|\n| specs/greet.md | tests/greet.test.js |\n| R-greet-1 | tests/greet.test.js |\n| R-greet-2 | tests/greet.test.js |\n| R-greet-3 | tests/greet.test.js |\n';
-const ready = { 'specs/greet.md': goodSpec, 'tests/PLAN.md': plan, 'tests/greet.test.js': 'x\n' };
+const ready = { 'specs/greet.md': goodSpec };
 
-test('a fine-grained, mapped, lint-clean spec set is ready', () => {
+test('a fine-grained, lint-clean spec set is ready without any tests or tests/PLAN.md (the plan stage writes them)', () => {
   assert.deepEqual(checkReadiness(repo(ready)), { ready: true, gaps: [] });
 });
 
-test('spec-lint problems are readiness gaps', () => {
-  const r = checkReadiness(repo({ 'specs/greet.md': goodSpec }));
+test('spec-lint structure problems are readiness gaps', () => {
+  const r = checkReadiness(repo({ 'specs/greet.md': 'no title\n' }));
   assert.equal(r.ready, false);
-  assert.ok(r.gaps.some((g) => /tests\/PLAN\.md/.test(g)));
-});
-
-test(`fewer than ${MIN_REQUIREMENTS} requirements is too coarse`, () => {
-  const spec = goodSpec.replace(/- R-greet-3: .*\n/, '');
-  const r = checkReadiness(repo({ ...ready, 'specs/greet.md': spec }));
-  assert.ok(r.gaps.some((g) => /specs\/greet\.md: 2 requirements/.test(g)), r.gaps.join('|'));
-});
-
-test('a requirement without "must" is not testable', () => {
-  const spec = goodSpec.replace('must trim surrounding whitespace from name', 'should be nice to names');
-  const r = checkReadiness(repo({ ...ready, 'specs/greet.md': spec }));
-  assert.ok(r.gaps.some((g) => /not testable/.test(g) && /should be nice/.test(g)), r.gaps.join('|'));
-});
-
-test('a compound requirement (two musts) must be split', () => {
-  const spec = goodSpec.replace('must trim surrounding whitespace from name', 'must trim whitespace and must lowercase it');
-  const r = checkReadiness(repo({ ...ready, 'specs/greet.md': spec }));
-  assert.ok(r.gaps.some((g) => /compound/.test(g)), r.gaps.join('|'));
-});
-
-test('examples are not counted: traceability comes from requirement-to-test mapping', () => {
-  const spec = goodSpec.replace(/- `greet\(1\)`.*\n/, '').replace(/- `greet\('Ann'\)`.*\n/, '');
-  assert.deepEqual(checkReadiness(repo({ ...ready, 'specs/greet.md': spec })), { ready: true, gaps: [] });
-});
-
-test('a requirement with no mapped test is a gap', () => {
-  const r = checkReadiness(repo({ ...ready, 'tests/PLAN.md': plan.replace('| R-greet-3 | tests/greet.test.js |\n', '') }));
-  assert.ok(r.gaps.some((g) => /R-greet-3.*not mapped/.test(g)), r.gaps.join('|'));
-});
-
-test('a requirement mapped only to a missing test file is a gap', () => {
-  const r = checkReadiness(repo({ 'specs/greet.md': goodSpec, 'tests/PLAN.md': plan.replace('| R-greet-3 | tests/greet.test.js', '| R-greet-3 | tests/other.test.js'), 'tests/greet.test.js': 'x\n' }));
-  assert.ok(r.gaps.some((g) => /tests\/other\.test\.js.*missing/.test(g)), r.gaps.join('|'));
+  assert.ok(r.gaps.some((g) => /# Spec:/.test(g)), r.gaps.join('|'));
 });
 
 test('a spec with no failure or negative path is incomplete', () => {
@@ -120,11 +86,6 @@ test('unchecked items in objective/OPEN-QUESTIONS.md block readiness; checked on
   assert.ok(r.gaps.some((g) => /open question/i.test(g) && /Which locale/.test(g)), r.gaps.join('|'));
   const done = repo({ ...ready, 'objective/OPEN-QUESTIONS.md': '# Open questions\n\n- [x] Which locale?\n' });
   assert.deepEqual(checkReadiness(done), { ready: true, gaps: [] });
-});
-
-test('a mapped test file that does not exist is a gap', () => {
-  const r = checkReadiness(repo({ 'specs/greet.md': goodSpec, 'tests/PLAN.md': plan }));
-  assert.ok(r.gaps.some((g) => /tests\/greet\.test\.js/.test(g) && /missing/.test(g)), r.gaps.join('|'));
 });
 
 test('hasObjectiveKit is true only when objective/ exists', () => {

@@ -41,7 +41,8 @@ export async function runLoop(opts) {
     if (!ready.ready) return { status: 'gated', steps: [], reason: `objective not ready (run \`hodgepodge ready\`): ${ready.gaps.join('; ')}` };
   }
   if (stepOpts.requireTestPlan) {
-    const lint = lintSpecs(stepOpts.repoDir);
+    // Before the plan step has written tests/PLAN.md only the specs' structure can be checked.
+    const lint = lintSpecs(stepOpts.repoDir, { testPlan: existsSync(join(stepOpts.repoDir, 'tests', 'PLAN.md')) });
     if (!lint.ok) return { status: 'gated', steps: [], reason: `spec-lint failed: ${lint.problems.join('; ')}` };
   }
   /** @type {StepResult[]} */

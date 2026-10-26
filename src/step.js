@@ -1,10 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { validateConfig } from './config.js';
 import { checkAntiStubGate, checkScopeGate, checkTypeGate } from './diff-gates.js';
 import { checkBudgetGate } from './budget-gate.js';
 import { checkTestPlanGate } from './test-plan-gate.js';
+import { lintSpecs } from './spec-lint.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { writeIterationRecord } from './run-record.js';
 import { diagnose } from './diagnosis.js';
@@ -20,6 +22,8 @@ import { checkFormatGate, declaresFormats } from './formats.js';
  * @typedef {import('./repo-gate.js').HarnessIdentity} HarnessIdentity
  * @typedef {{sha: string | null, iteration: number, cost: number, status: 'ok' | 'failed' | 'gated' | 'over-budget', reason?: string}} StepResult
  */
+
+const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 
 /** @param {string} p */
 const readIfExists = (p) => (existsSync(p) ? readFileSync(p, 'utf8') : '');
@@ -57,6 +61,22 @@ export function buildPrompt(repoDir, mode = 'forward', steer) {
 }
 
 /**
+ * Prompt for the plan step: plan prompt + test-plan template + specs index + plan.md.
+ * @param {string} repoDir
+ * @param {string} [steer]
+ * @returns {string}
+ */
+export function buildPlanPrompt(repoDir, steer) {
+  return [
+    loadModePrompt('plan'),
+    '## Test-plan template (templates/tests-PLAN.md)',
+    readFileSync(join(templatesDir, 'tests-PLAN.md'), 'utf8').trimEnd(),
+    buildContext(repoDir),
+    ...(steer ? ['## Steer note', steer] : []),
+  ].join('\n\n');
+}
+
+/**
  * @param {string} dir
  * @param {string[]} args
  */
@@ -69,6 +89,19 @@ function nextIteration(dir, /** @type {string} */ runId) {
   if (!existsSync(base)) return 1;
   const nums = readdirSync(base).filter((n) => /^\d+$/.test(n)).map(Number);
   return nums.length === 0 ? 1 : Math.max(...nums) + 1;
+}
+
+/**
+ * What the plan step must leave behind: every spec and requirement mapped in tests/PLAN.md, the mapped tests
+ * present, and the suite red.
+ * @param {string} repoDir
+ * @param {string[]} testCommand
+ * @returns {import('./diff-gates.js').GateCheck}
+ */
+function checkPlanStepOutput(repoDir, testCommand) {
+  const lint = lintSpecs(repoDir);
+  if (!lint.ok) return { ok: false, reason: `spec-lint failed: ${lint.problems.join('; ')}` };
+  return checkTestPlanGate(repoDir, { testCommand, requireRed: true });
 }
 
 /**
@@ -124,12 +157,14 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   }
 
   const iteration = nextIteration(repoDir, runId);
-  if (requireTestPlan) {
+  // The test plan is the first step's output: with specs but no tests/PLAN.md, this step writes it (red tests + plan.md).
+  const planStep = requireTestPlan && (cfg.mode ?? 'forward') === 'forward' && !existsSync(join(repoDir, 'tests', 'PLAN.md'));
+  if (requireTestPlan && !planStep) {
     const plan = checkTestPlanGate(repoDir, { testCommand, requireRed: iteration === 1 });
     if (!plan.ok) return gated(plan.reason ?? 'test-plan gate failed');
   }
   const baseline = runTests(testCommand, repoDir);
-  const prompt = buildPrompt(repoDir, cfg.mode, steer);
+  const prompt = planStep ? buildPlanPrompt(repoDir, steer) : buildPrompt(repoDir, cfg.mode, steer);
   const maxTokens = budget.remaining.tokens;
   const maxCostUsd = budget.remaining.cost;
   const maxWallClockSeconds = Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds);
@@ -151,7 +186,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   const overBudget = result.usage.tokens > maxTokens || result.usage.cost > maxCostUsd;
   /** @type {{name: string, ok: boolean, detail?: string}[]} */
   const gates = [{ name: 'repo', ok: true }, { name: 'budget', ok: true }];
-  if (requireTestPlan) gates.push({ name: 'test-plan', ok: true });
+  if (requireTestPlan && !planStep) gates.push({ name: 'test-plan', ok: true });
   const preGates = gates.length;
   /** @param {string} name @param {import('./diff-gates.js').GateCheck} c */
   const record = (name, c) => {
@@ -163,7 +198,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   } else {
     const staged = git(repoDir, 'diff', '--cached', '--name-only').split('\n').filter(Boolean);
     const diffOk = [
-      record('scope', checkScopeGate(staged, cfg.allowedPaths)),
+      record('scope', checkScopeGate(staged, planStep ? ['plan.md', 'tests/'] : cfg.allowedPaths)),
       record('anti-stub', checkAntiStubGate(diff)),
       ...(declaresFormats(repoDir) ? [record('formats', checkFormatGate(repoDir))] : []),
       ...(hardening ? [record('tests-only', checkScopeGate(staged, ['tests/']))] : []),
@@ -171,14 +206,16 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     if (!diffOk) {
       status = 'failed';
     } else {
-      const planning = isPlanningOnly(staged);
+      // The plan step's tests are red by design, so the regression gate does not apply; its own gate below does.
+      const planning = planStep || isPlanningOnly(staged);
       const t = planning ? null : checkTestsNoRegression(runTests(testCommand, repoDir), baseline);
       test = t ? { exitStatus: t.exitStatus, output: t.output } : { skipped: true, reason: 'planning-only' };
       const testsOk = t ? t.ok : true;
       gates.push({ name: 'tests', ok: testsOk, detail: t ? t.detail : 'skipped (planning-only)' });
+      const planOk = !planStep || record('test-plan', checkPlanStepOutput(repoDir, testCommand));
       const typesOk = record('types', checkTypeGate(repoDir, typeCommand));
       const hardenOk = !hardening || !testsOk || record('hardening', checkHardeningGate(repoDir, cfg.hardenCommand));
-      if (!testsOk || !typesOk || !hardenOk) status = 'failed';
+      if (!testsOk || !planOk || !typesOk || !hardenOk) status = 'failed';
     }
   }
 

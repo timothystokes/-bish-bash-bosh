@@ -1,13 +1,13 @@
 # Readiness: when the conversation is enough
 
-The Discover/Specify conversation ends only when requirements are captured at a fine grain. `hodgepodge ready --dir <sandbox>` checks this deterministically and prints `{ready, gaps}`; the harness (`src/readiness.js`) is the authority, not the agent's own claim. `podge` refuses to start until it passes.
+The Discover/Specify conversation ends when the owner answers `done` or the agent has no question left, and then only when requirements are captured at a fine grain. `hodgepodge ready --dir <sandbox>` checks this deterministically and prints `{ready, gaps}`; the harness (`src/readiness.js`) is the authority, not the agent's own claim. `podge` refuses to start until it passes.
 
 Signals checked, per spec in `specs/*.md`:
-- Structure: spec-lint is clean (titled, one decision per file, `Implementation: none|partial|implemented` present with evidence when not `none`, every spec mapped in `tests/PLAN.md`).
+- Structure: spec-lint is clean for structure (titled, one decision per file, `Implementation: none|partial|implemented` present with evidence when not `none`). The test mapping is not checked here: tests and `tests/PLAN.md` come from the plan step.
 - Granularity: at least 3 requirements.
 - Testable: every requirement contains "must" (or "must not").
 - Atomic: no requirement contains more than one "must"; split compound ones.
-- Traceable requirements: every requirement starts with a unique ID `R-<spec file name>-<n>:` and is mapped to a test in `tests/PLAN.md`.
+- Traceable requirements: every requirement starts with a unique ID `R-<spec file name>-<n>:`.
 - Vague words: no requirement (outside code spans) uses a vague word (fast, quick, secure, robust, user-friendly, easy, simple, scalable, efficient, reliable, etc.); state a measurable threshold or a concrete behaviour instead.
 - Measurable non-functionals: a requirement about latency, throughput, performance, memory, availability, capacity, rate limits, concurrency, timeouts or encryption must contain a number (with its unit).
 - Dimensions: each spec has a `## Dimensions` section with one bullet per interview dimension (Actors and goals, Behaviour, Inputs and outputs, Failure paths, Edge cases, Interfaces and data, Non-functional, Constraints, Acceptance, Out of scope), each `- <dimension>: covered` or `- <dimension>: n/a: <reason>`; a missing, unknown, duplicate or reason-less entry is a gap.
@@ -16,7 +16,6 @@ Signals checked, per spec in `specs/*.md`:
 - Formats: every `## Formats` bullet (`- <format>: <path>`) names a known format whose artifact exists inside the repo, validates, and is referenced by a requirement; artifacts agree across specs (e.g. no duplicate JSON Schema `$id`, no unresolved `$ref`, no repeated OpenAPI/AsyncAPI operation id, every Gherkin scenario tagged with a requirement ID `@R-<spec>-<n>` and no scenario name reused; every EBNF grammar parses and its `/* accept: "..." */` / `/* reject: "..." */` examples behave as declared; known formats: `json-schema`, `openapi`, `asyncapi`, `gherkin`, `ebnf`); a declared `-> <output path>` that exists conforms to its schema (also a loop gate).
 - Boundaries: Out of scope has at least one bullet.
 - Complete: no TBD, TODO, FIXME, `??` or `<angle>` placeholders outside code spans.
-- Tests exist: every test file named in `tests/PLAN.md` exists.
 
 Signals checked across the objective:
 - `objective/OPEN-QUESTIONS.md` has no unchecked `- [ ]` items.

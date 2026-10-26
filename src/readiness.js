@@ -2,7 +2,6 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkFormats } from './formats.js';
 import { bulletsBySection, lintSpecs } from './spec-lint.js';
-import { parseTestPlan } from './test-plan-gate.js';
 
 /** Fine-grained means at least this many atomic, testable requirements per spec. */
 export const MIN_REQUIREMENTS = 3;
@@ -113,7 +112,7 @@ export function dimensionStates(bullets) {
  * @returns {{ready: boolean, gaps: string[]}}
  */
 export function checkReadiness(repoDir) {
-  const lint = lintSpecs(repoDir);
+  const lint = lintSpecs(repoDir, { testPlan: false });
   const gaps = [...lint.problems];
   const specsDir = join(repoDir, 'specs');
   const files = existsSync(specsDir) ? readdirSync(specsDir).filter((f) => f.endsWith('.md')).sort() : [];
@@ -144,13 +143,6 @@ export function checkReadiness(repoDir) {
   }
 
   gaps.push(...checkFormats(repoDir));
-
-  const planPath = join(repoDir, 'tests', 'PLAN.md');
-  if (existsSync(planPath)) {
-    for (const tests of parseTestPlan(readFileSync(planPath, 'utf8')).values()) {
-      for (const t of tests) if (!existsSync(join(repoDir, t))) gaps.push(`${t}: mapped test file is missing`);
-    }
-  }
 
   const oq = join(repoDir, 'objective', 'OPEN-QUESTIONS.md');
   if (existsSync(oq)) {

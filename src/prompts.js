@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** Modes named in specs/modes.md; each needs its own file in prompts/ before it can run. */
-export const MODES = ['interview', 'forward', 'reverse', 'brownfield', 'test-hardening', 'clean-room'];
+export const MODES = ['interview', 'plan', 'forward', 'reverse', 'brownfield', 'test-hardening', 'clean-room'];
 
 const promptsDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'prompts');
 

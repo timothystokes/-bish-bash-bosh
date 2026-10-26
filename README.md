@@ -23,8 +23,8 @@ hodgepodge init --dir ~/sandboxes/demo --adapter copilot --model <model-id>
 
 ```sh
 cd ~/sandboxes/demo
-hodge            # requirements and specs: asks for the objective, then interviews you until specs are ready (or `hodge --reverse` to derive them from code)
-podge            # plan and implementation: loops until plan.md is done (use ./hodge and ./podge if they are not on your PATH)
+hodge            # requirements and specs: asks for the objective, then interviews you until you answer `done` and the specs are ready (or `hodge --reverse` to derive them from code)
+podge            # plan and implementation: the first step writes the test plan, red tests and plan.md; then loops until plan.md is done (use ./hodge and ./podge if they are not on your PATH)
 podge step       # one iteration only (hodge/podge/podge step share one lock per sandbox: a second run is refused while the first lives)
 ```
 
