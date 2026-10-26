@@ -26,6 +26,7 @@ The main goal is the **Docker-based implementation** (local driver + per-run con
 - When something goes wrong, tune the prompts/specs/gates ("add a sign"); don't just retry.
 - No compatibility code: the harness is pre-release, so renames and removals are outright. No aliases, deprecation or pointer messages, no migration notes.
 - Name the claim boundary: a task is "done" only with the tested scope stated (scripted adapter, live adapter, Docker). A passing structural check is not proof of runtime behaviour.
+- Development-time only (does not change how the harness runs): after adding or changing implementation steps, do not run a full loop (hodge and podge end to end) to test. Run single steps in isolation if needed, and verify the rest by other means (unit tests, scripted adapter fixtures, structural/type checks, reading rendered prompts). State in the claim boundary that the full loop was not run. Run a full loop only if the user explicitly asks.
 - Reconcile, don't rewrite: fix code that violates a spec, or change the spec deliberately with a stated rationale. Never edit a spec to match accidental behaviour.
 - Never `git stash` (shared across sessions). To compare against a baseline, use a detached `git worktree`.
 - Docs are part of done: a change that alters commands, config, prompts, templates or behaviour updates `README.md`, the affected `specs/*.md`, CLI help and the objective kit in the same session.
