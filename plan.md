@@ -122,14 +122,14 @@ Design in `specs/formats.md`. F-1..F-11 are scheduled in Phase 6 (X-1, X-3, X-5,
 | F-1 | Stable requirement IDs in specs, `tests/PLAN.md` and test results (same work as H-22) | implement | |
 | F-2 | `## Formats` declaration parsed per spec; unknown or missing artifact is a readiness gap | implement | F-1 |
 | F-3 | Format registry in the harness: `name -> {validate(path), crossCheck(paths)}`; embedded tools only | implement | F-2 |
-| F-4 | JSON Schema format (`ajv`, `@hyperjump/json-schema`): validity, cross-file `$ref` consistency, conformance of loop output to a declared schema as a step gate | implement | F-3 |
+| F-4 | JSON Schema format (`ajv`, `@hyperjump/json-schema`): validity, cross-file `$ref` consistency, conformance of loop output to a declared schema as a step gate | done (X-8) | F-3 |
 | F-5 | OpenAPI format (`@redocly/cli`, `spectral`, `swagger-parser`) | implement | F-3 |
 | F-6 | AsyncAPI format (`@asyncapi/parser`) | implement | F-3 |
 | F-7 | Gherkin format (`@cucumber/gherkin`): examples parse, each maps to a requirement ID | implement | F-3 |
 | F-8 | EBNF format (`ebnf`): grammar parses, examples accepted or rejected as declared | implement | F-3 |
 | F-9 | JUnit/TAP result mapping to requirement IDs feeding `done.json` (H-21, H-23) | implement | F-1 |
 | F-10 | Prompts and objective kit: interview proposes formats, owner confirms; `INTERVIEW.md` and `READINESS.md` updated | implement | F-2 |
-| F-11 | Loop gate: a step whose spec declares a format is checked against it (format artifacts valid, output conforms) in addition to tests | implement | F-4 |
+| F-11 | Loop gate: a step whose spec declares a format is checked against it (format artifacts valid, output conforms) in addition to tests | done (X-8) | F-4 |
 | F-12 | Later formats: XState, fast-check property specs, TypeSpec, DBML, Pact, Quint, axe-core, SHACL, CDDL, GraphQL SDL, Protobuf | defer | F-3 |
 
 ## Integration glue (from the whole-plan review)
