@@ -24,12 +24,17 @@ The main goal is the **Docker-based implementation** (local driver + per-run con
 - Keep `plan.md` truthful: update task status and the "Next best action" at the end of every session.
 - Missing tools, packages, CLIs or dependencies are never a blocker: install them yourself (package manager, npx, pip, brew, apt, etc.) and continue; if one route fails, try another. The only valid blocker is a missing credential/secret you cannot obtain; state exactly which.
 - When something goes wrong, tune the prompts/specs/gates ("add a sign"); don't just retry.
+- No compatibility code: the harness is pre-release, so renames and removals are outright. No aliases, deprecation or pointer messages, no migration notes.
+- Name the claim boundary: a task is "done" only with the tested scope stated (scripted adapter, live adapter, Docker). A passing structural check is not proof of runtime behaviour.
+- Reconcile, don't rewrite: fix code that violates a spec, or change the spec deliberately with a stated rationale. Never edit a spec to match accidental behaviour.
+- Never `git stash` (shared across sessions). To compare against a baseline, use a detached `git worktree`.
+- Docs are part of done: a change that alters commands, config, prompts, templates or behaviour updates `README.md`, the affected `specs/*.md`, CLI help and the objective kit in the same session.
 
 ## End-of-session checklist (mandatory, every session)
 1. Update task statuses in `plan.md`.
 2. Rewrite the **">>> Next best action"** section in `plan.md`: the single most valuable next task, with a one-line "why", chosen from unblocked tasks (break down the next phase first if none remain).
 3. Append a line to the "Session log" in `plan.md`: what was done, what was learned, any new "signs" added.
-4. Update any `specs/*.md` or `AGENTS.md` rules that changed.
+4. Update any `specs/*.md`, `README.md`, CLI help, templates or `AGENTS.md` rules that changed.
 5. Evaluate if additional steps should be added to the checklist or plan, and assess which step is the next best action and mark it in `plan.md`.
 6. Commit (with the co-author trailer) and push to `main`. Do not watch or poll CI afterwards.
 

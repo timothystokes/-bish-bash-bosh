@@ -88,10 +88,10 @@ Status `implement` = decided to do; `defer` = noted, not now. Move to `todo`/`do
 | ID | Task | Status | Source |
 |---|---|---|---|
 | H-1 | Diagnosis output shape: when a step fails or gates, the agent (or a diagnosis role prompt) reports root cause, evidence, fix, test and prevention in a fixed structure, so failures become "signs" (prompt/spec/gate changes) instead of retries. Define the shape, prompt and where it is recorded (e.g. the run record); tests first | implement | monorepo-2026 `debugger` subagent |
-| H-2 | `AGENTS.md` rule: no compatibility code. The harness is pre-release, so renames and removals are outright: no aliases, deprecation or pointer messages, no migration notes | implement | overalls `repository-compatibility-lifetime` |
-| H-3 | `AGENTS.md` rule: claim boundary. A task is "done" only with the tested scope named (scripted adapter vs live adapter vs Docker); a passing structural check is not proof of runtime behaviour | implement | overalls `repository-test-claim-boundary` |
-| H-4 | `AGENTS.md` rule: reconcile, don't rewrite. Fix code that violates a spec, or change the spec deliberately with rationale; never edit a spec to match accidental behaviour | implement | overalls AGENTS.md |
-| H-5 | `AGENTS.md` sign: never `git stash` (shared across sessions); compare against a baseline with a detached `git worktree` | implement | overalls AGENTS.md |
+| H-2 | `AGENTS.md` rule: no compatibility code. The harness is pre-release, so renames and removals are outright: no aliases, deprecation or pointer messages, no migration notes | done | overalls `repository-compatibility-lifetime` |
+| H-3 | `AGENTS.md` rule: claim boundary. A task is "done" only with the tested scope named (scripted adapter vs live adapter vs Docker); a passing structural check is not proof of runtime behaviour | done | overalls `repository-test-claim-boundary` |
+| H-4 | `AGENTS.md` rule: reconcile, don't rewrite. Fix code that violates a spec, or change the spec deliberately with rationale; never edit a spec to match accidental behaviour | done | overalls AGENTS.md |
+| H-5 | `AGENTS.md` sign: never `git stash` (shared across sessions); compare against a baseline with a detached `git worktree` | done | overalls AGENTS.md |
 | H-6 | Specs carry `Implementation: none/partial/implemented` plus evidence links (code, tests); `spec-lint` checks the field | implement | overalls ADR format |
 | H-7 | Verbose/diagnostic log mode (`--verbose` / env, to stderr) for `hodge`/`podge`, with a fixed event catalog and no free-form payloads so secrets cannot leak | defer | how-to-build-a-coding-agent, overalls Events catalog |
 | H-8 | Colocated `@cc`-style code contracts with a `--check` gate | defer | overalls code-contracts |
@@ -132,6 +132,21 @@ Design in `specs/formats.md`. Embedded harness tools validate spec artifacts; de
 | F-10 | Prompts and objective kit: interview proposes formats, owner confirms; `INTERVIEW.md` and `READINESS.md` updated | implement | F-2 |
 | F-11 | Loop gate: a step whose spec declares a format is checked against it (format artifacts valid, output conforms) in addition to tests | implement | F-4 |
 | F-12 | Later formats: XState, fast-check property specs, TypeSpec, DBML, Pact, Quint, axe-core, SHACL, CDDL, GraphQL SDL, Protobuf | defer | F-3 |
+
+## Integration glue (from the whole-plan review)
+| ID | Task | Status | Depends on |
+|---|---|---|---|
+| G-1 | Consolidation pass: merge overlapping H/F items (H-6/H-21/H-22/F-1; H-1/H-11/H-15/H-23; prompt edits H-13/H-14/H-15/H-16/H-19), order them into a "Phase 6: hardening" with dependencies | implement | |
+| G-2 | Write the H-2..H-5 rules into `AGENTS.md` | done | |
+| G-3 | Docs are part of done: `AGENTS.md` rule and checklist step 4 cover `README.md`, specs, CLI help and kit docs | done | |
+| G-4 | Docs-consistency test: every command in README and specs exists in the CLI help, and every CLI command is documented | implement | |
+| G-5 | Update templates and `init` seeds (`templates/spec.md`, objective kit, `tests-PLAN.md`, toy) for requirement IDs, `Implementation:`, `## Formats`, "Out of scope" | implement | G-1 |
+| G-6 | JSON Schemas for our own artifacts: config (incl. `qa` role), run record (diagnosis, lock), `done.json`, validated with `ajv` | implement | G-1 |
+| G-7 | `hodgepodge status` / `tui` show declared formats, readiness by dimension, QA findings and done evidence | implement | G-1 |
+| G-8 | Docker image carries the embedded validators and runs them offline | implement | F-3 |
+| G-9 | One skill snippet per supported format, loaded by `hodge` when the format is declared | implement | F-3 |
+| G-10 | Single prompt revision pass (H-13, H-14, H-15, H-16, H-19) with snapshot tests | implement | G-1 |
+| G-11 | Regression end-to-end fixture (scripted-adapter `hodge` to `podge` exercising every new gate) plus a live trial (P2-10) after each stage | implement | G-1 |
 
 ## Phase 5: Cloud (AWS) — FUTURE GOAL, not the current focus
 The main goal for now is the Docker-based local implementation. Do not pick P5-* tasks as the next best action until the owner promotes this phase.
@@ -270,3 +285,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (definition of done): compared our done criteria with the ghuntley repos; `hodge` readiness is strong, `podge` done was the agent's own checkbox ticks. Added H-21..H-24 (implement H-21..H-23, defer H-24). Fixed stale launcher and command names in `specs/loop.md`.
 - Session (ghuntley assessment): reviewed `how-to-build-a-coding-agent` and `monorepo-2026` for reusable concepts; candidates recorded in the "Harness hardening" table (H-1..H-9, implement or defer). `overalls` assessed too; `ralph-to-ralph-prod` assessed (H-10..H-12). All four repos assessed. Not adopted: auto-restart watchdog (contradicts "tune, don't retry"), `--dangerously-skip-permissions` with the host's cloud credentials (we sandbox), promise-token parsing (gates and structured status do this).
 - Session (spec formats): owner decided specs may declare adopted open-standard formats (JSON Schema, OpenAPI, AsyncAPI, Gherkin, EBNF, JUnit/TAP first) validated by tools embedded in the harness, and used as loop gates where they apply. Added `specs/formats.md` and plan section F-1..F-12 (implement F-1..F-11, defer F-12). F-1 shares work with H-22. No code changes.
+- Session (integration glue): reviewed the plan as a whole; added "Integration glue" G-1..G-11. Done now: G-2 (H-2..H-5 written into `AGENTS.md`, marked done) and G-3 (docs are part of done, checklist step 4 widened). Sign: the CLI rename left stale names in specs, so docs updates are part of every item.
