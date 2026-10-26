@@ -25,13 +25,11 @@ import { checkFormatGate, declaresFormats } from './formats.js';
 const readIfExists = (p) => (existsSync(p) ? readFileSync(p, 'utf8') : '');
 
 /**
- * Fixed per-iteration context stack: loop prompt + specs index + plan.md.
+ * Specs index + plan.md, the context shared by loop and QA prompts.
  * @param {string} repoDir
- * @param {string} [mode]
- * @param {string} [steer] operator note for this iteration only
  * @returns {string}
  */
-export function buildPrompt(repoDir, mode = 'forward', steer) {
+export function buildContext(repoDir) {
   const specsDir = join(repoDir, 'specs');
   const specs = existsSync(specsDir)
     ? readdirSync(specsDir).filter((f) => f.endsWith('.md')).sort()
@@ -40,12 +38,20 @@ export function buildPrompt(repoDir, mode = 'forward', steer) {
     const title = readFileSync(join(specsDir, f), 'utf8').split('\n')[0];
     return `- specs/${f}: ${title}`;
   });
+  return ['## Specs index', index.join('\n'), '## plan.md', readIfExists(join(repoDir, 'plan.md'))].join('\n\n');
+}
+
+/**
+ * Fixed per-iteration context stack: loop prompt + specs index + plan.md.
+ * @param {string} repoDir
+ * @param {string} [mode]
+ * @param {string} [steer] operator note for this iteration only
+ * @returns {string}
+ */
+export function buildPrompt(repoDir, mode = 'forward', steer) {
   return [
     loadModePrompt(mode),
-    '## Specs index',
-    index.join('\n'),
-    '## plan.md',
-    readIfExists(join(repoDir, 'plan.md')),
+    buildContext(repoDir),
     ...(steer ? ['## Steer note', steer] : []),
   ].join('\n\n');
 }

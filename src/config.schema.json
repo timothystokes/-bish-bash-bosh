@@ -25,6 +25,7 @@
     },
     "mode": { "enum": ["interview", "forward", "reverse", "brownfield", "test-hardening", "clean-room"] },
     "requireTestPlan": { "type": "boolean" },
+    "maxQaCycles": { "type": "integer", "minimum": 1 },
     "hardenCommand": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
     "allowedPaths": {
       "type": "array",

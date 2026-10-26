@@ -31,7 +31,7 @@ export function helpText() {
     'Usage:',
     '  hodgepodge init --dir <sandbox> --adapter <id> --model <id> [--seed toy|empty|objective]',
     '  hodge  [--dir <sandbox>] [--run-id <id>] [--reverse]',
-    '  podge  [--dir <sandbox>] [--run-id <id>] [--control <control.json>]',
+    '  podge  [--dir <sandbox>] [--run-id <id>] [--control <control.json>]   (with a `qa` role in hodge.json, done also needs a clean independent QA report; findings return to the plan, up to maxQaCycles)',
     '  podge step [--dir <sandbox>] [--run-id <id>]',
     '  hodgepodge <command> ...   (the commands below)',
     '  hodge, podge and podge step hold a single-run lock (<sandbox>/.hodge.lock, PID; stale locks are cleared) and refuse to start while another live run holds the sandbox.',
@@ -54,7 +54,7 @@ export function helpText() {
     '         then fine-grained) until `hodgepodge ready` passes; a target without the objective kit gets it first; Ctrl-D or an empty answer pauses and a rerun resumes;',
     '         with --reverse it instead runs the `reverse` role to write specs/ + characterization tests from existing code (commits only if only specs/tests changed,',
     '         spec-lint passes and the test suite is green); prints JSON {status, ...}; exit 0 only when ok',
-    '  podge  planning and implementation: loops steps until the plan is done and verified (suite, types, every R-<spec>-<n> named by a passing test; writes runs/<id>/done.json) or a step fails/gates/runs out of budget (failed iterations write diagnosis.json: root cause, evidence, fix, test, prevention) (--control <file> honours control.json);',
+    '  podge  planning and implementation: loops steps until the plan is done and verified (suite, types, every R-<spec>-<n> named by a passing test; writes runs/<id>/done.json) (plus a clean independent QA report when config has a `qa` role) or a step fails/gates/runs out of budget (failed iterations write diagnosis.json: root cause, evidence, fix, test, prevention) (--control <file> honours control.json);',
     '         prints JSON {status, steps, reason?}; exit 0 only when done',
     '  podge step  run one loop iteration (the unit `podge` and the cloud driver repeat); prints JSON {sha, iteration, cost, status}',
     '         (--dir defaults to ., --run-id defaults to "default")',
@@ -544,6 +544,7 @@ export async function main(argv, deps = {}) {
       testCommand: deps.testCommand,
       identity: deps.identity,
       ...(cmd === 'podge' && parsed.control ? { controlFile: resolve(parsed.control) } : {}),
+      ...(cmd === 'podge' && config.roles['qa'] ? { qaAdapter: resolveAdapter(config, 'qa', deps.registry ?? defaultRegistry) } : {}),
       requireTestPlan: /** @type {{requireTestPlan?: boolean}} */ (config).requireTestPlan === true,
     });
     out(`${JSON.stringify(res)}\n`);

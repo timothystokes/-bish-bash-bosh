@@ -17,3 +17,8 @@ export function loadModePrompt(mode) {
   if (!existsSync(file)) throw new Error(`no prompt written for mode: ${mode}`);
   return readFileSync(file, 'utf8').trimEnd();
 }
+
+/** Prompt for the `qa` role (not a mode: it runs between build cycles, never as the loop prompt). */
+export function loadQaPrompt() {
+  return readFileSync(join(promptsDir, 'qa.md'), 'utf8').trimEnd();
+}

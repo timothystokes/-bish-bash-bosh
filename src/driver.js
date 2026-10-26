@@ -5,11 +5,13 @@ import { runStep } from './step.js';
 import { verifyDone, applyGaps, syncImplementation, requirementsOf, writeDoneReport } from './done.js';
 import { lintSpecs } from './spec-lint.js';
 import { checkReadiness, hasObjectiveKit } from './readiness.js';
+import { runQaCycle, qaCycles, DEFAULT_MAX_QA_CYCLES } from './qa.js';
 import { readControl, consumeSteer } from './control.js';
 
 /**
  * @typedef {import('./step.js').StepResult} StepResult
- * @typedef {{status: 'done' | 'over-budget' | 'failed' | 'gated' | 'stopped', steps: StepResult[], reason?: string}} LoopResult
+ * @typedef {import('./qa.js').QaResult} QaResult
+ * @typedef {{status: 'done' | 'over-budget' | 'failed' | 'gated' | 'stopped', steps: StepResult[], reason?: string, qa?: QaResult[]}} LoopResult
  */
 
 /**
@@ -27,11 +29,13 @@ export function isPlanDone(plan) {
  * Failures stop the loop (tune prompts/specs/gates; no blind retries).
  * With `controlFile`, `control.json` is read before every iteration: stop ends the loop,
  * paused waits (polling), a steer note goes into the next prompt only.
- * @param {Parameters<typeof runStep>[0] & {controlFile?: string, sleep?: (ms: number) => Promise<void>, pollMs?: number}} opts
+ * With `qaAdapter` (the `qa` role), a verified plan is done only after an independent QA cycle reports no findings; findings
+ * become plan items for the build agent and QA re-checks, up to config `maxQaCycles` (default 5).
+ * @param {Parameters<typeof runStep>[0] & {controlFile?: string, qaAdapter?: import('./adapter.js').Adapter, sleep?: (ms: number) => Promise<void>, pollMs?: number}} opts
  * @returns {Promise<LoopResult>}
  */
 export async function runLoop(opts) {
-  const { controlFile, pollMs = 1000, sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)), ...stepOpts } = opts;
+  const { controlFile, qaAdapter, pollMs = 1000, sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)), ...stepOpts } = opts;
   if (hasObjectiveKit(stepOpts.repoDir)) {
     const ready = checkReadiness(stepOpts.repoDir);
     if (!ready.ready) return { status: 'gated', steps: [], reason: `objective not ready (run \`hodgepodge ready\`): ${ready.gaps.join('; ')}` };
@@ -42,6 +46,9 @@ export async function runLoop(opts) {
   }
   /** @type {StepResult[]} */
   const steps = [];
+  /** @type {QaResult[]} */
+  const qa = [];
+  const withQa = (/** @type {LoopResult} */ r) => (qa.length > 0 ? { ...r, qa } : r);
   const startPlan = join(stepOpts.repoDir, 'plan.md');
   const startConflict = existsSync(startPlan) ? findConflict(readFileSync(startPlan, 'utf8')) : undefined;
   if (startConflict) return { status: 'gated', steps, reason: `unresolved ${startConflict}: fix the spec or tests (\`hodge\`), then resolve it in plan.md` };
@@ -61,14 +68,24 @@ export async function runLoop(opts) {
     const res = await runStep({ ...stepOpts, ...(steer ? { steer } : {}) });
     if (controlFile && steer) consumeSteer(controlFile, steer);
     steps.push(res);
-    if (res.status !== 'ok') return { status: res.status, steps, ...(res.reason ? { reason: res.reason } : {}) };
+    if (res.status !== 'ok') return withQa({ status: res.status, steps, ...(res.reason ? { reason: res.reason } : {}) });
     const planPath = join(stepOpts.repoDir, 'plan.md');
     const plan = existsSync(planPath) ? readFileSync(planPath, 'utf8') : '';
     const conflict = findConflict(plan);
     if (conflict) return { status: 'gated', steps, reason: `unresolved ${conflict}: fix the spec or tests (\`hodge\`), then resolve it in plan.md` };
     if (isPlanDone(plan)) {
       const unproven = verifyPlanDone(stepOpts, plan);
-      if (!unproven) return { status: 'done', steps };
+      if (!unproven) {
+        if (!qaAdapter) return { status: 'done', steps };
+        const max = /** @type {{maxQaCycles?: number}} */ (stepOpts.config).maxQaCycles ?? DEFAULT_MAX_QA_CYCLES;
+        if (qaCycles(stepOpts.repoDir, stepOpts.runId) >= max) {
+          return withQa({ status: 'failed', steps, reason: `qa cycle limit (${max}) reached: the last findings were not re-verified` });
+        }
+        const q = await runQaCycle({ config: stepOpts.config, repoDir: stepOpts.repoDir, runId: stepOpts.runId, adapter: qaAdapter, identity: stepOpts.identity });
+        qa.push(q);
+        if (q.status === 'clean') return withQa({ status: 'done', steps });
+        if (q.status !== 'findings') return withQa({ status: q.status, steps, reason: `qa ${q.status}: ${q.reason ?? ''}`.trim() });
+      }
     }
   }
 }
