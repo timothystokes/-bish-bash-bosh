@@ -36,7 +36,7 @@ export function initSandbox(opts) {
       reverse: { adapter: opts.adapter, model: opts.model },
     },
     budgets: { maxTokens: 5000000, maxCostUsd: 20, maxWallClockSeconds: 7200, maxIterations: 20 },
-    allowedPaths: seed === 'objective' ? ['src/', 'bin/', 'lib/'] : ['src/'],
+    allowedPaths: seed === 'objective' ? ['src/', 'bin/', 'lib/', 'package.json'] : ['src/'],
     requireTestPlan: seed !== 'empty',
   };
   const valid = validateConfig(cfg);

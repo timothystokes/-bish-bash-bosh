@@ -137,7 +137,7 @@ test('objective seed lets the build agent write bin/ and lib/ as well as src/', 
   const dir = fresh();
   assert.equal(initSandbox({ dir, ...base, seed: 'objective' }).ok, true);
   const cfg = JSON.parse(readFileSync(join(dir, 'hodge.json'), 'utf8'));
-  assert.deepEqual(cfg.allowedPaths, ['src/', 'bin/', 'lib/']);
+  assert.deepEqual(cfg.allowedPaths, ['src/', 'bin/', 'lib/', 'package.json']);
 });
 
 test('default budgets fit a live agent: one conversation round plus several steps', () => {
