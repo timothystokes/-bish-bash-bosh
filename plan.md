@@ -3,9 +3,9 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**P5-4b: live-verify that `.sync` stops the running ECS task on `StopExecution` (Phase 5 / AWS, promoted by the owner for this pick). Needs an AWS account/credentials: if none are available, state exactly which credential is missing and stop. Do NOT check for `codex`/`claude`/`OPENAI_API_KEY`: P0-5b and P0-6b are "implement later" (deferred by the owner); skip them.**
-Why: all Docker tasks are done; the only remaining `todo` items are Phase 5 (P5-4b, then P5-6 toy objective in AWS, which depends on it) and P5-4b is the smaller, earlier step.
-Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`.
+**Reconcile the stale `implement` rows in the H-/F-/G- tables (H-1, H-6, H-10, H-11, H-13..H-17, H-19, H-21..H-23, F-1..F-3, F-9, G-10): each is covered by a Phase 6 X-task already marked done. Verify each against its X-task's code/tests, mark it `done (X-n)` with the tested scope, and note anything genuinely unbuilt as a new `implement` task. Leave `defer` rows alone.**
+Why: all Docker tasks are done and P5-4b/P5-6 (AWS) are `implement later` (deferred by the owner: never pick them, never check for AWS credentials); the only remaining non-deferred items are these `implement` rows, whose statuses are out of date.
+Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`. P0-5b, P0-6b, P5-4b and P5-6 are `implement later`: skip them.
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -169,7 +169,7 @@ Ordered; each task is tests-first and updates docs/specs/templates in the same s
 Deferred and unchanged: H-7, H-8, H-9, H-12, H-18, H-20, H-24, H-27, H-28, F-12.
 
 ## Phase 5: Cloud (AWS) — FUTURE GOAL, not the current focus
-The main goal for now is the Docker-based local implementation. The owner promoted P5-4b as the next best action (see top of file); other P5-* tasks stay unpicked until promoted.
+The main goal for now is the Docker-based local implementation. P5-4b and P5-6 are `implement later` (deferred by the owner): never pick them or check for AWS credentials until the owner promotes them.
 
 | ID | Task | Status | Depends on |
 |---|---|---|---|
@@ -177,10 +177,10 @@ The main goal for now is the Docker-based local implementation. The owner promot
 | P5-2 | Execution-context rebuild from git + run records (pointers only: sha, iteration, cost, status, flags) | done | P5-1 |
 | P5-3 | CDK stack (ECR, cluster, task definition, state machine, S3 artifacts bucket, Secrets Manager refs), snapshot-tested | done | P5-1 |
 | P5-4 | Cloud kill switch: observer calls `StopExecution` (offline-tested `stopRun`) | done | P5-3 |
-| P5-4b | Live-verify `.sync` stops the running ECS task on `StopExecution` (needs AWS account) | todo | P5-4 |
+| P5-4b | Live-verify `.sync` stops the running ECS task on `StopExecution` (needs AWS account) | implement later | P5-4 |
 | P5-5 | Artifact sync to S3 + promotion review via PR (pure, injected clients) | done | P5-3 |
 | P5-5b | Real S3 client + `gh` PR opener + CLI wiring (`hodge sync`, `hodge promote`) | done | P5-5 |
-| P5-6 | Phase 5 exit: toy objective runs in AWS end to end (needs AWS account + Docker) | todo | P5-1..P5-5, P1-8b |
+| P5-6 | Phase 5 exit: toy objective runs in AWS end to end (needs AWS account + Docker) | implement later | P5-1..P5-5, P1-8b |
 
 Later phases: none yet. See `docs/PLAN.md`.
 
@@ -369,3 +369,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (blocked check, P5-4b, fifth): `aws` not on PATH, no AWS_* env vars, no ~/.aws. Blocked on AWS credentials (access key id + secret, or an SSO profile, for an account where the cloud-driver stack can be deployed). No code changes; full loop not run. Next best action unchanged. Sign: do not retry until the owner supplies AWS credentials.
 - Session (blocked check, P5-4b, sixth): `aws` not on PATH, no AWS_* env vars, no ~/.aws. Blocked on AWS credentials (access key id + secret, or an SSO profile, for an account where the cloud-driver stack can be deployed). No code changes; full loop not run. Next best action unchanged. Sign: do not retry until the owner supplies AWS credentials.
 - Session (blocked check, P5-4b, seventh): `aws` not on PATH, no AWS_* env vars, no ~/.aws. Blocked on AWS credentials (access key id + secret, or an SSO profile, for an account where the cloud-driver stack can be deployed). No code changes; nothing tested (full loop not run). Next best action unchanged. Sign: do not retry until the owner supplies AWS credentials.
+- Session (plan edit): marked P5-4b and P5-6 `implement later`; repointed Next best action to reconciling stale H-/F-/G- `implement` rows. No code changes; full loop not run.
