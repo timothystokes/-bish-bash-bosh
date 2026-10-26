@@ -8,6 +8,7 @@ import addFormats from 'ajv-formats';
 import { parse as parseYaml } from 'yaml';
 import { AstBuilder, GherkinClassicTokenMatcher, Parser as GherkinParser } from '@cucumber/gherkin';
 import { IdGenerator } from '@cucumber/messages';
+import { Grammars } from 'ebnf';
 import { bulletsBySection } from './spec-lint.js';
 
 /**
@@ -419,6 +420,45 @@ FORMATS.gherkin = {
     }
     return problems;
   },
+};
+
+const EXAMPLE_COMMENT = /\/\*\s*(accept|reject)\s*:([\s\S]*?)\*\//g;
+
+FORMATS.ebnf = {
+  validate(path) {
+    const text = readFileSync(path, 'utf8');
+    /** @type {{kind: string, input: string}[]} */
+    const examples = [];
+    const problems = [];
+    for (const m of text.matchAll(EXAMPLE_COMMENT)) {
+      try {
+        const input = JSON.parse(m[2].trim());
+        if (typeof input !== 'string') throw new Error('not a string');
+        examples.push({ kind: m[1], input });
+      } catch {
+        problems.push(`malformed example (want /* ${m[1]}: "<JSON string>" */): ${m[2].trim()}`);
+      }
+    }
+    /** @type {InstanceType<typeof Grammars.W3C.Parser>} */
+    let parser;
+    try {
+      parser = new Grammars.W3C.Parser(text);
+    } catch (e) {
+      return [...problems, `invalid EBNF: ${message(e).replace(/\s*\n\s*/g, '; ')}`];
+    }
+    if (parser.grammarRules.length === 0) return [...problems, 'invalid EBNF: no rules'];
+    if (examples.length === 0 && problems.length === 0) return ['no examples: declare /* accept: "<text>" */ and /* reject: "<text>" */ comments'];
+    if (examples.length > 0 && !examples.some((x) => x.kind === 'reject')) problems.push('needs at least one reject example');
+    if (examples.length > 0 && !examples.some((x) => x.kind === 'accept')) problems.push('needs at least one accept example');
+    for (const { kind, input } of examples) {
+      const ast = parser.getAST(input);
+      const accepted = ast !== null && ast.errors.length === 0 && ast.rest.length === 0;
+      if (kind === 'accept' && !accepted) problems.push(`example ${JSON.stringify(input)} is declared accept but the grammar rejects it`);
+      if (kind === 'reject' && accepted) problems.push(`example ${JSON.stringify(input)} is declared reject but the grammar accepts it`);
+    }
+    return problems;
+  },
+  crossCheck: () => [],
 };
 
 /**
