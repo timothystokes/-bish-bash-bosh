@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**X-13 (G-11): regression end-to-end fixture (scripted-adapter `hodge` to `podge`) exercising every new gate.**
-Why: X-12 is complete, so X-13 is unblocked and is the last Phase 6 integration task. Test first. Scripted adapter only; the live trial stays owner-gated.
+**X-11 (H-17): adapter smoke prompt (fizzbuzz) for live checks.**
+Why: X-13 is done, so X-11 is the only unblocked `todo` left in Phase 6 and has no dependencies. Test first; scripted adapter only, live use stays owner-run.
 Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`.
 
 ## Phase 0: Foundations
@@ -145,7 +145,7 @@ Design in `specs/formats.md`. F-1..F-11 are scheduled in Phase 6 (X-1, X-3, X-5,
 | G-8 | Docker image carries the embedded validators and runs them offline | done (X-12; structural: validator imports are runtime deps, image does `npm ci --omit=dev`, no network use in `src/formats.js`; image not rebuilt/run) | F-3 |
 | G-9 | One skill snippet per supported format, loaded by `hodge` when the format is declared | done (X-12; scripted, unit level: interview prompt only; `prompts/formats/`, `test/format-skills.test.js`) | F-3 |
 | G-10 | Single prompt revision pass (H-13, H-14, H-15, H-16, H-19) with snapshot tests | implement | G-1 |
-| G-11 | Regression end-to-end fixture (scripted-adapter `hodge` to `podge` exercising every new gate) plus a live trial (P2-10) after each stage | implement | G-1 |
+| G-11 | Regression end-to-end fixture (scripted-adapter `hodge` to `podge` exercising every new gate) plus a live trial (P2-10) after each stage | done (X-13; scripted `podge` only; live trial is owner-run) | G-1 |
 
 ## Phase 6: hardening (consolidated from H-*, F-*, G-*)
 Ordered; each task is tests-first and updates docs/specs/templates in the same session. Merges: H-6+H-22+F-1 (X-1); H-21+H-23+F-9 (X-5); H-1 shape shared by H-11/H-15 (X-6, X-7); prompt edits H-13/H-14/H-15/H-16/H-19 (X-10, one pass).
@@ -163,7 +163,7 @@ Ordered; each task is tests-first and updates docs/specs/templates in the same s
 | X-10 | Single prompt revision pass with snapshot tests: scoped red step, "Out of scope" in spec template and interview, anti-gaming lines, test-hardening baseline and surviving-mutant diagnosis in a throwaway worktree | H-13, H-14, H-16, H-19, G-10 | done (scripted, unit level; snapshot + content tests; no live adapter/Docker; full loop not run) | X-1, X-7 |
 | X-11 | Adapter smoke prompt (fizzbuzz) for live checks | H-17 | todo | |
 | X-12 | Integration: templates/seeds for new fields (G-5), JSON Schemas for our artifacts via `ajv` (G-6), `status`/`tui` surfacing (G-7), validators in the Docker image (G-8), per-format skill snippets (G-9), docs-consistency test (G-4) | G-4..G-9 | done (G-4..G-9; scripted, unit level) | X-1..X-9 |
-| X-13 | Regression end-to-end fixture exercising every new gate (scripted adapter) plus live trial after each stage | G-11 | todo | X-12 |
+| X-13 | Regression end-to-end fixture exercising every new gate (scripted adapter) plus live trial after each stage | G-11 | done (scripted adapter, `podge` via CLI, `test/e2e-phase6.test.js`; no Docker, no live adapter; full `hodge` to `podge` loop not run) | X-12 |
 | X-14 | Reconcile the `podge` test gate with red-first interview tests: planning-only step skips the tests gate, later steps gate on no regressions, objective seed `package.json` gets a `test` script | P2-10 | done (scripted, unit level; live re-trial #2 on `p214b`: `hodge` then `podge` reached `done`, 11/11 target tests green) | |
 
 Deferred and unchanged: H-7, H-8, H-9, H-12, H-18, H-20, H-24, H-27, H-28, F-12.
@@ -332,3 +332,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - X-12 third slice done (G-7; scripted, unit level, local status source only; cloud source not done; full loop not run): new `src/run-details.js` (`readRunDetails`: declared formats per spec, per-dimension state covered/n/a/gap/missing via new `dimensionStates` in `src/readiness.js`, QA cycles and findings from `qa-N/`, `done.json` evidence; unreadable files ignored). `StatusSource.details` feeds `status` JSON (`details`) and `renderFrame` (`renderDetails`). `test/run-details.test.js` (red first; 534 pass, check clean). README, `specs/control-and-safety.md` and CLI help updated. Sign: new surfaces read artifacts through one read-only module, never re-derive them in the renderer. Next: G-9.
 - X-12 fourth slice done (G-9; scripted, unit level, interview prompt only; Docker not rebuilt; full loop not run): `prompts/formats/{json-schema,openapi,asyncapi,gherkin,ebnf}.md`, `loadFormatSkill` in `src/prompts.js`, `buildInterviewPrompt` appends `## Format skill: <format>` per declared known format. `test/format-skills.test.js` (red first; 537 pass, check clean). `specs/formats.md` and README updated. Sign: a new format needs its snippet or the G-9 test fails. Next: G-5.
 - X-12 fifth slice done (G-5; scripted, unit level; full loop not run): audited `templates/spec.md`, `tests-PLAN.md`, objective kit and toy seed. Toy tests now carry `R-add-N` in test names (the done gate needs this) and `PHASES.md` names every spec section; `test/templates.test.js` gained 3 tests (red first; 540 pass, check clean). X-12 complete. Sign: seeds must satisfy the same gates they teach, so lint and name-check them in tests. Next: X-13.
+- X-13 done (scripted adapter, `podge` via CLI; no Docker/live adapter; `hodge` interview and full loop not run): new `test/e2e-phase6.test.js` (5 tests, 541 total pass, check clean): spec-lint refusal before any agent call, formats gate on a non-conforming declared output (failed step, `diagnosis.json`, change discarded), harness-derived done disproving a ticked plan (unproven requirement, `done.json` ok:false, QA never runs), full path to done through a QA findings-then-clean cycle (done.json per requirement, `Implementation: implemented`, `qa-N/` artifacts, `readRunDetails`), and the run lock refusing a second run. Learned: a failing gate yields step status `failed` (not `gated`; that is for pre-checks), and the diagnosis lives in `diagnosis.json`, not `record.json`. Sign: assert on the artifacts the harness writes, not on the agent's claims. Next: X-11.
