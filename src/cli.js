@@ -125,6 +125,7 @@ function repoFor(repo, dir) {
  *   stderr?: (s: string) => void,
  *   exec?: import('./cloud-clients.js').Run,
  *   docker?: import('./kill-switch.js').DockerRunner,
+ *   program?: 'hodgepodge',
  * }} CliDeps
  */
 
@@ -162,7 +163,7 @@ export async function main(argv, deps = {}) {
     return 0;
   }
   // `podge step` is the only way to run a single iteration; there is no top-level `step`.
-  const viaPodge = argv[0] === 'podge' && argv[1] === 'step';
+  const viaPodge = deps.program !== 'hodgepodge' && argv[0] === 'podge' && argv[1] === 'step';
   if (viaPodge) argv = ['step', ...argv.slice(2)];
   const cmd = argv[0];
   if (cmd === 'spec-lint') {
@@ -415,7 +416,8 @@ export async function main(argv, deps = {}) {
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
   }
-  if (!['podge', 'hodge', 'status', 'tui'].includes(cmd) && !(cmd === 'step' && viaPodge)) {
+  const phase = deps.program !== 'hodgepodge' && (cmd === 'hodge' || cmd === 'podge');
+  if (!['status', 'tui'].includes(cmd) && !phase && !(cmd === 'step' && viaPodge)) {
     err(`hodgepodge: unknown command '${argv[0]}'\n\n${helpText()}`);
     return 2;
   }

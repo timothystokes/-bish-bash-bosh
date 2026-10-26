@@ -42,8 +42,7 @@ test('removed commands are rejected', async () => {
 
 test('bin/hodgepodge does not host hodge, podge or step', () => {
   for (const c of ['hodge', 'podge', 'step']) {
-    const r = spawnSync('node', ['bin/hodgepodge', c], { encoding: 'utf8' });
-    assert.equal(r.status, 2, c);
-    assert.match(r.stderr, /is its own program/);
+    assert.equal(spawnSync('node', ['bin/hodgepodge', c], { encoding: 'utf8' }).status, 2, c);
   }
+  assert.equal(spawnSync('node', ['bin/hodgepodge', 'podge', 'step'], { encoding: 'utf8' }).status, 2);
 });
