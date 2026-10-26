@@ -35,6 +35,8 @@ podge step       # one iteration only (hodge/podge/podge step share one lock per
 
 Use `--seed empty` to start from an empty target. Run `npx hodgepodge --help` for every command.
 
+Specs may declare machine-checked formats in a `## Formats` section (`- <format>: <path>`), checked by `hodgepodge ready` and the loop's `formats` gate. Known formats: `asyncapi`, `ebnf`, `gherkin`, `json-schema`, `openapi`.
+
 ## Configuration
 
 `hodge.json` is validated against `src/config.schema.json`. The key parts:

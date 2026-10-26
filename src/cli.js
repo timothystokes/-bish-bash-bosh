@@ -48,6 +48,8 @@ export function helpText() {
     '  hodgepodge kill --container <name> [--control <control.json>] [--grace <sec>]',
     '  hodgepodge control --file <control.json> pause|resume|stop|steer <note...>',
     '',
+    'Spec formats: a spec may declare `## Formats` bullets, checked by `ready` and the loop. Known formats: `asyncapi`, `ebnf`, `gherkin`, `json-schema`, `openapi`.',
+    '',
     'Commands:',
     '  init   scaffold a sandbox: <dir>/target (git repo seeded from templates) + <dir>/hodge.json (outside the repo; holds the target repo and a reference back to hodgepodge) + <dir>/hodgepodge, <dir>/hodge and <dir>/podge launchers; refuses dirs inside hodgepodge\n         or non-empty dirs; seed toy (default: spec, red tests, open plan), empty, or objective (objective/ kit: phases, interview protocol, readiness signals, brief and open questions to be filled by `hodge`); every seed configures build, interview and reverse roles; prints JSON {ok, dir, repo, config, hodgepodge}; exit 0 only when ok',
     '  hodge  requirements gathering and spec definition: asks for a description of the objective (not a flag), then alternates agent rounds with your answers (broad first,',
