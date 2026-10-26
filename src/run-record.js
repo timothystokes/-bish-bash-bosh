@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { validateDiagnosis } from './diagnosis.js';
 
 /**
  * @typedef {{name: string, ok: boolean, detail?: string}} GateResult
@@ -12,6 +13,7 @@ import { join } from 'node:path';
  *   transcript: string,
  *   diff: string,
  *   test: unknown,
+ *   diagnosis?: import('./diagnosis.js').Diagnosis,
  * }} RunRecord
  */
 
@@ -48,6 +50,7 @@ export function validateRunRecord(r) {
     if (typeof o[k] !== 'string') errors.push(`${k} must be a string`);
   }
   if (!('test' in o)) errors.push('test is required');
+  if (o.diagnosis !== undefined) errors.push(...validateDiagnosis(o.diagnosis).errors);
   return { ok: errors.length === 0, errors };
 }
 
@@ -92,6 +95,7 @@ export function writeIterationRecord(repoDir, runId, iteration, record) {
     writeFileSync(join(tmp, 'diff'), record.diff);
     writeFileSync(join(tmp, 'test.json'), JSON.stringify(record.test, null, 2));
     writeFileSync(join(tmp, 'usage.json'), JSON.stringify(record.usage, null, 2));
+    if (record.diagnosis) writeFileSync(join(tmp, 'diagnosis.json'), JSON.stringify(record.diagnosis, null, 2));
     const meta = { iteration, status: record.status, changedFiles: record.changedFiles, gates: record.gates };
     writeFileSync(join(tmp, 'record.json'), JSON.stringify(meta, null, 2));
     renameSync(tmp, dir);

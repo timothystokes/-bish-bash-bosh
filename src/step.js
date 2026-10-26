@@ -7,6 +7,7 @@ import { checkBudgetGate } from './budget-gate.js';
 import { checkTestPlanGate } from './test-plan-gate.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { writeIterationRecord } from './run-record.js';
+import { diagnose } from './diagnosis.js';
 import { loadModePrompt } from './prompts.js';
 import { checkBrownfieldGate } from './brownfield-gate.js';
 import { checkHardeningGate } from './hardening-gate.js';
@@ -179,18 +180,24 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     git(repoDir, 'clean', '-fdq');
   }
 
+  const finalGates = status === 'ok' || gates.length > preGates ? gates : [...gates, { name: 'tests', ok: false, detail: status }];
+  const diagnosis = diagnose({ status, gates: finalGates, transcript: result.transcript });
   writeIterationRecord(repoDir, runId, iteration, {
     status,
     usage: { ...result.usage, seconds },
     changedFiles: result.changedFiles,
-    gates: status === 'ok' || gates.length > preGates ? gates : [...gates, { name: 'tests', ok: false, detail: status }],
+    gates: finalGates,
     prompt,
     transcript: result.transcript,
     diff,
     test,
+    ...(diagnosis ? { diagnosis } : {}),
   });
   git(repoDir, 'add', '-A');
   git(repoDir, 'commit', '-q', '--allow-empty', '-m', `podge step ${runId}/${String(iteration).padStart(3, '0')}: ${status}`);
 
-  return { sha: git(repoDir, 'rev-parse', 'HEAD').trim(), iteration, cost: result.usage.cost, status };
+  return {
+    sha: git(repoDir, 'rev-parse', 'HEAD').trim(), iteration, cost: result.usage.cost, status,
+    ...(diagnosis ? { reason: diagnosis.rootCause } : {}),
+  };
 }
