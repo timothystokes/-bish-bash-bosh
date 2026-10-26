@@ -132,20 +132,20 @@ test('gates: dirty tree and harness repo make no agent call', async () => {
   assert.equal(a.prompts.length, 0);
 });
 
-test('hodge reverse uses the reverse role; usage errors exit 2', async () => {
+test('hodge --reverse uses the reverse role; usage errors exit 2', async () => {
   const dir = makeRepo();
   const cfgPath = join(tmpdir(), `hodge-rev-cfg-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(config({ reverse: { adapter: 'rv', model: 'm' } })));
   const out = /** @type {string[]} */ ([]);
   const registry = { rv: () => agent(goodWrites).adapter, f: () => { throw new Error('build role must not be used'); } };
-  const code = await main(['reverse', '--dir', sandboxOf(cfgPath, dir)], {
+  const code = await main(['hodge', '--reverse', '--dir', sandboxOf(cfgPath, dir)], {
     registry, identity, testCommand: pass, stdout: (s) => { out.push(s); }, stderr: () => {},
   });
   assert.equal(code, 0);
   assert.equal(JSON.parse(out.join('')).status, 'ok');
 
   const dir2 = makeRepo();
-  const bad = await main(['reverse', '--dir', sandboxOf(cfgPath, dir2)], {
+  const bad = await main(['hodge', '--reverse', '--dir', sandboxOf(cfgPath, dir2)], {
     registry, identity, testCommand: fail, stdout: () => {}, stderr: () => {},
   });
   assert.equal(bad, 1);
@@ -153,6 +153,6 @@ test('hodge reverse uses the reverse role; usage errors exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
   const noRole = join(tmpdir(), `hodge-rev-norole-${Date.now()}.json`);
   writeFileSync(noRole, JSON.stringify(config({})));
-  assert.equal(await main(['reverse', '--dir', sandboxOf(noRole)], { registry, stdout: () => {}, stderr: (s) => { err.push(s); } }), 2);
+  assert.equal(await main(['hodge', '--reverse', '--dir', sandboxOf(noRole)], { registry, stdout: () => {}, stderr: (s) => { err.push(s); } }), 2);
   assert.match(err.join(''), /no role 'reverse'/);
 });

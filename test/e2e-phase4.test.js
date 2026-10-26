@@ -72,7 +72,7 @@ test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite pas
     },
   };
   const srcCfg = writeConfig({ roles: { build: { adapter: 'reverser', model: 'm' }, reverse: { adapter: 'reverser', model: 'm' } } });
-  const rev = await hodge(['reverse', '--dir', sandboxOf(srcCfg, source), '--run-id', 'p4r'], { reverser: scripted(reverseFixture) });
+  const rev = await hodge(['hodge', '--reverse', '--dir', sandboxOf(srcCfg, source), '--run-id', 'p4r'], { reverser: scripted(reverseFixture) });
   assert.equal(rev.res.status, 'ok', JSON.stringify(rev.res));
   assert.equal(rev.code, 0);
   assert.equal(git(source, 'status', '--porcelain'), '');
@@ -95,7 +95,7 @@ test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite pas
     writes: { 'plan.md': '- [x] implement greet\n', 'package.json': pkg, 'src/greet.js': 'export const greet = (name) => "hello " + name;\n' },
   };
   const bCfg = writeConfig({ mode: 'clean-room', roles: { build: { adapter: 'builder', model: 'm' } } });
-  const run = await hodge(['run', '--dir', sandboxOf(bCfg, builder), '--run-id', 'p4b'], { builder: scripted(buildFixture) });
+  const run = await hodge(['podge', '--dir', sandboxOf(bCfg, builder), '--run-id', 'p4b'], { builder: scripted(buildFixture) });
   assert.equal(run.res.status, 'done', JSON.stringify(run.res));
   assert.equal(run.code, 0);
 

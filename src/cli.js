@@ -23,54 +23,51 @@ import { createAwsCliS3Client, createGhPrOpener, defaultRun } from './cloud-clie
 /** @returns {string} */
 export function helpText() {
   return [
-    'hodge: model-agnostic harness for loop-engineered delivery',
+    'hodgepodge: model-agnostic harness for loop-engineered delivery',
+    '',
+    'Three programs, one flow: `hodgepodge init`, then `hodge` (requirements and specs), then `podge` (plan and implementation).',
     '',
     'Usage:',
-    '  hodge [--help]',
-    '  Sandbox commands take --dir <sandbox> (default: the current directory). `hodge init` writes <sandbox>/hodge.json holding the target repo,',
-    '  roles, budgets and the path back to hodgepodge, so after `cd <sandbox>` just run `hodge run`, `hodge step`, `hodge interview`, ... (or ./hodge).',
-    '  hodge step [--dir <sandbox>] [--run-id <id>]',
-    '  hodge run  [--dir <sandbox>] [--run-id <id>] [--control <control.json>]',
-    '  hodge objective [--dir <sandbox>] [--run-id <id>]',
-    '  hodge interview [--dir <sandbox>] [--run-id <id>]',
-    '  hodge reverse [--dir <sandbox>] [--run-id <id>]',
-    '  hodge clean-room --source <dir> --repo <builder-dir>',
-    '  hodge status [--dir <sandbox>] [--run-id <id>] [--control <control.json>]',
-    '  hodge tui --control <control.json> [--dir <sandbox>] [--run-id <id>]',
-    '  hodge proxy --upstream <url> [--audit <file>] [--meter <file>] [--port <n>]',
-    '  hodge sync --bucket <name> --run-id <id> [--repo <dir> | --dir <sandbox>]',
-    '  hodge promote --run-id <id> --head <branch> --base <branch> --bucket <name> [--sha <sha>] [--repo <dir> | --dir <sandbox>]',
-    '  hodge init --dir <sandbox> --adapter <id> --model <id> [--seed toy|empty|objective]',
-    '  hodge spec-lint [--repo <dir> | --dir <sandbox>]',
-    '  hodge ready [--repo <dir> | --dir <sandbox>]',
-    '  hodge kill --container <name> [--control <control.json>] [--grace <sec>]',
-    '  hodge control --file <control.json> pause|resume|stop|steer <note...>',
+    '  hodgepodge init --dir <sandbox> --adapter <id> --model <id> [--seed toy|empty|objective]',
+    '  hodge  [--dir <sandbox>] [--run-id <id>] [--reverse]',
+    '  podge  [--dir <sandbox>] [--run-id <id>] [--control <control.json>]',
+    '  hodgepodge <command> ...   (every command below; `hodge` and `podge` are also commands of `hodgepodge`)',
+    '  Sandbox commands take --dir <sandbox> (default: the current directory). `hodgepodge init` writes <sandbox>/hodge.json holding the target repo,',
+    '  roles, budgets and the path back to hodgepodge, plus hodgepodge/hodge/podge launchers, so after `cd <sandbox>` just run `./hodge` then `./podge`.',
+    '  hodgepodge step [--dir <sandbox>] [--run-id <id>]',
+    '  hodgepodge clean-room --source <dir> --repo <builder-dir>',
+    '  hodgepodge status [--dir <sandbox>] [--run-id <id>] [--control <control.json>]',
+    '  hodgepodge tui --control <control.json> [--dir <sandbox>] [--run-id <id>]',
+    '  hodgepodge proxy --upstream <url> [--audit <file>] [--meter <file>] [--port <n>]',
+    '  hodgepodge sync --bucket <name> --run-id <id> [--repo <dir> | --dir <sandbox>]',
+    '  hodgepodge promote --run-id <id> --head <branch> --base <branch> --bucket <name> [--sha <sha>] [--repo <dir> | --dir <sandbox>]',
+    '  hodgepodge spec-lint [--repo <dir> | --dir <sandbox>]',
+    '  hodgepodge ready [--repo <dir> | --dir <sandbox>]',
+    '  hodgepodge kill --container <name> [--control <control.json>] [--grace <sec>]',
+    '  hodgepodge control --file <control.json> pause|resume|stop|steer <note...>',
     '',
     'Commands:',
-    '  step   run one loop iteration; prints JSON {sha, iteration, cost, status}',
-    '         (--dir defaults to ., --run-id defaults to "default")',
-    '  run    loop steps until the plan is done or a step fails/gates/runs out of budget (--control <file> honours control.json);',
+    '  init   scaffold a sandbox: <dir>/target (git repo seeded from templates) + <dir>/hodge.json (outside the repo; holds the target repo and a reference back to hodgepodge) + <dir>/hodgepodge, <dir>/hodge and <dir>/podge launchers; refuses dirs inside hodgepodge\n         or non-empty dirs; seed toy (default: spec, red tests, open plan), empty, or objective (objective/ kit: phases, interview protocol, readiness signals, brief and open questions to be filled by `hodge`); every seed configures build, interview and reverse roles; prints JSON {ok, dir, repo, config, hodgepodge}; exit 0 only when ok',
+    '  hodge  requirements gathering and spec definition: asks for a description of the objective (not a flag), then alternates agent rounds with your answers (broad first,',
+    '         then fine-grained) until `hodgepodge ready` passes; a target without the objective kit gets it first; Ctrl-D or an empty answer pauses and a rerun resumes;',
+    '         with --reverse it instead runs the `reverse` role to write specs/ + characterization tests from existing code (commits only if only specs/tests changed,',
+    '         spec-lint passes and the test suite is green); prints JSON {status, ...}; exit 0 only when ok',
+    '  podge  planning and implementation: loops steps until the plan is done or a step fails/gates/runs out of budget (--control <file> honours control.json);',
     '         prints JSON {status, steps, reason?}; exit 0 only when done',
-    '  objective  requirements gathering: asks for a description of the objective, then alternates agent rounds with your answers (broad first,',
-    '         then fine-grained) until `hodge ready` passes; needs a sandbox from `hodge init --seed objective`; Ctrl-D or an empty answer pauses and a',
-    '         rerun resumes; prints JSON {status, rounds, reason?}; exit 0 only when ready',
-    '  interview  asks for the objective (it is not a flag), then runs the `interview` role to write specs/*.md + tests/PLAN.md; commits only if spec-lint passes;',
-    '         with an objective kit it is the same conversation as `hodge objective` (rounds until `hodge ready`); prints JSON {status, ...}; exit 0 only when ok',
-    '  reverse  run the `reverse` role to write specs/ + characterization tests from existing code; commits only if only specs/tests changed,',
-    '         spec-lint passes and the test suite is green; prints JSON {status, sha, reason?}; exit 0 only when ok',
-    '  init   scaffold a sandbox: <dir>/target (git repo seeded from templates) + <dir>/hodge.json (outside the repo; holds the target repo and a reference back to hodgepodge) + <dir>/hodge launcher; refuses dirs inside hodgepodge\n         or non-empty dirs; seed toy (default: spec, red tests, open plan), empty, or objective (objective/ kit: phases, interview protocol, readiness signals, brief and open questions to be filled by `hodge objective`); every seed configures build, interview and reverse roles; prints JSON {ok, dir, repo, config, hodgepodge}; exit 0 only when ok',
+    '  step   run one loop iteration (the unit `podge` and the cloud driver repeat); prints JSON {sha, iteration, cost, status}',
+    '         (--dir defaults to ., --run-id defaults to "default")',
     '  clean-room  export only specs/ + tests/ from --source into a fresh git repo at --repo (the builder never sees source); prints JSON {ok, sha, files};',
-    '         exit 0 only when ok. Then run `hodge run` there with config mode clean-room (firewall gate checks the bundle first)',
+    '         exit 0 only when ok. Then run `podge` there with config mode clean-room (firewall gate checks the bundle first)',
     '  status  print JSON run status: iterations, tokens, cost, seconds vs budgets (and control state with --control)',
     '  tui    live terminal view: log tail, cost meter vs budget; keys p pause, r resume, s steer, x stop (confirmed), q quit',
     '  proxy  secret-redacting, usage-metering proxy in front of a model endpoint; prints JSON {port} then serves until SIGINT/SIGTERM',
-    '  ready  check the specs are captured at a fine grain (granularity, testable/atomic requirements, examples, negative paths, no placeholders,\n         no open questions); prints JSON {ready, gaps}; exit 0 only when ready. `hodge run` is gated by it when the target has an objective kit',
+    '  ready  check the specs are captured at a fine grain (granularity, testable/atomic requirements, examples, negative paths, no placeholders,\n         no open questions); prints JSON {ready, gaps}; exit 0 only when ready. `podge` is gated by it when the target has an objective kit',
     '  spec-lint  check specs/*.md structure and tests/PLAN.md mapping; prints JSON {ok, problems};',
     '         exit 0 only when clean',
     '  sync   copy runs/<id>/** to S3 (idempotent, needs the `aws` CLI); prints JSON {uploaded, skipped}',
     '  promote  open a promotion-review PR from --head to --base with the commit and artifacts URI (needs `gh`); never merges; prints JSON {url}',
     '  kill   stop the run container: sets stop in --control first (so no new iteration starts), then `docker stop`; prints JSON {stopped, name};\n         exit 0 when stopped or already gone, 1 on docker failure',
-    '  control  write pause/resume/stop/steer to a control file read by `hodge run --control`; prints JSON {ok}',
+    '  control  write pause/resume/stop/steer to a control file read by `podge --control`; prints JSON {ok}',
     '',
   ].join('\n');
 }
@@ -172,11 +169,11 @@ export async function main(argv, deps = {}) {
     for (let i = 0; i < rest.length; i += 2) {
       const val = rest[i + 1];
       if (!['--repo', '--dir'].includes(rest[i])) {
-        err(`hodge spec-lint: unknown argument '${rest[i]}'\n`);
+        err(`hodgepodge spec-lint: unknown argument '${rest[i]}'\n`);
         return 2;
       }
       if (val === undefined || val.startsWith('--')) {
-        err(`hodge spec-lint: ${rest[i]} requires a value\n`);
+        err(`hodgepodge spec-lint: ${rest[i]} requires a value\n`);
         return 2;
       }
       v[rest[i]] = val;
@@ -192,11 +189,11 @@ export async function main(argv, deps = {}) {
     for (let i = 0; i < rest.length; i += 2) {
       const val = rest[i + 1];
       if (!['--repo', '--dir'].includes(rest[i])) {
-        err(`hodge ready: unknown argument '${rest[i]}'\n`);
+        err(`hodgepodge ready: unknown argument '${rest[i]}'\n`);
         return 2;
       }
       if (val === undefined || val.startsWith('--')) {
-        err(`hodge ready: ${rest[i]} requires a value\n`);
+        err(`hodgepodge ready: ${rest[i]} requires a value\n`);
         return 2;
       }
       v[rest[i]] = val;
@@ -214,18 +211,18 @@ export async function main(argv, deps = {}) {
     for (let i = 0; i < rest.length; i += 2) {
       const val = rest[i + 1];
       if (!allowed.includes(rest[i])) {
-        err(`hodge ${cmd}: unknown argument '${rest[i]}'\n`);
+        err(`hodgepodge ${cmd}: unknown argument '${rest[i]}'\n`);
         return 2;
       }
       if (val === undefined || val.startsWith('--')) {
-        err(`hodge ${cmd}: ${rest[i]} requires a value\n`);
+        err(`hodgepodge ${cmd}: ${rest[i]} requires a value\n`);
         return 2;
       }
       v[rest[i]] = val;
     }
     const missing = required.filter((f) => !v[f]);
     if (missing.length > 0) {
-      err(`hodge ${cmd}: ${missing.join(', ')} required\n`);
+      err(`hodgepodge ${cmd}: ${missing.join(', ')} required\n`);
       return 2;
     }
     const run = deps.exec ?? defaultRun;
@@ -253,7 +250,7 @@ export async function main(argv, deps = {}) {
       out(`${JSON.stringify(res)}\n`);
       return 0;
     } catch (e) {
-      err(`hodge ${cmd}: ${/** @type {Error} */ (e).message}\n`);
+      err(`hodgepodge ${cmd}: ${/** @type {Error} */ (e).message}\n`);
       return 2;
     }
   }
@@ -264,17 +261,17 @@ export async function main(argv, deps = {}) {
     for (let i = 0; i < rest.length; i += 2) {
       const val = rest[i + 1];
       if (!['--dir', '--adapter', '--model', '--seed'].includes(rest[i])) {
-        err(`hodge init: unknown argument '${rest[i]}'\n`);
+        err(`hodgepodge init: unknown argument '${rest[i]}'\n`);
         return 2;
       }
       if (val === undefined || val.startsWith('--')) {
-        err(`hodge init: ${rest[i]} requires a value\n`);
+        err(`hodgepodge init: ${rest[i]} requires a value\n`);
         return 2;
       }
       v[rest[i]] = val;
     }
     if (!v['--dir'] || !v['--adapter'] || !v['--model']) {
-      err('hodge init: --dir, --adapter and --model are required\n');
+      err('hodgepodge init: --dir, --adapter and --model are required\n');
       return 2;
     }
     const res = initSandbox({ dir: v['--dir'], adapter: v['--adapter'], model: v['--model'], seed: v['--seed'] });
@@ -288,17 +285,17 @@ export async function main(argv, deps = {}) {
     for (let i = 0; i < rest.length; i += 2) {
       const val = rest[i + 1];
       if (!['--source', '--repo'].includes(rest[i])) {
-        err(`hodge clean-room: unknown argument '${rest[i]}'\n`);
+        err(`hodgepodge clean-room: unknown argument '${rest[i]}'\n`);
         return 2;
       }
       if (val === undefined || val.startsWith('--')) {
-        err(`hodge clean-room: ${rest[i]} requires a value\n`);
+        err(`hodgepodge clean-room: ${rest[i]} requires a value\n`);
         return 2;
       }
       v[rest[i]] = val;
     }
     if (!v['--source'] || !v['--repo']) {
-      err('hodge clean-room: --source and --repo are required\n');
+      err('hodgepodge clean-room: --source and --repo are required\n');
       return 2;
     }
     const res = exportBundle({ sourceDir: v['--source'], builderDir: v['--repo'] });
@@ -312,26 +309,26 @@ export async function main(argv, deps = {}) {
     for (let i = 0; i < rest.length; i += 2) {
       const val = rest[i + 1];
       if (!['--upstream', '--audit', '--meter', '--port'].includes(rest[i])) {
-        err(`hodge proxy: unknown argument '${rest[i]}'\n`);
+        err(`hodgepodge proxy: unknown argument '${rest[i]}'\n`);
         return 2;
       }
       if (val === undefined || val.startsWith('--')) {
-        err(`hodge proxy: ${rest[i]} requires a value\n`);
+        err(`hodgepodge proxy: ${rest[i]} requires a value\n`);
         return 2;
       }
       v[rest[i]] = val;
     }
     if (!v['--upstream']) {
-      err('hodge proxy: --upstream <url> is required\n');
+      err('hodgepodge proxy: --upstream <url> is required\n');
       return 2;
     }
     if (!URL.canParse(v['--upstream'])) {
-      err(`hodge proxy: invalid --upstream '${v['--upstream']}'\n`);
+      err(`hodgepodge proxy: invalid --upstream '${v['--upstream']}'\n`);
       return 2;
     }
     const port = v['--port'] === undefined ? 0 : Number(v['--port']);
     if (!Number.isInteger(port) || port < 0 || port > 65535) {
-      err(`hodge proxy: invalid --port '${v['--port']}'\n`);
+      err(`hodgepodge proxy: invalid --port '${v['--port']}'\n`);
       return 2;
     }
     const proxy = createSecretProxy({
@@ -350,7 +347,7 @@ export async function main(argv, deps = {}) {
     try {
       out(`${JSON.stringify({ port: await proxy.listen(port) })}\n`);
     } catch (e) {
-      err(`hodge proxy: ${/** @type {Error} */ (e).message}\n`);
+      err(`hodgepodge proxy: ${/** @type {Error} */ (e).message}\n`);
       return 2;
     }
     await stopped;
@@ -364,22 +361,22 @@ export async function main(argv, deps = {}) {
     for (let i = 0; i < rest.length; i += 2) {
       const val = rest[i + 1];
       if (!['--container', '--control', '--grace'].includes(rest[i])) {
-        err(`hodge kill: unknown argument '${rest[i]}'\n`);
+        err(`hodgepodge kill: unknown argument '${rest[i]}'\n`);
         return 2;
       }
       if (val === undefined || val.startsWith('--')) {
-        err(`hodge kill: ${rest[i]} requires a value\n`);
+        err(`hodgepodge kill: ${rest[i]} requires a value\n`);
         return 2;
       }
       v[rest[i]] = val;
     }
     const name = v['--container'];
     if (!name || name.startsWith('-')) {
-      err('hodge kill: --container <name> is required (a name, not an option)\n');
+      err('hodgepodge kill: --container <name> is required (a name, not an option)\n');
       return 2;
     }
     if (v['--grace'] !== undefined && !/^\d+$/.test(v['--grace'])) {
-      err('hodge kill: --grace must be a whole number of seconds\n');
+      err('hodgepodge kill: --grace must be a whole number of seconds\n');
       return 2;
     }
     try {
@@ -392,14 +389,14 @@ export async function main(argv, deps = {}) {
       out(`${JSON.stringify(res)}\n`);
       return 0;
     } catch (e) {
-      err(`hodge kill: ${/** @type {Error} */ (e).message}\n`);
+      err(`hodgepodge kill: ${/** @type {Error} */ (e).message}\n`);
       return 1;
     }
   }
   if (cmd === 'control') {
     const rest = argv.slice(1);
     if (rest[0] !== '--file' || !rest[1] || rest[1].startsWith('--')) {
-      err('hodge control: --file <control.json> is required\n');
+      err('hodgepodge control: --file <control.json> is required\n');
       return 2;
     }
     const [action, ...note] = rest.slice(2);
@@ -408,30 +405,33 @@ export async function main(argv, deps = {}) {
     const text = note.join(' ').trim();
     const update = action === 'steer' ? (text ? { steer: text } : undefined) : updates[action ?? ''];
     if (!update || (action !== 'steer' && note.length > 0)) {
-      err(`hodge control: expected pause, resume, stop, or steer <note>${action ? ` (got '${action}')` : ''}\n`);
+      err(`hodgepodge control: expected pause, resume, stop, or steer <note>${action ? ` (got '${action}')` : ''}\n`);
       return 2;
     }
     const res = writeControl(resolve(rest[1]), update);
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
   }
-  if (cmd !== 'step' && cmd !== 'run' && cmd !== 'interview' && cmd !== 'objective' && cmd !== 'reverse' && cmd !== 'status' && cmd !== 'tui') {
-    err(`hodge: unknown command '${argv[0]}'\n\n${helpText()}`);
+  if (!['step', 'podge', 'hodge', 'status', 'tui'].includes(cmd)) {
+    err(`hodgepodge: unknown command '${argv[0]}'\n\n${helpText()}`);
     return 2;
   }
 
-  const parsed = parseStepArgs(argv.slice(1), { control: cmd === 'run' || cmd === 'status' || cmd === 'tui' });
+  const label = cmd === 'hodge' || cmd === 'podge' ? cmd : `hodgepodge ${cmd}`;
+  // `hodge --reverse` is a bare flag, so it is taken out before the flag/value pairs are parsed.
+  const reverse = cmd === 'hodge' && argv.includes('--reverse');
+  const parsed = parseStepArgs(argv.slice(1).filter((a) => !(reverse && a === '--reverse')), { control: cmd === 'podge' || cmd === 'status' || cmd === 'tui' });
   if (!parsed.ok) {
-    err(`hodge ${cmd}: ${parsed.error}\n`);
+    err(`${label}: ${parsed.error}\n`);
     return 2;
   }
   if (cmd === 'tui' && !parsed.control) {
-    err('hodge tui: --control <control.json> is required\n');
+    err('hodgepodge tui: --control <control.json> is required\n');
     return 2;
   }
   const sandbox = loadSandbox(parsed.dir);
   if (!sandbox.ok) {
-    err(`hodge ${cmd}: ${sandbox.error}\n`);
+    err(`${label}: ${sandbox.error}\n`);
     return 2;
   }
   const { config, repo } = sandbox;
@@ -453,13 +453,14 @@ export async function main(argv, deps = {}) {
     return 0;
   }
   try {
-    const adapter = resolveAdapter(config, cmd === 'interview' || cmd === 'objective' || cmd === 'reverse' ? (cmd === 'objective' ? 'interview' : cmd) : 'build', deps.registry ?? defaultRegistry);
-    if (cmd === 'objective' || cmd === 'interview') {
+    const role = cmd === 'hodge' ? (reverse ? 'reverse' : 'interview') : 'build';
+    const adapter = resolveAdapter(config, role, deps.registry ?? defaultRegistry);
+    if (cmd === 'hodge' && !reverse) {
       // The agent runs silently for minutes; say so, or a submitted answer looks like a dead prompt.
       const inner = adapter;
       const announced = {
         run: async (/** @type {Parameters<typeof inner.run>[0]} */ req) => {
-          err('\nAnswer received. Running the interview agent; this can take several minutes (nothing prints until it finishes)...\n');
+          err('\nAnswer received. Running the agent; this can take several minutes (nothing prints until it finishes)...\n');
           const res = await inner.run(req);
           err('Agent finished; checking its work.\n');
           return res;
@@ -493,7 +494,7 @@ export async function main(argv, deps = {}) {
         if (!hasObjectiveKit(repo)) {
           addObjectiveKit(repo);
           execFileSync('git', ['-C', repo, 'add', '-A']);
-          execFileSync('git', ['-C', repo, '-c', 'commit.gpgsign=false', '-c', 'user.name=hodge', '-c', 'user.email=hodge@localhost', 'commit', '-q', '-m', 'hodge interview: add objective kit']);
+          execFileSync('git', ['-C', repo, '-c', 'commit.gpgsign=false', '-c', 'user.name=hodge', '-c', 'user.email=hodge@localhost', 'commit', '-q', '-m', 'hodge: add objective kit']);
         }
         const res = await runObjective({
           config,
@@ -510,7 +511,7 @@ export async function main(argv, deps = {}) {
         rl.close();
       }
     }
-    if (cmd === 'reverse') {
+    if (reverse) {
       const res = await runReverse({
         config,
         repoDir: repo,
@@ -522,7 +523,7 @@ export async function main(argv, deps = {}) {
       out(`${JSON.stringify(res)}\n`);
       return res.status === 'ok' ? 0 : 1;
     }
-    const run = cmd === 'run' ? runLoop : runStep;
+    const run = cmd === 'podge' ? runLoop : runStep;
     const res = await run({
       config,
       repoDir: repo,
@@ -530,13 +531,13 @@ export async function main(argv, deps = {}) {
       adapter,
       testCommand: deps.testCommand,
       identity: deps.identity,
-      ...(cmd === 'run' && parsed.control ? { controlFile: resolve(parsed.control) } : {}),
+      ...(cmd === 'podge' && parsed.control ? { controlFile: resolve(parsed.control) } : {}),
       requireTestPlan: /** @type {{requireTestPlan?: boolean}} */ (config).requireTestPlan === true,
     });
     out(`${JSON.stringify(res)}\n`);
     return res.status === 'ok' || res.status === 'done' ? 0 : 1;
   } catch (e) {
-    err(`hodge ${cmd}: ${/** @type {Error} */ (e).message}\n`);
+    err(`${label}: ${/** @type {Error} */ (e).message}\n`);
     return 2;
   }
 }

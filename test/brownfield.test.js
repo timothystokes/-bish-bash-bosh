@@ -44,10 +44,10 @@ test('brownfield prompt carries spec-delta rules', () => {
   assert.match(p, /plan\.md/);
 });
 
-test('gate: fails without specs and points at hodge reverse', () => {
+test('gate: fails without specs and points at hodge --reverse', () => {
   const g = checkBrownfieldGate(makeRepo(false));
   assert.equal(g.ok, false);
-  assert.match(g.reason ?? '', /hodge reverse/);
+  assert.match(g.reason ?? '', /hodge --reverse/);
 });
 
 test('gate: fails when specs dir is missing', () => {
@@ -66,7 +66,7 @@ test('runStep in brownfield mode without specs is gated before any agent call', 
   const adapter = { ...inner, run: (/** @type {any} */ r) => { called = true; return inner.run(r); } };
   const res = await runStep({ config: config(), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity });
   assert.equal(res.status, 'gated');
-  assert.match(res.reason ?? '', /hodge reverse/);
+  assert.match(res.reason ?? '', /hodge --reverse/);
   assert.equal(called, false);
 });
 
@@ -74,7 +74,7 @@ test('runLoop in brownfield mode without specs is gated; with specs it runs', as
   const adapter = createFakeAdapter({ exitStatus: 0, transcript: 't', writes: { 'src/x.js': 'export const x = 1;\n' }, usage: { tokens: 1, cost: 0 } });
   const bad = await runLoop({ config: config(), repoDir: makeRepo(false), runId: 'r', adapter, testCommand: pass, identity });
   assert.equal(bad.status, 'gated');
-  assert.match(bad.reason ?? '', /hodge reverse/);
+  assert.match(bad.reason ?? '', /hodge --reverse/);
   const good = await runStep({ config: config(), repoDir: makeRepo(true), runId: 'r', adapter, testCommand: pass, identity });
   assert.equal(good.status, 'ok', good.reason);
 });

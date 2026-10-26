@@ -182,7 +182,7 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
     `${JSON.stringify({ status, reason, usage: { ...result.usage, seconds }, changedFiles: result.changedFiles }, null, 2)}\n`,
   );
   git(repoDir, 'add', '-A');
-  git(repoDir, 'commit', '-q', '--allow-empty', '-m', `hodge interview ${runId}: ${status}`);
+  git(repoDir, 'commit', '-q', '--allow-empty', '-m', `hodge ${runId}: ${status}`);
 
   return { status, sha: git(repoDir, 'rev-parse', 'HEAD').trim(), ...(reason ? { reason } : {}) };
 }

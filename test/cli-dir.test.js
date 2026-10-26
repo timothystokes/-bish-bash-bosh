@@ -31,7 +31,7 @@ test('parseStepArgs takes only --dir (default .), --run-id and --control', () =>
 
 test('interview takes no --objective, --config or --repo', async () => {
   for (const flag of ['--objective', '--config', '--repo']) {
-    const r = await run(['interview', flag, 'x']);
+    const r = await run(['hodge', flag, 'x']);
     assert.equal(r.code, 2, flag);
     assert.match(r.err, new RegExp(`unknown argument '${flag}'`));
   }

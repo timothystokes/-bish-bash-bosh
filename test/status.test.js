@@ -44,7 +44,7 @@ test('readRunStatus on an unknown run is empty, not an error', () => {
   assert.equal(s.lastStatus, null);
 });
 
-test('hodge status prints JSON and includes control state', async () => {
+test('hodgepodge status prints JSON and includes control state', async () => {
   const dir = makeRun();
   const cfg = join(dir, 'cfg.json');
   writeFileSync(cfg, JSON.stringify({ targetRepo: 'git@example.com:o/t.git', roles: { build: { adapter: 'f', model: 'm' } }, budgets, allowedPaths: ['src/'] }));
@@ -58,7 +58,7 @@ test('hodge status prints JSON and includes control state', async () => {
   assert.equal(j.control.paused, true);
 });
 
-test('hodge status needs a sandbox (hodge.json)', async () => {
+test('hodgepodge status needs a sandbox (hodge.json)', async () => {
   let e = '';
   const code = await main(['status', '--dir', '/nonexistent/sandbox'], { stdout: () => {}, stderr: (/** @type {string} */ s) => (e += s) });
   assert.equal(code, 2);

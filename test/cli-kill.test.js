@@ -19,7 +19,7 @@ async function run(args, docker) {
 }
 
 test('help lists kill', () => {
-  assert.match(helpText(), /hodge kill --container/);
+  assert.match(helpText(), /hodgepodge kill --container/);
 });
 
 test('kill writes control stop then docker stop, prints JSON', async () => {

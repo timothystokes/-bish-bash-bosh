@@ -12,11 +12,12 @@ import { validateConfig } from './config.js';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const templates = join(root, 'templates');
 const SEEDS = ['toy', 'empty', 'objective'];
+const LAUNCHERS = ['hodgepodge', 'hodge', 'podge'];
 const IGNORE = 'node_modules/\nruns/\n';
 
 /**
  * @typedef {{dir: string, adapter: string, model: string, seed?: string}} InitOptions
- * @param {InitOptions} opts dir is the sandbox root: `<dir>/target` (repo), `<dir>/hodge.json` (config; `targetRepo` is relative to dir, `hodgepodge` points back at this tool) and `<dir>/hodge` (launcher)
+ * @param {InitOptions} opts dir is the sandbox root: `<dir>/target` (repo), `<dir>/hodge.json` (config; `targetRepo` is relative to dir, `hodgepodge` points back at this tool) and `<dir>/hodgepodge`, `<dir>/hodge`, `<dir>/podge` (launchers)
  * @returns {{ok: true, dir: string, repo: string, config: string, hodgepodge: string} | {ok: false, reason: string}}
  */
 export function initSandbox(opts) {
@@ -26,7 +27,6 @@ export function initSandbox(opts) {
   const dir = resolve(opts.dir);
   const repo = join(dir, 'target');
   const config = join(dir, 'hodge.json');
-  const launcher = join(dir, 'hodge');
   const cfg = {
     targetRepo: 'target',
     hodgepodge: root,
@@ -52,9 +52,12 @@ export function initSandbox(opts) {
     else writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'target', private: true, type: 'module' }, null, 2) + '\n');
     writeFileSync(join(repo, '.gitignore'), IGNORE);
     writeFileSync(config, JSON.stringify(cfg, null, 2) + '\n');
-    // So the owner can `cd <dir>` and run `./hodge run`, `./hodge step`, ... without any path flags.
-    writeFileSync(launcher, `#!/bin/sh\nexec node ${JSON.stringify(join(root, 'bin', 'hodge'))} "$@"\n`);
-    chmodSync(launcher, 0o755);
+    // So the owner can `cd <dir>` and run `./hodge`, `./podge`, `./hodgepodge step`, ... without any path flags.
+    for (const name of LAUNCHERS) {
+      const path = join(dir, name);
+      writeFileSync(path, `#!/bin/sh\nexec node ${JSON.stringify(join(root, 'bin', name))} "$@"\n`);
+      chmodSync(path, 0o755);
+    }
     const git = (/** @type {string[]} */ ...a) =>
       execFileSync('git', ['-C', repo, '-c', 'user.name=hodge-init', '-c', 'user.email=hodge-init@localhost', ...a], { stdio: 'pipe' });
     git('init', '-q', '-b', 'main');
@@ -91,7 +94,7 @@ export function addObjectiveKit(repo) {
 /**
  * The objective kit (phases, interview protocol, readiness signals, brief, open questions) goes to
  * `objective/`; the starter plan.md goes to the repo root. Nothing here is specific to a solution:
- * the objective itself is gathered later by `hodge objective`.
+ * the objective itself is gathered later by `hodge`.
  * @param {string} repo
  */
 function seedObjective(repo) {

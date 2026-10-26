@@ -31,11 +31,11 @@ async function runCli(args) {
   return { ac, done, outs, errs, portP };
 }
 
-test('help documents hodge proxy', () => {
-  assert.match(helpText(), /hodge proxy --upstream/);
+test('help documents hodgepodge proxy', () => {
+  assert.match(helpText(), /hodgepodge proxy --upstream/);
 });
 
-test('hodge proxy requires --upstream and rejects unknown args (exit 2)', async () => {
+test('hodgepodge proxy requires --upstream and rejects unknown args (exit 2)', async () => {
   /** @type {string[]} */
   const errs = [];
   assert.equal(await main(['proxy'], { stderr: (s) => errs.push(s) }), 2);
@@ -45,7 +45,7 @@ test('hodge proxy requires --upstream and rejects unknown args (exit 2)', async 
   assert.equal(await main(['proxy', '--upstream', 'not a url'], { stderr: (s) => errs.push(s) }), 2);
 });
 
-test('hodge proxy prints its port, redacts, audits, meters, and stops on abort', async () => {
+test('hodgepodge proxy prints its port, redacts, audits, meters, and stops on abort', async () => {
   /** @type {string[]} */
   const seen = [];
   const upstream = createServer((req, res) => {

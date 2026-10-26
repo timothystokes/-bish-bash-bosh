@@ -7,5 +7,5 @@
 - In `runStep` the scope and anti-stub gates run before tests; any failure => `failed`, work reverted. `record.json` gates, in order: repo, budget, scope, anti-stub, tests, types.
 - Budget gate (`src/budget-gate.js`): tokens, cost, wall-clock and iteration caps per run, summed from run records (`usage.json`, incl. `seconds`). `runStep` refuses (`over-budget`, no sha, nothing written) when any cap is exhausted and gives the adapter only the remaining budget as limits.
 - Fast-wheel rule: scoped tests per iteration; full suite on a schedule.
-- Spec-lint (`src/spec-lint.js` `lintSpecs`, `hodge spec-lint`): structure only. Each `specs/*.md` is non-empty, starts with `# Spec: <name>`, has one top-level title (one decision per file), titles are unique, and every spec is mapped in `tests/PLAN.md`. Semantic duplicate/contradiction detection is later work. Wiring into `hodge run` is P2-5.
+- Spec-lint (`src/spec-lint.js` `lintSpecs`, `hodgepodge spec-lint`): structure only. Each `specs/*.md` is non-empty, starts with `# Spec: <name>`, has one top-level title (one decision per file), titles are unique, and every spec is mapped in `tests/PLAN.md`. Semantic duplicate/contradiction detection is later work. Wiring into `podge` is P2-5.
 - Duplicate-symbol check to catch duplicate implementations from missed searches.

@@ -37,11 +37,11 @@ test('the kit documents phases, the interview protocol and the readiness thresho
   const dir = fresh();
   initSandbox({ dir, ...base });
   const read = (/** @type {string} */ f) => readFileSync(join(dir, 'target', 'objective', f), 'utf8');
-  assert.match(read('PHASES.md'), /hodge objective/);
+  assert.match(read('PHASES.md'), /hodge/);
   assert.match(read('PHASES.md'), /Discover[\s\S]*Specify[\s\S]*Test plan[\s\S]*Plan[\s\S]*Build/);
   assert.match(read('INTERVIEW.md'), /one question at a time/i);
   assert.match(read('READINESS.md'), /at least 3 requirements/i);
-  assert.match(read('READINESS.md'), /hodge ready/);
+  assert.match(read('READINESS.md'), /hodgepodge ready/);
 });
 
 test('config gets an interview role and requires the test plan', () => {
@@ -53,7 +53,7 @@ test('config gets an interview role and requires the test plan', () => {
   assert.equal(cfg.requireTestPlan, true);
 });
 
-test('hodge init has no --objective option (the objective is gathered by `hodge objective`)', async () => {
+test('hodgepodge init has no --objective option (the objective is gathered by `hodge`)', async () => {
   /** @type {string[]} */
   const errs = [];
   const code = await main(['init', '--dir', fresh(), '--adapter', 'a', '--model', 'm', '--seed', 'objective', '--objective', 'x'], { stdout: () => {}, stderr: (s) => errs.push(s) });
@@ -146,7 +146,7 @@ test('run is gated until the objective is ready (no agent call)', async () => {
   assert.equal(called, 0);
 });
 
-test('hodge ready reports gaps then ready', async () => {
+test('hodgepodge ready reports gaps then ready', async () => {
   const dir = fresh();
   assert.equal(initSandbox({ dir, ...base }).ok, true);
   /** @type {string[]} */
@@ -174,11 +174,11 @@ test('kit files live under templates/objective (shipped in the image)', () => {
   for (const f of [...KIT, 'plan.md']) assert.ok(existsSync(join(root, 'templates', 'objective', f)), f);
 });
 
-test('hodge interview in an objective-kit sandbox asks for the objective and is gated without one', async () => {
+test('hodge in an objective-kit sandbox asks for the objective and is gated without one', async () => {
   const dir = fresh();
   assert.equal((await main(['init', '--dir', dir, '--adapter', 'a', '--model', 'm', '--seed', 'objective'], { stdout: () => {}, stderr: () => {} })), 0);
   let out = '';
-  const code = await main(['interview', '--dir', dir], {
+  const code = await main(['hodge', '--dir', dir], {
     registry: { a: () => ({ run: async () => { throw new Error('agent must not run without an objective'); } }) },
     input: Readable.from(['']),
     stdout: (s) => (out += s),

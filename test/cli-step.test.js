@@ -63,7 +63,7 @@ test('resolveAdapter throws on unknown adapter id or missing role', () => {
   assert.throws(() => resolveAdapter(cfg('f'), 'review', { f: () => /** @type {any} */ ({}) }), /no role 'review'/);
 });
 
-test('hodge step prints JSON {sha, iteration, cost, status} and exits 0', async () => {
+test('hodgepodge step prints JSON {sha, iteration, cost, status} and exits 0', async () => {
   const dir = makeRepo();
   const cfgPath = join(tmpdir(), `hodge-cfg-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(cfg('f')));
@@ -83,7 +83,7 @@ test('hodge step prints JSON {sha, iteration, cost, status} and exits 0', async 
   assert.equal(res.sha, git(dir, 'rev-parse', 'HEAD'));
 });
 
-test('hodge step exits non-zero when the step fails or is gated', async () => {
+test('hodgepodge step exits non-zero when the step fails or is gated', async () => {
   const dir = makeRepo();
   const cfgPath = join(tmpdir(), `hodge-cfg-f-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(cfg('f')));
@@ -99,7 +99,7 @@ test('hodge step exits non-zero when the step fails or is gated', async () => {
   assert.equal(JSON.parse(out.join('')).status, 'failed');
 });
 
-test('hodge step reports config problems on stderr with exit 2', async () => {
+test('hodgepodge step reports config problems on stderr with exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
   const missing = await main(['step', '--dir', '/nonexistent/sandbox'], { stdout: () => {}, stderr: capture(err) });
   assert.equal(missing, 2);
@@ -116,7 +116,7 @@ test('hodge step reports config problems on stderr with exit 2', async () => {
   assert.match(err.join(''), /hodge\.json/);
 });
 
-test('hodge step reports unknown adapter with exit 2', async () => {
+test('hodgepodge step reports unknown adapter with exit 2', async () => {
   const cfgPath = join(tmpdir(), `hodge-cfg-u-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(cfg('nope')));
   const err = /** @type {string[]} */ ([]);
@@ -125,7 +125,7 @@ test('hodge step reports unknown adapter with exit 2', async () => {
   assert.match(err.join(''), /unknown adapter 'nope'/);
 });
 
-test('hodge control writes pause/resume/steer/stop to the control file', async () => {
+test('hodgepodge control writes pause/resume/steer/stop to the control file', async () => {
   const { readFileSync } = await import('node:fs');
   const f = join(mkdtempSync(join(tmpdir(), 'hodge-ctl-')), 'control.json');
   const run = async (/** @type {string[]} */ ...a) => {
@@ -146,7 +146,7 @@ test('hodge control writes pause/resume/steer/stop to the control file', async (
   assert.deepEqual(JSON.parse(s.o), { ok: true });
 });
 
-test('hodge control rejects bad usage', async () => {
+test('hodgepodge control rejects bad usage', async () => {
   const e = /** @type {string[]} */ ([]);
   assert.equal(await main(['control', 'pause'], { stderr: capture(e) }), 2);
   assert.equal(await main(['control', '--file', '/tmp/x.json', 'bogus'], { stderr: capture(e) }), 2);
@@ -154,14 +154,14 @@ test('hodge control rejects bad usage', async () => {
   assert.equal(await main(['control', '--file', '/tmp/x.json'], { stderr: capture(e) }), 2);
 });
 
-test('hodge run --control passes the control file so a stop is honoured', async () => {
+test('podge --control passes the control file so a stop is honoured', async () => {
   const dir = makeRepo();
   const f = join(mkdtempSync(join(tmpdir(), 'hodge-ctl-')), 'control.json');
   writeFileSync(f, JSON.stringify({ stop: true }));
   const cfgFile = join(dir, '..', `cfg-${Date.now()}.json`);
   writeFileSync(cfgFile, JSON.stringify(cfg('fake')));
   const o = /** @type {string[]} */ ([]);
-  const code = await main(['run', '--dir', sandboxOf(cfgFile, dir), '--control', f], {
+  const code = await main(['podge', '--dir', sandboxOf(cfgFile, dir), '--control', f], {
     registry: { fake: () => createFakeAdapter({ exitStatus: 0, transcript: '', usage: { tokens: 0, cost: 0 }, writes: {} }) },
     stdout: capture(o),
     stderr: capture([]),

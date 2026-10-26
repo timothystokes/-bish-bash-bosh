@@ -1,6 +1,6 @@
 # Readiness: when the conversation is enough
 
-The Discover/Specify conversation ends only when requirements are captured at a fine grain. `hodge ready --dir <sandbox>` checks this deterministically and prints `{ready, gaps}`; the harness (`src/readiness.js`) is the authority, not the agent's own claim. `hodge run` refuses to start until it passes.
+The Discover/Specify conversation ends only when requirements are captured at a fine grain. `hodgepodge ready --dir <sandbox>` checks this deterministically and prints `{ready, gaps}`; the harness (`src/readiness.js`) is the authority, not the agent's own claim. `podge` refuses to start until it passes.
 
 Signals checked, per spec in `specs/*.md`:
 - Structure: spec-lint is clean (titled, one decision per file, every spec mapped in `tests/PLAN.md`).
@@ -16,7 +16,7 @@ Signals checked, per spec in `specs/*.md`:
 Signals checked across the objective:
 - `objective/OPEN-QUESTIONS.md` has no unchecked `- [ ]` items.
 
-Not machine-checkable, so the interviewer must judge it and the owner reviews it before `hodge run`:
+Not machine-checkable, so the interviewer must judge it and the owner reviews it before `podge`:
 - Every dimension in `objective/INTERVIEW.md` was considered for each capability (record "n/a" decisions as ticked open questions).
 - Each requirement traces back to something in `objective/BRIEF.md`; nothing in the brief is unaddressed.
 

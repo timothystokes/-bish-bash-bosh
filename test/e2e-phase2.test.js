@@ -86,7 +86,7 @@ test('phase 2 exit: objective goes interview -> specs -> test plan -> forward lo
   const registry = { interviewer: scripted(interviewFixture), builder: scripted(buildFixture) };
 
   // 1. interview: specs + red tests committed, spec-lint passes
-  const iv = await hodge(['interview', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'p2'], registry, Readable.from(['add two numbers\n']));
+  const iv = await hodge(['hodge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'p2'], registry, Readable.from(['add two numbers\n']));
   assert.equal(iv.res.status, 'ok', JSON.stringify(iv.res));
   assert.equal(iv.code, 0);
   assert.ok(existsSync(join(dir, 'specs', 'add.md')));
@@ -101,7 +101,7 @@ test('phase 2 exit: objective goes interview -> specs -> test plan -> forward lo
   git(dir, 'commit', '-qm', 'plan');
 
   // 3. forward loops: tests red first, then green
-  const run = await hodge(['run', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'p2'], registry);
+  const run = await hodge(['podge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'p2'], registry);
   assert.equal(run.res.status, 'done', JSON.stringify(run.res));
   assert.equal(run.code, 0);
   assert.equal(run.res.steps.length, 1);

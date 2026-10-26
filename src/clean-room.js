@@ -52,7 +52,7 @@ export function checkCleanRoomGate(repoDir, opts = {}) {
   try {
     roots = git(repoDir, 'rev-list', '--max-parents=0', 'HEAD').split('\n').filter(Boolean);
   } catch {
-    return fail('builder repo has no commits; run `hodge clean-room` to export the bundle');
+    return fail('builder repo has no commits; run `hodgepodge clean-room` to export the bundle');
   }
   const leaked = new Set();
   for (const root of roots) {

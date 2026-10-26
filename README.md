@@ -2,7 +2,7 @@
 
 A model-agnostic harness for delivering software with loop engineering (Ralph-style): one task per loop iteration, fresh agent context, specs and a plan file as state, and tests as gates.
 
-Hodgepodge holds the harness only. Delivery work always happens in a separate **target repo**, which `hodge` creates and drives for you.
+Hodgepodge holds the harness only. Delivery work always happens in a separate **target repo**, which `hodgepodge init` creates and `hodge` then `podge` drive for you.
 
 ## Requirements
 
@@ -15,24 +15,25 @@ Hodgepodge holds the harness only. Delivery work always happens in a separate **
 
 ```sh
 npm install
-npx hodge init --dir ~/sandboxes/demo --adapter copilot --model <model-id>
+npx hodgepodge init --dir ~/sandboxes/demo --adapter copilot --model <model-id>
 ```
 
-`init` creates `~/sandboxes/demo/target` (a git repo seeded with a toy spec, red tests and an open plan), `~/sandboxes/demo/hodge.json` (config, kept outside the repo: target repo, roles, budgets, and a `hodgepodge` reference back to this tool) and `~/sandboxes/demo/hodge` (a launcher). After that, `cd` into the sandbox and run the commands from there; they take no config, repo or objective flags:
+`init` creates `~/sandboxes/demo/target` (a git repo seeded with a toy spec, red tests and an open plan), `~/sandboxes/demo/hodge.json` (config, kept outside the repo: target repo, roles, budgets, and a `hodgepodge` reference back to this tool) and and `hodgepodge`, `hodge` and `podge` launchers. After that, `cd` into the sandbox and run the commands from there; they take no config, repo or objective flags:
 
 ```sh
 cd ~/sandboxes/demo
-hodge run          # or ./hodge run if hodge is not on your PATH
-hodge step
-hodge interview    # asks for the objective, then interviews you question by question until specs are ready
-hodge reverse
+hodge            # requirements and specs: asks for the objective, then interviews you until specs are ready (or `hodge --reverse` to derive them from code)
+podge            # plan and implementation: loops until plan.md is done (use ./hodge and ./podge if they are not on your PATH)
+hodgepodge step  # one iteration only
 ```
 
-`step`, `run`, `interview`, `objective`, `reverse`, `status` and `tui` work on the sandbox in `--dir <sandbox>`, which defaults to the current directory (`--run-id`, and `--control` for `run`/`status`/`tui`, are the only other flags). `spec-lint`, `ready`, `sync` and `promote` also default to the sandbox in the current directory.
+`hodge` then `podge` is the whole flow: hodge, then podge, aka hodgepodge.
 
-`run` loops one iteration at a time until the target `plan.md` is fully checked, a step fails or is gated, or a budget runs out. It prints JSON `{status, steps, reason?}` and exits 0 only when done.
+`hodge`, `podge`, `step`, `status` and `tui` work on the sandbox in `--dir <sandbox>`, which defaults to the current directory (`--run-id`, and `--control` for `podge`/`status`/`tui`, are the only other flags). `spec-lint`, `ready`, `sync` and `promote` also default to the sandbox in the current directory.
 
-Use `--seed empty` to start from an empty target. Run `npx hodge --help` for every command.
+`podge` loops one iteration at a time until the target `plan.md` is fully checked, a step fails or is gated, or a budget runs out. It prints JSON `{status, steps, reason?}` and exits 0 only when done.
+
+Use `--seed empty` to start from an empty target. Run `npx hodgepodge --help` for every command.
 
 ## Configuration
 
@@ -49,22 +50,22 @@ Adapters: `copilot`, `claude-code`, `codex`, `openai-http` (endpoint and key com
 
 | Goal | Command |
 |---|---|
-| Capture specs from an objective (the objective is asked for, not passed) | `hodge interview` |
-| Build from specs (forward) | `hodge run` |
-| One iteration only | `hodge step` |
-| Derive specs and tests from existing code | `hodge reverse` |
-| Rebuild from specs and tests only | `hodge clean-room --source <dir> --repo <builder-dir>`, then `hodge run` with mode `clean-room` |
-| Check spec structure | `hodge spec-lint` |
+| Capture specs from an objective (the objective is asked for, not passed) | `hodge` |
+| Build from specs (forward) | `podge` |
+| One iteration only | `hodgepodge step` |
+| Derive specs and tests from existing code | `hodge --reverse` |
+| Rebuild from specs and tests only | `hodgepodge clean-room --source <dir> --repo <builder-dir>`, then `podge` with mode `clean-room` |
+| Check spec structure | `hodgepodge spec-lint` |
 
-Brownfield and test-hardening loops are selected with config `mode` and run via `hodge run`.
+Brownfield and test-hardening loops are selected with config `mode` and run via `podge`.
 
 ## Watching and controlling a run
 
 ```sh
-hodge status [--control <control.json>]                              # iterations, tokens, cost vs budgets
-hodge tui    --control <control.json>                                # live view: p pause, r resume, s steer, x stop, q quit
-hodge control --file <control.json> pause|resume|stop|steer <note>   # start `run` with --control <control.json>
-hodge kill --container <name> --control <control.json>              # stop the run container
+hodgepodge status [--control <control.json>]                              # iterations, tokens, cost vs budgets
+hodgepodge tui    --control <control.json>                                # live view: p pause, r resume, s steer, x stop, q quit
+hodgepodge control --file <control.json> pause|resume|stop|steer <note>   # start `podge` with --control <control.json>
+hodgepodge kill --container <name> --control <control.json>              # stop the run container
 ```
 
 ## Running in Docker
@@ -77,11 +78,11 @@ docker build -f Dockerfile.agents --build-arg BASE_IMAGE=hodgepodge:dev -t hodge
 docker run --rm -v <sandbox>:/sandbox hodgepodge-agents:dev run
 ```
 
-Bind-mounted paths should live under your home directory. Model traffic can be routed through `hodge proxy` for secret redaction and usage metering.
+Bind-mounted paths should live under your home directory. Model traffic can be routed through `hodgepodge proxy` for secret redaction and usage metering.
 
 ## Safety
 
-Secret redaction on model traffic, per-run budgets, a kill switch, scope and test gates, and human approval before anything is promoted out of the sandbox (`hodge promote` opens a PR and never merges).
+Secret redaction on model traffic, per-run budgets, a kill switch, scope and test gates, and human approval before anything is promoted out of the sandbox (`hodgepodge promote` opens a PR and never merges).
 
 ## Development
 

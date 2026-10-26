@@ -32,7 +32,7 @@ test('output is plain JSON and every transition targets an existing state', () =
   }
 });
 
-test('step runs hodge step on Fargate Spot via RunTask.sync', () => {
+test('step runs hodgepodge step on Fargate Spot via RunTask.sync', () => {
   const s = state(buildStateMachine(config), 'RunStep');
   assert.equal(s.Resource, 'arn:aws:states:::ecs:runTask.sync');
   assert.equal(s.Parameters.Cluster, config.clusterArn);

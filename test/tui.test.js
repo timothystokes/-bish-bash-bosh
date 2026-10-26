@@ -122,7 +122,7 @@ test('runTui draws frames, handles input, and resolves on quit', async () => {
   assert.equal(JSON.parse(readFileSync(join(dir, 'c.json'), 'utf8')).paused, true);
 });
 
-test('hodge tui requires --control', async () => {
+test('hodgepodge tui requires --control', async () => {
   /** @type {string[]} */
   const errs = [];
   const code = await main(['tui'], { stdout: () => {}, stderr: (/** @type {string} */ s) => errs.push(s) });

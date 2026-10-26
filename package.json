@@ -5,7 +5,9 @@
   "description": "Model-agnostic harness for loop-engineered software delivery",
   "type": "module",
   "bin": {
-    "hodge": "bin/hodge"
+    "hodgepodge": "bin/hodgepodge",
+    "hodge": "bin/hodge",
+    "podge": "bin/podge"
   },
   "engines": {
     "node": ">=20"

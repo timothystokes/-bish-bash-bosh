@@ -38,7 +38,7 @@ function makeToyTarget() {
   return dir;
 }
 
-test('toy objective: hodge run takes a red target to green unattended', async () => {
+test('toy objective: podge takes a red target to green unattended', async () => {
   const dir = makeToyTarget();
   const cfgPath = join(mkdtempSync(join(tmpdir(), 'hodge-cfg-')), 'hodge.json');
   writeFileSync(
@@ -66,7 +66,7 @@ test('toy objective: hodge run takes a red target to green unattended', async ()
   };
   /** @type {string[]} */
   const outs = [];
-  const code = await main(['run', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'toy'], {
+  const code = await main(['podge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'toy'], {
     registry,
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
     stdout: (s) => outs.push(s),
@@ -105,7 +105,7 @@ test('toy objective: green-from-the-start suite is gated (tests must fail first)
   );
   /** @type {string[]} */
   const outs = [];
-  const code = await main(['run', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'toy'], {
+  const code = await main(['podge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'toy'], {
     registry: { agent: () => createCopilotAdapter({ command: process.execPath, prefixArgs: [fakeAgent] }) },
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
     stdout: (s) => outs.push(s),

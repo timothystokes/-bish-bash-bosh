@@ -32,7 +32,7 @@ export async function runLoop(opts) {
   const { controlFile, pollMs = 1000, sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)), ...stepOpts } = opts;
   if (hasObjectiveKit(stepOpts.repoDir)) {
     const ready = checkReadiness(stepOpts.repoDir);
-    if (!ready.ready) return { status: 'gated', steps: [], reason: `objective not ready (run \`hodge ready\`): ${ready.gaps.join('; ')}` };
+    if (!ready.ready) return { status: 'gated', steps: [], reason: `objective not ready (run \`hodgepodge ready\`): ${ready.gaps.join('; ')}` };
   }
   if (stepOpts.requireTestPlan) {
     const lint = lintSpecs(stepOpts.repoDir);

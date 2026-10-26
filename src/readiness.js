@@ -11,7 +11,7 @@ const PLACEHOLDER = /\b(TBD|TODO|FIXME)\b|\?\?|<[^>\n]+>/;
 
 /**
  * @param {string} repoDir
- * @returns {boolean} true when the repo was seeded with an objective kit (`hodge init --seed objective`)
+ * @returns {boolean} true when the repo was seeded with an objective kit (`hodgepodge init --seed objective`)
  */
 export function hasObjectiveKit(repoDir) {
   return existsSync(join(repoDir, 'objective'));

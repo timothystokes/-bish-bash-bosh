@@ -62,12 +62,12 @@ test('gh opener runs gh pr create (never merge) and returns the URL', async () =
   await assert.rejects(failing.openPullRequest({ title: 'T', body: 'B', head: 'h', base: 'b' }), /nope/);
 });
 
-test('help documents hodge sync and hodge promote', () => {
-  assert.match(helpText(), /hodge sync --bucket/);
-  assert.match(helpText(), /hodge promote --run-id/);
+test('help documents hodgepodge sync and hodgepodge promote', () => {
+  assert.match(helpText(), /hodgepodge sync --bucket/);
+  assert.match(helpText(), /hodgepodge promote --run-id/);
 });
 
-test('hodge sync uploads run records, then skips them on a repeat', async () => {
+test('hodgepodge sync uploads run records, then skips them on a repeat', async () => {
   const repo = mkdtempSync(join(tmpdir(), 'hodge-sync-'));
   mkdirSync(join(repo, 'runs', 'r1'), { recursive: true });
   writeFileSync(join(repo, 'runs', 'r1', 'a.json'), '{}');
@@ -90,7 +90,7 @@ test('hodge sync uploads run records, then skips them on a repeat', async () => 
   assert.deepEqual(JSON.parse(outs[1]).skipped, ['runs/r1/a.json']);
 });
 
-test('hodge sync/promote reject missing or unknown args (exit 2)', async () => {
+test('hodgepodge sync/promote reject missing or unknown args (exit 2)', async () => {
   /** @type {string[]} */
   const errs = [];
   const e = { stderr: (/** @type {string} */ s) => errs.push(s) };
@@ -101,7 +101,7 @@ test('hodge sync/promote reject missing or unknown args (exit 2)', async () => {
   assert.equal(await main(['promote', '--run-id', 'r1', '--head', 'x', '--base', 'x', '--bucket', 'b'], { ...e, exec: fakeRun(() => ({ code: 0 })).run }), 2);
 });
 
-test('hodge promote opens a PR with head sha and artifacts URI', async () => {
+test('hodgepodge promote opens a PR with head sha and artifacts URI', async () => {
   const exec = fakeRun(({ cmd }) => (cmd === 'gh' ? { code: 0, stdout: 'https://github.com/o/r/pull/9\n' } : { code: 0, stdout: 'abc123\n' }));
   /** @type {string[]} */
   const outs = [];

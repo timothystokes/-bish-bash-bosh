@@ -117,12 +117,12 @@ test('config accepts optional requireTestPlan boolean', () => {
   assert.equal(validateConfig({ ...config(), requireTestPlan: 'yes' }).ok, false);
 });
 
-test('hodge run prints loop JSON, exit 0 when done, 1 otherwise', async () => {
+test('podge prints loop JSON, exit 0 when done, 1 otherwise', async () => {
   const dir = makeRepo('- [ ] one\n');
   const cfgPath = join(tmpdir(), `hodge-run-cfg-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(config(2)));
   const out = /** @type {string[]} */ ([]);
-  const code = await main(['run', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r'], {
+  const code = await main(['podge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r'], {
     registry: { f: () => createFakeAdapter({ exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0.1 }, writes: {} }) },
     testCommand: pass,
     identity,
@@ -135,9 +135,9 @@ test('hodge run prints loop JSON, exit 0 when done, 1 otherwise', async () => {
   assert.equal(res.steps.length, 3);
 });
 
-test('hodge run reports usage errors with exit 2', async () => {
+test('podge reports usage errors with exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
-  const code = await main(['run'], { stdout: () => {}, stderr: (s) => { err.push(s); } });
+  const code = await main(['podge'], { stdout: () => {}, stderr: (s) => { err.push(s); } });
   assert.equal(code, 2);
-  assert.match(err.join(''), /hodge run: cannot read config .*hodge\.json/);
+  assert.match(err.join(''), /podge: cannot read config .*hodge\.json/);
 });

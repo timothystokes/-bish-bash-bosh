@@ -131,7 +131,7 @@ test('runStep in clean-room mode is gated, with no agent call, on a leaky builde
   assert.equal(calls, 0);
 });
 
-test('hodge clean-room CLI exports the bundle and prints JSON', async () => {
+test('hodgepodge clean-room CLI exports the bundle and prints JSON', async () => {
   const src = makeSource();
   const dest = builderDir();
   let out = '';

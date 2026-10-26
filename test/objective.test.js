@@ -169,12 +169,12 @@ test('a failed round (spec-lint) ends the conversation with the reason', async (
   assert.match(res.reason ?? '', /spec-lint failed/);
 });
 
-test('hodge objective --dir drives the conversation from stdin', async () => {
+test('hodge --dir drives the conversation from stdin', async () => {
   const { dir } = sandbox();
   const a = scripted(fullRounds);
   /** @type {string[]} */
   const outs = [];
-  const code = await main(['objective', '--dir', dir], {
+  const code = await main(['hodge', '--dir', dir], {
     stdout: (s) => outs.push(s),
     stderr: (s) => outs.push(s),
     input: Readable.from(['A greeter\nDevelopers\nYes\n']),

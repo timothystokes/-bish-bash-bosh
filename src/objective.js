@@ -23,7 +23,7 @@ const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgs
 /**
  * Requirements gathering: ask for a description of the objective, then alternate agent rounds
  * (which update specs and write one next question) with the owner's answers, broad first and fine-grained
- * later, until `hodge ready` passes. Everything lives in the target repo, so a paused conversation resumes.
+ * later, until `hodgepodge ready` passes. Everything lives in the target repo, so a paused conversation resumes.
  * @param {{
  *   config: unknown,
  *   repoDir: string,
@@ -39,7 +39,7 @@ const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgs
 export async function runObjective({ config, repoDir, runId, adapter, ask, say, maxRounds = 30, identity }) {
   /** @param {string} reason @returns {ObjectiveResult} */
   const gated = (reason) => ({ status: 'gated', rounds: 0, reason });
-  if (!hasObjectiveKit(repoDir)) return gated('no objective kit in the target (create the sandbox with `hodge init --seed objective`)');
+  if (!hasObjectiveKit(repoDir)) return gated('no objective kit in the target (create the sandbox with `hodgepodge init --seed objective`)');
   if (git(repoDir, 'status', '--porcelain').trim() !== '') return gated('working tree is not clean');
 
   const briefPath = join(repoDir, 'objective', 'BRIEF.md');
@@ -50,7 +50,7 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
     brief = `# Objective brief\n\n${description}\n`;
     writeFileSync(briefPath, brief);
     git(repoDir, 'add', '-A');
-    git(repoDir, 'commit', '-q', '-m', 'hodge objective: brief');
+    git(repoDir, 'commit', '-q', '-m', 'hodge: brief');
   }
 
   const runDir = join(repoDir, 'runs', runId);
@@ -68,12 +68,12 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
     appendFileSync(join(repoDir, 'objective', 'CONVERSATION.md'), `\n## Round ${round - 1}\n\n**Question:** ${question}\n\n**Answer:** ${answer}\n`);
     rmSync(questionPath);
     git(repoDir, 'add', '-A');
-    git(repoDir, 'commit', '-q', '-m', `hodge objective ${runId}: answer to round ${round - 1}`);
+    git(repoDir, 'commit', '-q', '-m', `hodge ${runId}: answer to round ${round - 1}`);
     return true;
   };
 
   for (;;) {
-    if (!(await answerPending())) return { status: 'paused', rounds: ran, reason: 'no answer given; run `hodge objective` again to resume' };
+    if (!(await answerPending())) return { status: 'paused', rounds: ran, reason: 'no answer given; run `hodge` again to resume' };
     if (ran >= maxRounds) return { status: 'max-rounds', rounds: ran, reason: `stopped after ${maxRounds} rounds; run again to continue` };
     const res = await runInterview({ config, repoDir, runId, adapter, objective: brief, round, identity });
     ran++;

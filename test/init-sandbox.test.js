@@ -88,7 +88,7 @@ test('rejects an unknown seed and an empty adapter or model', () => {
 });
 
 test('help lists init', () => {
-  assert.match(helpText(), /hodge init --dir/);
+  assert.match(helpText(), /hodgepodge init --dir/);
 });
 
 /** @param {string[]} args */
@@ -122,10 +122,11 @@ test('cli init requires --dir, --adapter and --model; exits 1 on refusal', async
   assert.equal(JSON.parse(r.out).ok, false);
 });
 
-test('writes a launcher so the sandbox can be driven from inside it', () => {
+test('writes hodgepodge, hodge and podge launchers so the sandbox can be driven from inside it', () => {
   const dir = fresh();
   assert.equal(initSandbox({ dir, ...base }).ok, true);
-  const launcher = join(dir, 'hodge');
+  for (const name of ['hodge', 'podge']) assert.ok(statSync(join(dir, name)).mode & 0o100, `${name} launcher is executable`);
+  const launcher = join(dir, 'hodgepodge');
   assert.ok(statSync(launcher).mode & 0o100, 'launcher is executable');
   const out = spawnSync(launcher, ['status'], { cwd: dir, encoding: 'utf8' });
   assert.equal(out.status, 0, out.stderr);

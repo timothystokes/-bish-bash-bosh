@@ -133,7 +133,7 @@ export async function runReverse({ config, repoDir, runId, adapter, focus, testC
     `${JSON.stringify({ status, reason, test, usage: { ...result.usage, seconds }, changedFiles: result.changedFiles }, null, 2)}\n`,
   );
   git(repoDir, 'add', '-A');
-  git(repoDir, 'commit', '-q', '-m', `hodge reverse ${runId}: ${status}`);
+  git(repoDir, 'commit', '-q', '-m', `hodge --reverse ${runId}: ${status}`);
 
   return { status, sha: git(repoDir, 'rev-parse', 'HEAD').trim(), ...(reason ? { reason } : {}) };
 }

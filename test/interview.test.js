@@ -132,7 +132,7 @@ test('gates: empty objective, dirty tree, harness repo, missing role make no age
   assert.equal(a.prompts.length, 0);
 });
 
-test('hodge interview on a repo without a kit scaffolds objective/ and keeps asking until ready', async () => {
+test('hodge on a repo without a kit scaffolds objective/ and keeps asking until ready', async () => {
   const dir = makeRepo();
   const cfgPath = join(tmpdir(), `hodge-int-cfg-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(config({ interview: { adapter: 'iv', model: 'm' } })));
@@ -153,7 +153,7 @@ test('hodge interview on a repo without a kit scaffolds objective/ and keeps ask
       return createFakeAdapter({ exitStatus: 0, transcript: 't', usage: { tokens: 5, cost: 0.1 }, writes: rounds[n++] ?? {} }).run(req);
     },
   };
-  const code = await main(['interview', '--dir', sandboxOf(cfgPath, dir)], {
+  const code = await main(['hodge', '--dir', sandboxOf(cfgPath, dir)], {
     registry: { iv: () => adapter, f: () => { throw new Error('build role must not be used'); } },
     identity,
     input: Readable.from(['Build a greeter\n', 'Developers\n', 'Yes\n', '']),
@@ -168,16 +168,16 @@ test('hodge interview on a repo without a kit scaffolds objective/ and keeps ask
   assert.equal(readFileSync(join(dir, 'README.md'), 'utf8'), '# target\n');
 });
 
-test('hodge interview usage errors exit 2', async () => {
+test('hodge usage errors exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
   const e = (/** @type {string} */ s) => { err.push(s); };
-  assert.equal(await main(['interview', '--dir', '/nonexistent/sandbox'], { stdout: () => {}, stderr: e }), 2);
+  assert.equal(await main(['hodge', '--dir', '/nonexistent/sandbox'], { stdout: () => {}, stderr: e }), 2);
   assert.match(err.join(''), /hodge\.json/);
 
   const cfgPath = join(tmpdir(), `hodge-int-norole-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(config({})));
   err.length = 0;
-  assert.equal(await main(['interview', '--dir', sandboxOf(cfgPath)], { registry: { f: () => agent({}).adapter }, stdout: () => {}, stderr: e }), 2);
+  assert.equal(await main(['hodge', '--dir', sandboxOf(cfgPath)], { registry: { f: () => agent({}).adapter }, stdout: () => {}, stderr: e }), 2);
   assert.match(err.join(''), /no role 'interview'/);
 
   err.length = 0;
