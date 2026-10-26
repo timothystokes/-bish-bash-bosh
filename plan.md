@@ -116,6 +116,23 @@ Status `implement` = decided to do; `defer` = noted, not now. Move to `todo`/`do
 | H-27 | Numbered brief items (B-1..); each requirement cites the brief item it satisfies; `ready` fails on an uncited brief item | defer | `READINESS.md` "not machine-checkable" list |
 | H-28 | Independent spec-review pass (H-11 evaluator idea) looks for gaps and contradictions before `ready` can pass | defer | ralph-to-ralph-prod `qa-prompt.md` |
 
+## Spec formats (declared standards that constrain specs)
+Design in `specs/formats.md`. Embedded harness tools validate spec artifacts; declared formats also gate loop output where they apply.
+| ID | Task | Status | Depends on |
+|---|---|---|---|
+| F-1 | Stable requirement IDs in specs, `tests/PLAN.md` and test results (same work as H-22) | implement | |
+| F-2 | `## Formats` declaration parsed per spec; unknown or missing artifact is a readiness gap | implement | F-1 |
+| F-3 | Format registry in the harness: `name -> {validate(path), crossCheck(paths)}`; embedded tools only | implement | F-2 |
+| F-4 | JSON Schema format (`ajv`, `@hyperjump/json-schema`): validity, cross-file `$ref` consistency, conformance of loop output to a declared schema as a step gate | implement | F-3 |
+| F-5 | OpenAPI format (`@redocly/cli`, `spectral`, `swagger-parser`) | implement | F-3 |
+| F-6 | AsyncAPI format (`@asyncapi/parser`) | implement | F-3 |
+| F-7 | Gherkin format (`@cucumber/gherkin`): examples parse, each maps to a requirement ID | implement | F-3 |
+| F-8 | EBNF format (`ebnf`): grammar parses, examples accepted or rejected as declared | implement | F-3 |
+| F-9 | JUnit/TAP result mapping to requirement IDs feeding `done.json` (H-21, H-23) | implement | F-1 |
+| F-10 | Prompts and objective kit: interview proposes formats, owner confirms; `INTERVIEW.md` and `READINESS.md` updated | implement | F-2 |
+| F-11 | Loop gate: a step whose spec declares a format is checked against it (format artifacts valid, output conforms) in addition to tests | implement | F-4 |
+| F-12 | Later formats: XState, fast-check property specs, TypeSpec, DBML, Pact, Quint, axe-core, SHACL, CDDL, GraphQL SDL, Protobuf | defer | F-3 |
+
 ## Phase 5: Cloud (AWS) — FUTURE GOAL, not the current focus
 The main goal for now is the Docker-based local implementation. Do not pick P5-* tasks as the next best action until the owner promotes this phase.
 
@@ -252,3 +269,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (requirements-capture completeness): reviewed what defines "enough detail" in `hodge` (readiness gate, interview loop, protocol, owner review). Gaps are structural-not-semantic checks. Added H-25..H-28 (implement H-25, H-26; defer H-27, H-28).
 - Session (definition of done): compared our done criteria with the ghuntley repos; `hodge` readiness is strong, `podge` done was the agent's own checkbox ticks. Added H-21..H-24 (implement H-21..H-23, defer H-24). Fixed stale launcher and command names in `specs/loop.md`.
 - Session (ghuntley assessment): reviewed `how-to-build-a-coding-agent` and `monorepo-2026` for reusable concepts; candidates recorded in the "Harness hardening" table (H-1..H-9, implement or defer). `overalls` assessed too; `ralph-to-ralph-prod` assessed (H-10..H-12). All four repos assessed. Not adopted: auto-restart watchdog (contradicts "tune, don't retry"), `--dangerously-skip-permissions` with the host's cloud credentials (we sandbox), promise-token parsing (gates and structured status do this).
+- Session (spec formats): owner decided specs may declare adopted open-standard formats (JSON Schema, OpenAPI, AsyncAPI, Gherkin, EBNF, JUnit/TAP first) validated by tools embedded in the harness, and used as loop gates where they apply. Added `specs/formats.md` and plan section F-1..F-12 (implement F-1..F-11, defer F-12). F-1 shares work with H-22. No code changes.
