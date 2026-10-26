@@ -5,7 +5,7 @@ Update this file at the end of every session. Status: `todo` | `doing` | `done` 
 ## >>> Next best action
 **P2-10: create a sandbox with `hodgepodge init --dir ~/work/SANDBOXES/obj --adapter copilot --model <id> --seed objective`, `cd ~/work/SANDBOXES/obj`, run `hodge` for a small real objective, then `podge`. Record what breaks (does the agent write QUESTION.md, are rounds too coarse/fine, does readiness gate too hard) as signs. Then the toy trial below.**
 Why: requirements gathering was the missing front phase; it is unit-tested with scripted adapters only. Previous next action (still valid after P2-10):
-**Trial run: `cd ~/work/SANDBOXES/toy && hodgepodge step` with the real `copilot` adapter (sandbox already created by `hodge init`), then `podge`. Record what breaks (usage parsing, gates, prompts) as signs/tasks. P0-5b/P0-6b stay owner-blocked on credentials.**
+**Trial run: `cd ~/work/SANDBOXES/toy && podge step` with the real `copilot` adapter (sandbox already created by `hodge init`), then `podge`. Record what breaks (usage parsing, gates, prompts) as signs/tasks. P0-5b/P0-6b stay owner-blocked on credentials.**
 Why: the Docker path and `hodge init` exist, so a live end-to-end trial is now the most valuable signal. Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`. Regenerate a sandbox with `hodgepodge init --dir <dir> --adapter copilot --model <id>`.
 
 ## Phase 0: Foundations

@@ -1,4 +1,9 @@
 #!/usr/bin/env node
 import { main } from '../src/cli.js';
 
-process.exitCode = await main(process.argv.slice(2));
+const args = process.argv.slice(2);
+if (['hodge', 'podge', 'step'].includes(args[0])) {
+  console.error(`hodgepodge: '${args[0]}' is its own program: run \`${args[0] === 'hodge' ? 'hodge' : 'podge'}${args[0] === 'step' ? ' step' : ''}\``);
+  process.exit(2);
+}
+process.exitCode = await main(args);

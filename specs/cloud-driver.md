@@ -1,13 +1,13 @@
 # Spec: Cloud driver (AWS)
 - **Status: future goal.** The current main goal is the Docker-based local implementation (`specs/loop.md`). This spec describes the later scaled-out solution; it is not a current requirement.
 - Infrastructure as code: **AWS CDK**.
-- AWS Step Functions loops over `hodgepodge step`; each iteration is one Fargate Spot task (`RunTask.sync`) with a fresh context. Lambda is not used for iterations (15-minute cap, no persistent workspace); only for light steps (gate/budget checks).
+- AWS Step Functions loops over `podge step`; each iteration is one Fargate Spot task (`RunTask.sync`) with a fresh context. Lambda is not used for iterations (15-minute cap, no persistent workspace); only for light steps (gate/budget checks).
 - Git and run records are the source of truth. Execution context holds pointers only: commit SHA, iteration, cumulative cost, last status, pause/stop flag; it must be rebuildable from git.
 - Pause/steer/approval via `waitForTaskToken` or a control record read by a Choice state. Budget gate is a Choice on cumulative cost and iteration count.
 - Kill switch: an external observer calls `StopExecution`. Verify `.sync` also stops the running ECS task.
 - History limit (~25,000 events): run N iterations per execution, then start a successor execution with SHA and totals.
 - Artifacts to S3, secrets from Secrets Manager. Spot interruption is tolerable: resume from the last commit.
-- Local/cloud parity: the same container image and `hodgepodge step` run in both.
+- Local/cloud parity: the same container image and `podge step` run in both.
 - State machine is built by the pure `buildStateMachine(config)` (`src/state-machine.js`). Execution input is `{runId, executionIterations: 0}`; `$.pointers` is `{sha, iteration, cost, status, paused, stop}`, re-read each loop by a light lambda. Decide order: stop, pause (wait + re-read), done, gated/over-budget (fail), budget, per-execution cap (successor).
 - Pointers are rebuilt by the pure `rebuildPointers(repoDir, runId, controlFile)` (`src/pointers.js`): `sha` = git HEAD (null if no commits), `iteration`/`cost` = run-record totals, `status` = `done` if plan.md is fully ticked, else last record status, else `new`; `paused`/`stop` from the control file, malformed control = `stop: true`.
 - CDK stack `HodgeStack` (`infra/stack.js`): ECR, S3 artifacts (versioned, private), EFS volume holding the target checkout (mounted at `/work` in the task and `/mnt/work` in the ReadPointers lambda, handler `src/read-pointers-handler.js`), Fargate task with Secrets Manager refs exposed as `HODGE_SECRET_<NAME>`, Fargate Spot cluster, state machine named `hodge-loop` (successor ARN built from the name). Synth is offline.

@@ -101,7 +101,7 @@ Run record per objective: `runs/<id>/{plan.md, iterations/NNN/{prompt,transcript
 
 ## Cloud loop driver: Step Functions (decided)
 
-- `hodgepodge step` is the single iteration unit: idempotent, reads git, runs one loop, commits, emits a small JSON status `{sha, iteration, cost, status}`. Designed in Phases 0-1.
+- `podge step` is the single iteration unit: idempotent, reads git, runs one loop, commits, emits a small JSON status `{sha, iteration, cost, status}`. Designed in Phases 0-1.
 - Two thin drivers call it: a local Node `while` loop, and an AWS Step Functions state machine (Fargate `RunTask.sync` per iteration, fresh context each time).
 - Git and run records are the source of truth. Execution context holds pointers only (commit SHA, iteration, cumulative cost, last status, pause/stop flag) and must be rebuildable from git.
 - Pause/steer/approval via `waitForTaskToken` or a control record read by a Choice state; budget gate is a Choice on cumulative cost and iteration count.

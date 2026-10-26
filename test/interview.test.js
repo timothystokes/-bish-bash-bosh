@@ -181,7 +181,7 @@ test('hodge usage errors exit 2', async () => {
   assert.match(err.join(''), /no role 'interview'/);
 
   err.length = 0;
-  assert.equal(await main(['step', '--dir', sandboxOf(cfgPath), '--objective', 'x'], { stdout: () => {}, stderr: e }), 2);
+  assert.equal(await main(['podge', 'step', '--dir', sandboxOf(cfgPath), '--objective', 'x'], { stdout: () => {}, stderr: e }), 2);
 });
 
 test('readlineOptions: a TTY input gets terminal mode so Enter submits; piped input stays plain', async () => {

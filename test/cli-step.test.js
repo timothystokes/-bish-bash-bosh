@@ -63,12 +63,12 @@ test('resolveAdapter throws on unknown adapter id or missing role', () => {
   assert.throws(() => resolveAdapter(cfg('f'), 'review', { f: () => /** @type {any} */ ({}) }), /no role 'review'/);
 });
 
-test('hodgepodge step prints JSON {sha, iteration, cost, status} and exits 0', async () => {
+test('podge step prints JSON {sha, iteration, cost, status} and exits 0', async () => {
   const dir = makeRepo();
   const cfgPath = join(tmpdir(), `hodge-cfg-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(cfg('f')));
   const out = /** @type {string[]} */ ([]);
-  const code = await main(['step', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r1'], {
+  const code = await main(['podge', 'step', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r1'], {
     registry: { f: () => createFakeAdapter({ exitStatus: 0, transcript: 'ok', usage: { tokens: 5, cost: 0.1 }, writes: { 'src/a.js': 'x\n' } }) },
     testCommand: ['node', '-e', 'process.exit(0)'],
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
@@ -83,12 +83,12 @@ test('hodgepodge step prints JSON {sha, iteration, cost, status} and exits 0', a
   assert.equal(res.sha, git(dir, 'rev-parse', 'HEAD'));
 });
 
-test('hodgepodge step exits non-zero when the step fails or is gated', async () => {
+test('podge step exits non-zero when the step fails or is gated', async () => {
   const dir = makeRepo();
   const cfgPath = join(tmpdir(), `hodge-cfg-f-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(cfg('f')));
   const out = /** @type {string[]} */ ([]);
-  const code = await main(['step', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r1'], {
+  const code = await main(['podge', 'step', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r1'], {
     registry: { f: () => createFakeAdapter({ exitStatus: 1, transcript: 'no', usage: { tokens: 1, cost: 0 }, writes: {} }) },
     testCommand: ['node', '-e', 'process.exit(0)'],
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
@@ -99,28 +99,28 @@ test('hodgepodge step exits non-zero when the step fails or is gated', async () 
   assert.equal(JSON.parse(out.join('')).status, 'failed');
 });
 
-test('hodgepodge step reports config problems on stderr with exit 2', async () => {
+test('podge step reports config problems on stderr with exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
-  const missing = await main(['step', '--dir', '/nonexistent/sandbox'], { stdout: () => {}, stderr: capture(err) });
+  const missing = await main(['podge', 'step', '--dir', '/nonexistent/sandbox'], { stdout: () => {}, stderr: capture(err) });
   assert.equal(missing, 2);
   assert.match(err.join(''), /cannot read config/);
 
   err.length = 0;
-  const bad = await main(['step', '--dir', sandboxOf({ nope: true })], { stdout: () => {}, stderr: capture(err) });
+  const bad = await main(['podge', 'step', '--dir', sandboxOf({ nope: true })], { stdout: () => {}, stderr: capture(err) });
   assert.equal(bad, 2);
   assert.match(err.join(''), /invalid config/);
 
   err.length = 0;
-  const noConfig = await main(['step', '--dir', mkdtempSync(join(tmpdir(), 'hodge-empty-'))], { stdout: () => {}, stderr: capture(err) });
+  const noConfig = await main(['podge', 'step', '--dir', mkdtempSync(join(tmpdir(), 'hodge-empty-'))], { stdout: () => {}, stderr: capture(err) });
   assert.equal(noConfig, 2);
   assert.match(err.join(''), /hodge\.json/);
 });
 
-test('hodgepodge step reports unknown adapter with exit 2', async () => {
+test('podge step reports unknown adapter with exit 2', async () => {
   const cfgPath = join(tmpdir(), `hodge-cfg-u-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(cfg('nope')));
   const err = /** @type {string[]} */ ([]);
-  const code = await main(['step', '--dir', sandboxOf(cfgPath)], { registry: {}, stdout: () => {}, stderr: capture(err) });
+  const code = await main(['podge', 'step', '--dir', sandboxOf(cfgPath)], { registry: {}, stdout: () => {}, stderr: capture(err) });
   assert.equal(code, 2);
   assert.match(err.join(''), /unknown adapter 'nope'/);
 });

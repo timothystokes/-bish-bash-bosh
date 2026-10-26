@@ -27,7 +27,7 @@ function validate(c) {
 }
 
 /**
- * Builds the Amazon States Language definition that loops `hodgepodge step`, one Fargate Spot
+ * Builds the Amazon States Language definition that loops `podge step`, one Fargate Spot
  * task per iteration. The execution context holds pointers only (`$.pointers`: sha,
  * iteration, cost, status, paused, stop), re-read from git and run records each loop.
  * Input: `{runId, executionIterations: 0}`.
@@ -38,7 +38,7 @@ export function buildStateMachine(config) {
   validate(config);
   const { budgets } = config;
   return {
-    Comment: 'hodge loop: one hodgepodge step per Fargate Spot task',
+    Comment: 'hodge loop: one podge step per Fargate Spot task',
     StartAt: 'ReadPointers',
     States: {
       ReadPointers: {

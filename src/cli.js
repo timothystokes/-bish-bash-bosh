@@ -32,10 +32,9 @@ export function helpText() {
     '  hodge  [--dir <sandbox>] [--run-id <id>] [--reverse]',
     '  podge  [--dir <sandbox>] [--run-id <id>] [--control <control.json>]',
     '  podge step [--dir <sandbox>] [--run-id <id>]',
-    '  hodgepodge <command> ...   (every command below; `hodge` and `podge` are also commands of `hodgepodge`)',
+    '  hodgepodge <command> ...   (the commands below)',
     '  Sandbox commands take --dir <sandbox> (default: the current directory). `hodgepodge init` writes <sandbox>/hodge.json holding the target repo,',
     '  roles, budgets and the path back to hodgepodge, plus hodgepodge/hodge/podge launchers, so after `cd <sandbox>` just run `./hodge` then `./podge`.',
-    '  hodgepodge step [--dir <sandbox>] [--run-id <id>]',
     '  hodgepodge clean-room --source <dir> --repo <builder-dir>',
     '  hodgepodge status [--dir <sandbox>] [--run-id <id>] [--control <control.json>]',
     '  hodgepodge tui --control <control.json> [--dir <sandbox>] [--run-id <id>]',
@@ -55,7 +54,7 @@ export function helpText() {
     '         spec-lint passes and the test suite is green); prints JSON {status, ...}; exit 0 only when ok',
     '  podge  planning and implementation: loops steps until the plan is done or a step fails/gates/runs out of budget (--control <file> honours control.json);',
     '         prints JSON {status, steps, reason?}; exit 0 only when done',
-    '  step   (also `podge step`) run one loop iteration (the unit `podge` and the cloud driver repeat); prints JSON {sha, iteration, cost, status}',
+    '  podge step  run one loop iteration (the unit `podge` and the cloud driver repeat); prints JSON {sha, iteration, cost, status}',
     '         (--dir defaults to ., --run-id defaults to "default")',
     '  clean-room  export only specs/ + tests/ from --source into a fresh git repo at --repo (the builder never sees source); prints JSON {ok, sha, files};',
     '         exit 0 only when ok. Then run `podge` there with config mode clean-room (firewall gate checks the bundle first)',
@@ -162,8 +161,9 @@ export async function main(argv, deps = {}) {
     out(helpText());
     return 0;
   }
-  // `podge step` is the single-iteration form of `podge`; it is the same command as `hodgepodge step`.
-  if (argv[0] === 'podge' && argv[1] === 'step') argv = ['step', ...argv.slice(2)];
+  // `podge step` is the only way to run a single iteration; there is no top-level `step`.
+  const viaPodge = argv[0] === 'podge' && argv[1] === 'step';
+  if (viaPodge) argv = ['step', ...argv.slice(2)];
   const cmd = argv[0];
   if (cmd === 'spec-lint') {
     const rest = argv.slice(1);
@@ -415,12 +415,12 @@ export async function main(argv, deps = {}) {
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
   }
-  if (!['step', 'podge', 'hodge', 'status', 'tui'].includes(cmd)) {
+  if (!['podge', 'hodge', 'status', 'tui'].includes(cmd) && !(cmd === 'step' && viaPodge)) {
     err(`hodgepodge: unknown command '${argv[0]}'\n\n${helpText()}`);
     return 2;
   }
 
-  const label = cmd === 'hodge' || cmd === 'podge' ? cmd : `hodgepodge ${cmd}`;
+  const label = cmd === 'hodge' || cmd === 'podge' ? cmd : cmd === 'step' ? 'podge step' : `hodgepodge ${cmd}`;
   // `hodge --reverse` is a bare flag, so it is taken out before the flag/value pairs are parsed.
   const reverse = cmd === 'hodge' && argv.includes('--reverse');
   const parsed = parseStepArgs(argv.slice(1).filter((a) => !(reverse && a === '--reverse')), { control: cmd === 'podge' || cmd === 'status' || cmd === 'tui' });

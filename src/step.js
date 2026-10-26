@@ -186,7 +186,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     test,
   });
   git(repoDir, 'add', '-A');
-  git(repoDir, 'commit', '-q', '-m', `hodgepodge step ${runId}/${String(iteration).padStart(3, '0')}: ${status}`);
+  git(repoDir, 'commit', '-q', '-m', `podge step ${runId}/${String(iteration).padStart(3, '0')}: ${status}`);
 
   return { sha: git(repoDir, 'rev-parse', 'HEAD').trim(), iteration, cost: result.usage.cost, status };
 }

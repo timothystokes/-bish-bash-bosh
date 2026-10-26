@@ -12,5 +12,4 @@ COPY prompts ./prompts
 COPY templates ./templates
 ENV PATH="/opt/hodgepodge/bin:${PATH}"
 WORKDIR /sandbox
-ENTRYPOINT ["hodgepodge"]
-CMD ["podge"]
+ENTRYPOINT ["podge"]

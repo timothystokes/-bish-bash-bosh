@@ -52,7 +52,7 @@ export function initSandbox(opts) {
     else writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'target', private: true, type: 'module' }, null, 2) + '\n');
     writeFileSync(join(repo, '.gitignore'), IGNORE);
     writeFileSync(config, JSON.stringify(cfg, null, 2) + '\n');
-    // So the owner can `cd <dir>` and run `./hodge`, `./podge`, `./hodgepodge step`, ... without any path flags.
+    // So the owner can `cd <dir>` and run `./hodge`, `./podge`, `./podge step`, ... without any path flags.
     for (const name of LAUNCHERS) {
       const path = join(dir, name);
       writeFileSync(path, `#!/bin/sh\nexec node ${JSON.stringify(join(root, 'bin', name))} "$@"\n`);
