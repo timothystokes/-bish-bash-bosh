@@ -49,7 +49,7 @@ When a spec declares a format, `hodge` adds that format's skill snippet (`prompt
 - `budgets`: `maxTokens`, `maxCostUsd`, `maxWallClockSeconds`, `maxIterations`. They are per run id and shared by `hodge` and `podge`. `init` defaults to 5,000,000 tokens, $20, 7200 s and 20 iterations (one live agent call can use over 100k tokens).
 - `mode`: `forward` (default), `interview`, `reverse`, `brownfield`, `test-hardening`, `clean-room`.
 
-Adapters: `copilot`, `claude-code`, `codex`, `openai-http` (endpoint and key come from `HODGE_HTTP_BASE_URL` / `HODGE_HTTP_API_KEY`, never from config).
+Adapters: `copilot`, `claude-code`, `codex`, `openai-http` (endpoint and key come from `HODGE_HTTP_BASE_URL` / `HODGE_HTTP_API_KEY`, never from config). To smoke-test an adapter live, call `runSmoke(adapter, {cwd, limits})` from `src/smoke.js` in an empty scratch directory (the agent writes and runs a FizzBuzz script; the harness re-checks it).
 
 ## Modes and commands
 
