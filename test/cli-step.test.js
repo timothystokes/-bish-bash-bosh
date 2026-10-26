@@ -169,3 +169,27 @@ test('podge --control passes the control file so a stop is honoured', async () =
   assert.equal(code, 1);
   assert.equal(JSON.parse(o.join('')).status, 'stopped');
 });
+
+test('--debug logs the agent transcript and gate results to stderr; off by default', async () => {
+  const run = async (/** @type {string[]} */ extra) => {
+    const dir = makeRepo();
+    const cfgPath = join(tmpdir(), `hodge-cfg-d-${Date.now()}-${Math.random()}.json`);
+    writeFileSync(cfgPath, JSON.stringify(cfg('f')));
+    const err = /** @type {string[]} */ ([]);
+    const code = await main(['podge', 'step', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r1', ...extra], {
+      registry: { f: () => createFakeAdapter({ exitStatus: 1, transcript: 'SECRET-LOOKING-TRANSCRIPT', usage: { tokens: 1, cost: 0 }, writes: {} }) },
+      testCommand: ['node', '-e', 'process.exit(0)'],
+      identity: { root: '/nonexistent/hodgepodge', remotes: [] },
+      stdout: () => {},
+      stderr: capture(err),
+    });
+    return { code, err: err.join('') };
+  };
+  const on = await run(['--debug']);
+  assert.equal(on.code, 1);
+  assert.match(on.err, /\[debug\] build: exit 1/);
+  assert.match(on.err, /SECRET-LOOKING-TRANSCRIPT/);
+  assert.match(on.err, /\[debug\] gate tests: FAILED/);
+  const off = await run([]);
+  assert.doesNotMatch(off.err, /\[debug\]|SECRET-LOOKING/);
+});

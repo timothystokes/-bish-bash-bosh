@@ -83,16 +83,17 @@ function nextIteration(dir, /** @type {string} */ runId) {
  *   requireTestPlan?: boolean,
  *   steer?: string,
  *   identity?: HarnessIdentity,
+ *   log?: (msg: string) => void,
  * }} opts
  * @returns {Promise<StepResult>}
  */
-export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], typeCommand, requireTestPlan = false, steer, identity }) {
+export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], typeCommand, requireTestPlan = false, steer, identity, log = () => {} }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
   const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets, allowedPaths: string[], mode?: string, hardenCommand?: string[]}} */ (config);
 
   const self = identity ?? harnessIdentity();
-  const gated = (/** @type {string} */ reason) => ({ sha: null, iteration: 0, cost: 0, status: /** @type {const} */ ('gated'), reason });
+  const gated = (/** @type {string} */ reason) => (log(`step gated: ${reason}`), { sha: null, iteration: 0, cost: 0, status: /** @type {const} */ ('gated'), reason });
   for (const target of [cfg.targetRepo, repoDir]) {
     const g = checkRepoGate(target, self);
     if (!g.ok) return gated(g.reason);
@@ -118,6 +119,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
 
   const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
   if (!budget.ok) {
+    log(`budget gate: ${budget.reason}`);
     return { sha: null, iteration: 0, cost: 0, status: 'over-budget', reason: budget.reason };
   }
 
@@ -187,6 +189,10 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   }
 
   const finalGates = status === 'ok' || gates.length > preGates ? gates : [...gates, { name: 'tests', ok: false, detail: status }];
+  for (const g of finalGates) log(`gate ${g.name}: ${g.ok ? 'ok' : 'FAILED'}${g.detail ? ` (${g.detail})` : ''}`);
+  const failedTest = /** @type {{output?: string}} */ (test);
+  if (status !== 'ok' && failedTest.output) log(`test output:\n${failedTest.output}`);
+  log(`step ${iteration}: ${status}`);
   const diagnosis = diagnose({ status, gates: finalGates, transcript: result.transcript });
   writeIterationRecord(repoDir, runId, iteration, {
     status,

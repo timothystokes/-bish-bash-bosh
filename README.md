@@ -28,6 +28,8 @@ podge            # plan and implementation: loops until plan.md is done (use ./h
 podge step       # one iteration only (hodge/podge/podge step share one lock per sandbox: a second run is refused while the first lives)
 ```
 
+Add `--debug` (or set `HODGEPODGE_DEBUG=1`) to `hodge`, `podge` or `podge step` to log to stderr each agent call's exit status, usage and full transcript, every gate result with its detail, test output on failure, and stack traces. The transcript is whatever the agent printed, so review debug logs before sharing them.
+
 `hodge` then `podge` is the whole flow: hodge, then podge, aka hodgepodge.
 
 `hodge`, `podge`, `step`, `status` and `tui` work on the sandbox in `--dir <sandbox>`, which defaults to the current directory (`--run-id`, and `--control` for `podge`/`status`/`tui`, are the only other flags). `spec-lint`, `ready`, `sync` and `promote` also default to the sandbox in the current directory.
