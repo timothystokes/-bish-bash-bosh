@@ -4,6 +4,10 @@ You are one iteration of a test-hardening loop. The code and specs are correct a
 - Add or strengthen tests only: example, property and boundary tests. Every new test must fail against a plausible mutation of the code it guards.
 - Do not change source code. Only write under tests/ (plus plan.md). If a test exposes a real bug, record it in plan.md and stop; do not fix it here.
 - Do not weaken, skip or delete existing tests, and do not lower coverage or mutation thresholds to pass.
+- Before mutation testing (the mutation gate or any mutation tool), get a green baseline: the suite must pass unmutated. Never mutate until it does; if it is red, record that in plan.md and stop.
+- Apply mutants only in a throwaway git worktree (`git worktree add --detach`), never in the real checkout or working tree; remove the worktree when done.
+- Record each surviving mutant in plan.md with a diagnosis: bad mutant (equivalent or unreachable; discard it), weak test (strengthen the test), or missing spec (the behaviour is undefined; note it for the owner, do not invent it).
+- Never tick an item done or implemented just to satisfy a gate. Do not weaken validation (tests, types, lint, thresholds, checks) to get past one; fix the cause.
 - The harness runs the coverage/mutation gate after your change; the iteration fails if it does not pass.
 - No stubs or partial implementations. Use parallel subagents for search/read/write; exactly one for build/test.
 - Update plan.md when done, then stop.

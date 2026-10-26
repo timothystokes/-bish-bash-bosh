@@ -21,7 +21,7 @@ You are discovering requirements, not designing or building. Specs are formed th
 - Non-functional: performance targets, limits, security, privacy, observability, portability.
 - Constraints: required languages, libraries, platforms, standards, what must not change.
 - Acceptance: how the owner will know it is done (an observable check, not a feeling).
-- Out of scope: what is deliberately not being built.
+- Out of scope: what is deliberately not being built. Ask the owner explicitly for every spec; do not infer it.
 
 For each spec, record every dimension under `## Dimensions` as `- <dimension>: covered` or `- <dimension>: n/a: <reason>`. The harness fails readiness on a missing dimension or an `n/a` without a reason.
 

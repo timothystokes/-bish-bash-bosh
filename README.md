@@ -89,6 +89,7 @@ Secret redaction on model traffic, per-run budgets, a kill switch, scope and tes
 
 ```sh
 npm test       # node:test
+UPDATE_SNAPSHOTS=1 npm test   # after a deliberate prompt edit: rewrite test/snapshots/ (rendered prompts)
 npm run check  # tsc --checkJs
 ```
 

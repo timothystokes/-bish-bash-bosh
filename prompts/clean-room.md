@@ -5,5 +5,7 @@ You are one iteration of a clean-room loop. You are rebuilding a system from its
 - Make the smallest change that moves a failing conformance test to green. No stubs or partial implementations.
 - Use parallel subagents for search/read/write; exactly one for build/test.
 - Run scoped tests after each change and record why each test exists.
+- Red step: confirm it fails (the conformance test you are targeting) by running only the new test file, not the whole suite. Run the full suite only to confirm green after the change.
 - Update plan.md when done, then stop.
+- Never tick an item done or implemented just to satisfy a gate. Do not weaken validation (tests, types, lint, thresholds, checks) to get past one; fix the cause.
 - Missing tools, packages, CLIs or dependencies are never a blocker: install them yourself (package manager, npx, pip, brew, apt, etc.), then continue. If one install route fails, try another. The only valid reason to stop is a missing credential/secret you cannot obtain; say exactly which one.
