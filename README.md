@@ -19,7 +19,7 @@ npm link          # puts hodgepodge, hodge and podge on your PATH (or use ./bin/
 hodgepodge init --dir ~/sandboxes/demo --adapter copilot --model <model-id>
 ```
 
-`init` creates `~/sandboxes/demo/target` (a git repo seeded with a toy spec, red tests and an open plan), `~/sandboxes/demo/hodge.json` (config, kept outside the repo: target repo, roles, budgets, and a `hodgepodge` reference back to this tool) and and `hodgepodge`, `hodge` and `podge` launchers. After that, `cd` into the sandbox and run the commands from there; they take no config, repo or objective flags:
+`init` creates `~/sandboxes/demo/target` (a git repo seeded with a toy spec, red tests and an open plan), `~/sandboxes/demo/hodge.json` (config, kept outside the repo: target repo, roles, budgets, and `hodgepodge`, the relative path of the runtime copy), `~/sandboxes/demo/.hodgepodge` (a copy of the tool's code, prompts, templates and production dependencies, so the sandbox never reads this repo) and `hodgepodge`, `hodge` and `podge` launchers. After that, `cd` into the sandbox and run the commands from there; they take no config, repo or objective flags:
 
 ```sh
 cd ~/sandboxes/demo
@@ -48,7 +48,7 @@ When a spec declares a format, `hodge` adds that format's skill snippet (`prompt
 
 `hodge.json` is validated against `src/config.schema.json`. The key parts (run artifacts `record.json`, `usage.json`, `diagnosis.json` and `done.json` have schemas in `src/schemas/`):
 
-- `targetRepo` (relative to the sandbox dir), `hodgepodge` (written by `init`: where the tool lives), `allowedPaths`: where the agent works and what it may write (`init` defaults to `src/`; `--seed objective` also allows `bin/`, `lib/` and `package.json`, since a CLI entry point and its `bin` mapping are not solution-specific).
+- `targetRepo` (relative to the sandbox dir), `hodgepodge` (written by `init`: the runtime copy, `.hodgepodge`, relative to the sandbox dir), `allowedPaths`: where the agent works and what it may write (`init` defaults to `src/`; `--seed objective` also allows `bin/`, `lib/` and `package.json`, since a CLI entry point and its `bin` mapping are not solution-specific).
 - `roles`: map roles (`build`, `interview`, `reverse`, optional `qa`, ...) to an adapter and model. Models live in config only. `init` does not add `qa`; add it by hand to enable the evaluator.
 - `maxQaCycles`: optional, default 5; the most QA cycles `podge` runs when a `qa` role is configured.
 - `budgets`: `maxTokens`, `maxCostUsd`, `maxWallClockSeconds`, `maxIterations`. They are per run id and shared by `hodge` and `podge`. `init` defaults to 5,000,000 tokens, $20, 7200 s and 20 iterations (one live agent call can use over 100k tokens).

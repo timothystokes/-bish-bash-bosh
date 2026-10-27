@@ -55,7 +55,7 @@ test('commands run from inside the sandbox (--dir defaults to cwd)', async () =>
 test('init records where hodgepodge lives in the sandbox config', async () => {
   const dir = await sandbox();
   const cfg = JSON.parse(readFileSync(join(dir, 'hodge.json'), 'utf8'));
-  assert.equal(cfg.hodgepodge, join(import.meta.dirname, '..'));
+  assert.equal(cfg.hodgepodge, '.hodgepodge');
 });
 
 test('status needs only --dir', async () => {

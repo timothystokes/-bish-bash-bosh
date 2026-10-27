@@ -41,7 +41,7 @@ test('writes a valid config next to (not inside) the target repo', () => {
   assert.deepEqual(validateConfig(cfg), { ok: true, errors: [] });
   assert.deepEqual(cfg.roles.build, { adapter: 'agent-x', model: 'model-y' });
   assert.equal(cfg.targetRepo, 'target');
-  assert.equal(cfg.hodgepodge, root);
+  assert.equal(cfg.hodgepodge, '.hodgepodge');
   assert.equal(cfg.requireTestPlan, true);
   assert.ok(!existsSync(join(dir, 'target', 'hodge.json')));
 });
@@ -148,4 +148,29 @@ test('default budgets fit a live agent: one conversation round plus several step
   assert.ok(b.maxWallClockSeconds >= 3600);
   assert.ok(b.maxIterations >= 10);
   assert.ok(b.maxCostUsd >= 10);
+});
+
+test('copies the runtime (code, prompts, templates, production deps) into the sandbox', () => {
+  const dir = fresh();
+  const res = initSandbox({ dir, ...base });
+  assert.equal(res.ok, true);
+  const rt = join(dir, '.hodgepodge');
+  assert.equal(res.hodgepodge, rt);
+  for (const f of ['bin/hodge', 'bin/podge', 'bin/hodgepodge', 'src/cli.js', 'prompts/forward.md', 'prompts/formats', 'templates/spec.md', 'package.json', 'node_modules/ajv/package.json']) {
+    assert.ok(existsSync(join(rt, f)), f);
+  }
+  assert.ok(!existsSync(join(rt, 'node_modules', 'typescript')), 'dev dependencies are not copied');
+  assert.ok(!existsSync(join(rt, 'test')));
+});
+
+test('a sandbox has no dependency back on the hodgepodge source', () => {
+  const dir = fresh();
+  assert.equal(initSandbox({ dir, ...base }).ok, true);
+  for (const f of ['hodge.json', 'hodgepodge', 'hodge', 'podge']) {
+    assert.ok(!readFileSync(join(dir, f), 'utf8').includes(root), `${f} must not mention ${root}`);
+  }
+  // The copy is what runs: prompts it reads come from inside the sandbox.
+  const out = spawnSync('node', ['-e', "import('./src/prompts.js').then(m => console.log(m.loadModePrompt('forward').length))"], { cwd: join(dir, '.hodgepodge'), encoding: 'utf8' });
+  assert.equal(out.status, 0, out.stderr);
+  assert.ok(Number(out.stdout) > 0);
 });

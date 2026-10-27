@@ -2,7 +2,7 @@
  * Sandbox scaffolding: a fresh target repo (git, seeded) plus a config outside it.
  * The target never lives inside hodgepodge (repo gate).
  */
-import { mkdirSync, readdirSync, existsSync, writeFileSync, copyFileSync, rmSync, chmodSync } from 'node:fs';
+import { mkdirSync, readdirSync, existsSync, writeFileSync, copyFileSync, rmSync, chmodSync, cpSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,11 +13,13 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const templates = join(root, 'templates');
 const SEEDS = ['toy', 'empty', 'objective'];
 const LAUNCHERS = ['hodgepodge', 'hodge', 'podge'];
+const RUNTIME_DIR = '.hodgepodge';
+const RUNTIME_FILES = ['bin', 'src', 'prompts', 'templates', 'package.json', 'package-lock.json'];
 const IGNORE = 'node_modules/\nruns/\n';
 
 /**
  * @typedef {{dir: string, adapter: string, model: string, seed?: string}} InitOptions
- * @param {InitOptions} opts dir is the sandbox root: `<dir>/target` (repo), `<dir>/hodge.json` (config; `targetRepo` is relative to dir, `hodgepodge` points back at this tool) and `<dir>/hodgepodge`, `<dir>/hodge`, `<dir>/podge` (launchers)
+ * @param {InitOptions} opts dir is the sandbox root: `<dir>/target` (repo), `<dir>/.hodgepodge` (a copy of the runtime: code, prompts, templates, production dependencies), `<dir>/hodge.json` (config; `targetRepo` and `hodgepodge` are relative to dir) and `<dir>/hodgepodge`, `<dir>/hodge`, `<dir>/podge` (launchers)
  * @returns {{ok: true, dir: string, repo: string, config: string, hodgepodge: string} | {ok: false, reason: string}}
  */
 export function initSandbox(opts) {
@@ -29,7 +31,7 @@ export function initSandbox(opts) {
   const config = join(dir, 'hodge.json');
   const cfg = {
     targetRepo: 'target',
-    hodgepodge: root,
+    hodgepodge: RUNTIME_DIR,
     roles: {
       build: { adapter: opts.adapter, model: opts.model },
       interview: { adapter: opts.adapter, model: opts.model },
@@ -51,11 +53,12 @@ export function initSandbox(opts) {
     else if (seed === 'objective') seedObjective(repo);
     else writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'target', private: true, type: 'module' }, null, 2) + '\n');
     writeFileSync(join(repo, '.gitignore'), IGNORE);
+    copyRuntime(join(dir, RUNTIME_DIR));
     writeFileSync(config, JSON.stringify(cfg, null, 2) + '\n');
     // So the owner can `cd <dir>` and run `./hodge`, `./podge`, `./podge step`, ... without any path flags.
     for (const name of LAUNCHERS) {
       const path = join(dir, name);
-      writeFileSync(path, `#!/bin/sh\nexec node ${JSON.stringify(join(root, 'bin', name))} "$@"\n`);
+      writeFileSync(path, `#!/bin/sh\nexec node "$(dirname "$0")/${RUNTIME_DIR}/bin/${name}" "$@"\n`);
       chmodSync(path, 0o755);
     }
     const git = (/** @type {string[]} */ ...a) =>
@@ -67,7 +70,22 @@ export function initSandbox(opts) {
     rmSync(dir, { recursive: true, force: true });
     return { ok: false, reason: `init failed: ${/** @type {Error} */ (e).message}` };
   }
-  return { ok: true, dir, repo, config, hodgepodge: root };
+  return { ok: true, dir, repo, config, hodgepodge: join(dir, RUNTIME_DIR) };
+}
+
+/**
+ * Copy what the tool needs at runtime so the sandbox never reads the hodgepodge checkout:
+ * code, prompts, templates and the production dependency closure from package-lock.json.
+ * @param {string} to
+ */
+function copyRuntime(to) {
+  mkdirSync(to, { recursive: true });
+  for (const f of RUNTIME_FILES) cpSync(join(root, f), join(to, f), { recursive: true });
+  const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
+  for (const [path, info] of Object.entries(/** @type {Record<string, {dev?: boolean}>} */ (lock.packages))) {
+    if (!path.startsWith('node_modules/') || info.dev) continue;
+    if (existsSync(join(root, path))) cpSync(join(root, path), join(to, path), { recursive: true });
+  }
 }
 
 /**
