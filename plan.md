@@ -3,16 +3,16 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**O-1: compare ghuntley prompts with ours and report the content in a table (tests-first where code is added; else a report in `docs/`).**
-Why: owner-requested 2026-10-28; O-2 builds on it, O-3/O-4 are independent.
+**O-2: compare the size of the instructional files referenced by ghuntley's solution and ours (bytes/lines per file, totals; report in `docs/`).**
+Why: O-1 report (`docs/ghuntley-prompt-comparison.md`) gives the file list; O-3/O-4 are independent.
 Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`.
 Sign: loop context stays minimal (one plan item + spec pointers); byte budgets are tested, so shrink prompts instead of raising budgets.
 
 ## Owner requests (2026-10-28)
 | ID | Task | Status | Depends on |
 |---|---|---|---|
-| O-1 | Compare the actual prompts used by the `../../ghuntley` codebases with our defined prompts; report the actual content side by side in a table | todo | |
-| O-2 | Compare the size of the instructional files referenced by his solution and ours (bytes/lines per file, totals) | todo | O-1 |
+| O-1 | Compare the actual prompts used by the `../../ghuntley` codebases with our defined prompts; report the actual content side by side in a table | done (`docs/ghuntley-prompt-comparison.md`) | |
+| O-2 | Compare the size of the instructional files referenced by his solution and ours (bytes/lines per file, totals) | todo | O-1 (done) |
 | O-3 | Outer console while a loop runs: each entry writes `more-questions.md` (hodge: assessed and added to the questions) or `more-todos.md` (podge: end-of-session checklist adds its items before assessing next best action). Plain console, no model; independent of the running loop | todo | |
 | O-4 | `init` copies prompts and context files into the sandbox (e.g. local npm install into the target dir) so a sandbox has no dependency back on the hodgepodge source | todo | |
 
@@ -388,3 +388,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (owner request: loops far too big vs ghuntley's constrained prompts): the harness now parses the next unchecked `plan.md` item (`src/next-item.js`) and the loop prompt carries only that item plus spec pointers; plan and QA prompts no longer inline `plan.md`; the interview prompt points at the kit and carries only brief, 10 open questions and conversation tail. Rewrote all mode prompts (<= 1.3 KB; was 1.4-2.7 KB), objective kit files (<= 2.2 KB; was up to 5.1 KB) and `AGENTS.md` (4.7 -> 2.8 KB); `test/next-item.test.js` enforces the budgets. Fixed a pre-existing README docs-consistency failure. Learned: ghuntley's ~100-char prompts are tutorial prompts; his ralph-to-ralph loop is ~5 KB prompt + spec, so our win is item-by-item context, not extreme brevity. Hodgepodge's own 112 KB `plan.md` is not split (it is not loop context). Claim boundary: scripted adapter and unit level; no full loop run.
 - Session (owner request: shrink prompts further, esp. requirements gathering): build prompts now ~110 words (was ~177), interview 148, QA 133; kit files <= 1.7 KB; interview stage/gap text shortened. Dropped from prompts (covered by gates/harness diagnosis): scoped-test narration, `Verify:` and diagnosis-block lines. Budgets are now word counts in `test/next-item.test.js`. Huntley (from memory, unverified locally) gathers requirements in a plain conversation, not a loop; ours is owner Q&A rounds, so kept minimal. Claim boundary: unit level, no full loop.
 - Session (owner request: align requirements gathering to Huntley's phases and group questions): interview asks topic-grouped batches with a default per question (`src/questions.js`, `answerBatch` in `src/objective.js`); owner answers `y` or `N: x; M: y`. Index-default answering is our design, not found in Huntley's pages. Claim boundary: unit + scripted adapter (Q-1..Q-4); no full loop run.
+- Session (O-1): wrote `docs/ghuntley-prompt-comparison.md` comparing ghuntley's actual prompts (tutorial one-liners, ralph-to-ralph build/QA/inspect, loop script) with ours in tables. Learned: his only tiny prompts are tutorial inputs; real loop prompts are 4-5 KB with whole files `@`-attached (spec 57 KB). Sign: ghuntley clones live at `/Users/tim/work/ghuntley`. Claim boundary: read-only report, no code, no loop run.
