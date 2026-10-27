@@ -46,13 +46,14 @@ export function createClaudeCodeAdapter(opts = {}) {
   const command = opts.command ?? 'claude';
   const prefix = opts.prefixArgs ?? [];
   return {
-    async run({ prompt, cwd, limits }) {
+    async run({ prompt, cwd, limits, onOutput }) {
       const { code, stdout, stderr, timedOut, changedFiles } = await runProcessAgent({
         command,
         args: [...prefix, ...buildClaudeArgs({ prompt, model: opts.model })],
         cwd,
         env: opts.env,
         maxWallClockSeconds: limits.maxWallClockSeconds,
+        onOutput,
       });
       const parsed = parseClaudeOutput(stdout);
       const over =

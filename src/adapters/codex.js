@@ -57,13 +57,14 @@ export function createCodexAdapter(opts = {}) {
   const command = opts.command ?? 'codex';
   const prefix = opts.prefixArgs ?? [];
   return {
-    async run({ prompt, cwd, limits }) {
+    async run({ prompt, cwd, limits, onOutput }) {
       const { code, stdout, stderr, timedOut, changedFiles } = await runProcessAgent({
         command,
         args: [...prefix, ...buildCodexArgs({ prompt, model: opts.model })],
         cwd,
         env: opts.env,
         maxWallClockSeconds: limits.maxWallClockSeconds,
+        onOutput,
       });
       const parsed = parseCodexOutput(stdout);
       const over =

@@ -63,7 +63,7 @@ export function createCopilotAdapter(opts = {}) {
   const command = opts.command ?? 'copilot';
   const prefix = opts.prefixArgs ?? [];
   return {
-    async run({ prompt, cwd, limits }) {
+    async run({ prompt, cwd, limits, onOutput }) {
       const args = [...prefix, ...buildCopilotArgs({ prompt, model: opts.model })];
       const { code, stdout, stderr, timedOut, changedFiles } = await runProcessAgent({
         command,
@@ -71,6 +71,7 @@ export function createCopilotAdapter(opts = {}) {
         cwd,
         env: opts.env,
         maxWallClockSeconds: limits.maxWallClockSeconds,
+        onOutput,
       });
       const parsed = parseCopilotOutput(stdout);
       const over =

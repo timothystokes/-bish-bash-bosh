@@ -30,10 +30,10 @@ function snapshot(dir) {
 
 /**
  * Run a CLI agent process under limits and report which files it changed.
- * @param {{command: string, args: string[], cwd: string, env?: Record<string, string>, maxWallClockSeconds?: number}} p
+ * @param {{command: string, args: string[], cwd: string, env?: Record<string, string>, maxWallClockSeconds?: number, onOutput?: (stream: 'stdout' | 'stderr', chunk: string) => void}} p
  * @returns {Promise<{code: number, stdout: string, stderr: string, timedOut: boolean, changedFiles: string[]}>}
  */
-export async function runProcessAgent({ command, args, cwd, env, maxWallClockSeconds }) {
+export async function runProcessAgent({ command, args, cwd, env, maxWallClockSeconds, onOutput }) {
   const before = snapshot(cwd);
   const res = await new Promise((resolve) => {
     let stdout = '';
@@ -47,8 +47,14 @@ export async function runProcessAgent({ command, args, cwd, env, maxWallClockSec
             child.kill('SIGKILL');
           }, maxWallClockSeconds * 1000)
         : undefined;
-    child.stdout.on('data', (b) => (stdout += b));
-    child.stderr.on('data', (b) => (stderr += b));
+    child.stdout.on('data', (b) => {
+      stdout += b;
+      onOutput?.('stdout', String(b));
+    });
+    child.stderr.on('data', (b) => {
+      stderr += b;
+      onOutput?.('stderr', String(b));
+    });
     child.on('error', (e) => {
       clearTimeout(timer);
       resolve({ code: 127, stdout, stderr: stderr + String(e.message), timedOut });

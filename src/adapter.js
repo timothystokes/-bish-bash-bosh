@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 
 /**
  * @typedef {{maxTokens?: number, maxCostUsd?: number, maxWallClockSeconds?: number}} Limits
- * @typedef {{prompt: string, cwd: string, limits: Limits}} AdapterRequest
+ * @typedef {{prompt: string, cwd: string, limits: Limits, onOutput?: (stream: 'stdout' | 'stderr', chunk: string) => void}} AdapterRequest
  * @typedef {{tokens: number, cost: number}} Usage
  * @typedef {{exitStatus: number, transcript: string, usage: Usage, changedFiles: string[]}} AdapterResult
  * @typedef {{run: (req: AdapterRequest) => Promise<AdapterResult>}} Adapter

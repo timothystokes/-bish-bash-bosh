@@ -28,7 +28,7 @@ podge            # plan and implementation: the first step writes the test plan,
 podge step       # one iteration only (hodge/podge/podge step share one lock per sandbox: a second run is refused while the first lives)
 ```
 
-Add `--debug` (or set `HODGEPODGE_DEBUG=1`) to `hodge`, `podge` or `podge step` to log to stderr each agent call's exit status, usage and full transcript, every gate result with its detail, test output on failure, and stack traces. The transcript is whatever the agent printed, so review debug logs before sharing them.
+Add `--debug` (or set `HODGEPODGE_DEBUG=1`) to `hodge`, `podge` or `podge step` to log to stdout each agent prompt, the agent process raw stdout/stderr live, each call's exit status, usage and parsed transcript, every gate result with its detail, test output on failure, and stack traces. The transcript is whatever the agent printed, so review debug logs before sharing them.
 
 `hodge` then `podge` is the whole flow: hodge, then podge, aka hodgepodge.
 

@@ -170,7 +170,7 @@ test('podge --control passes the control file so a stop is honoured', async () =
   assert.equal(JSON.parse(o.join('')).status, 'stopped');
 });
 
-test('--debug logs the agent transcript and gate results to stderr; off by default', async () => {
+test('--debug logs the agent transcript and gate results to stdout; off by default', async () => {
   const run = async (/** @type {string[]} */ extra) => {
     const dir = makeRepo();
     const cfgPath = join(tmpdir(), `hodge-cfg-d-${Date.now()}-${Math.random()}.json`);
@@ -180,8 +180,8 @@ test('--debug logs the agent transcript and gate results to stderr; off by defau
       registry: { f: () => createFakeAdapter({ exitStatus: 1, transcript: 'SECRET-LOOKING-TRANSCRIPT', usage: { tokens: 1, cost: 0 }, writes: {} }) },
       testCommand: ['node', '-e', 'process.exit(0)'],
       identity: { root: '/nonexistent/hodgepodge', remotes: [] },
-      stdout: () => {},
-      stderr: capture(err),
+      stdout: capture(err),
+      stderr: () => {},
     });
     return { code, err: err.join('') };
   };

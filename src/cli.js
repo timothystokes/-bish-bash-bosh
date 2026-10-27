@@ -33,7 +33,7 @@ export function helpText() {
     '  hodge  [--dir <sandbox>] [--run-id <id>] [--reverse] [--debug]',
     '  podge  [--dir <sandbox>] [--run-id <id>] [--control <control.json>] [--debug]   (with a `qa` role in hodge.json, done also needs a clean independent QA report; findings return to the plan, up to maxQaCycles)',
     '  podge step [--dir <sandbox>] [--run-id <id>] [--debug]',
-    '  --debug (or HODGEPODGE_DEBUG=1) on hodge/podge/podge step: log to stderr each agent call\'s exit status, usage and full transcript, every gate result with its detail, test output on failure, and stack traces. The transcript is agent output, not the environment, but it may contain whatever the agent printed: do not share debug logs unreviewed.',
+    '  --debug (or HODGEPODGE_DEBUG=1) on hodge/podge/podge step: log to stdout the agent prompt, the agent process raw stdout/stderr live, each call\'s exit status, usage and parsed transcript, every gate result with its detail, test output on failure, and stack traces. The transcript is agent output, not the environment, but it may contain whatever the agent printed: do not share debug logs unreviewed.',
     '  hodgepodge <command> ...   (the commands below)',
     '  hodge, podge and podge step hold a single-run lock (<sandbox>/.hodge.lock, PID; stale locks are cleared) and refuse to start while another live run holds the sandbox.',
     '  Sandbox commands take --dir <sandbox> (default: the current directory). `hodgepodge init` writes <sandbox>/hodge.json holding the target repo,',
@@ -156,21 +156,21 @@ function resetTty(input) {
 }
 
 /**
- * In debug mode, print each agent call's exit status, usage, changed files and full transcript to stderr.
+ * In debug mode, print to stdout the agent process raw stdout/stderr live, then each call's exit status, usage, changed files and parsed transcript.
  * @param {import('./adapter.js').Adapter} adapter
  * @param {string} role
  * @param {boolean} debug
- * @param {(s: string) => void} err
+ * @param {(s: string) => void} out
  * @returns {import('./adapter.js').Adapter}
  */
-function debugAdapter(adapter, role, debug, err) {
+function debugAdapter(adapter, role, debug, out) {
   if (!debug) return adapter;
   return {
     run: async (req) => {
-      err(`[debug] ${role}: agent start (cwd ${req.cwd}, limits ${JSON.stringify(req.limits)})\n`);
-      const res = await adapter.run(req);
-      err(`[debug] ${role}: exit ${res.exitStatus}, usage ${JSON.stringify(res.usage)}, changed ${JSON.stringify(res.changedFiles)}\n`);
-      err(`[debug] ${role}: transcript begin\n${res.transcript}\n[debug] ${role}: transcript end\n`);
+      out(`[debug] ${role}: agent start (cwd ${req.cwd}, limits ${JSON.stringify(req.limits)})\n[debug] ${role}: prompt begin\n${req.prompt}\n[debug] ${role}: prompt end\n`);
+      const res = await adapter.run({ ...req, onOutput: (stream, chunk) => out(stream === 'stdout' ? chunk : `[${role} stderr] ${chunk}`) });
+      out(`\n[debug] ${role}: exit ${res.exitStatus}, usage ${JSON.stringify(res.usage)}, changed ${JSON.stringify(res.changedFiles)}\n`);
+      out(`[debug] ${role}: transcript begin\n${res.transcript}\n[debug] ${role}: transcript end\n`);
       return res;
     },
   };
@@ -491,7 +491,7 @@ export async function main(argv, deps = {}) {
   }
   try {
     const role = cmd === 'hodge' ? (reverse ? 'reverse' : 'interview') : 'build';
-    const adapter = debugAdapter(resolveAdapter(config, role, deps.registry ?? defaultRegistry), role, debug, err);
+    const adapter = debugAdapter(resolveAdapter(config, role, deps.registry ?? defaultRegistry), role, debug, out);
     if (cmd === 'hodge' && !reverse) {
       // The agent runs silently for minutes; say so, or a submitted answer looks like a dead prompt.
       const inner = adapter;
@@ -569,14 +569,15 @@ export async function main(argv, deps = {}) {
       testCommand: deps.testCommand,
       identity: deps.identity,
       ...(cmd === 'podge' && parsed.control ? { controlFile: resolve(parsed.control) } : {}),
-      ...(cmd === 'podge' && config.roles['qa'] ? { qaAdapter: debugAdapter(resolveAdapter(config, 'qa', deps.registry ?? defaultRegistry), 'qa', debug, err) } : {}),
+      ...(cmd === 'podge' && config.roles['qa'] ? { qaAdapter: debugAdapter(resolveAdapter(config, 'qa', deps.registry ?? defaultRegistry), 'qa', debug, out) } : {}),
       requireTestPlan: /** @type {{requireTestPlan?: boolean}} */ (config).requireTestPlan === true,
-      ...(debug ? { log: (/** @type {string} */ m) => err(`[debug] ${m}\n`) } : {}),
+      ...(debug ? { log: (/** @type {string} */ m) => out(`[debug] ${m}\n`) } : {}),
     });
     out(`${JSON.stringify(res)}\n`);
     return res.status === 'ok' || res.status === 'done' ? 0 : 1;
   } catch (e) {
-    err(`${label}: ${debug ? /** @type {Error} */ (e).stack : /** @type {Error} */ (e).message}\n`);
+    if (debug) out(`[debug] ${/** @type {Error} */ (e).stack}\n`);
+    err(`${label}: ${/** @type {Error} */ (e).message}\n`);
     return 2;
   } finally {
     lock.release();
