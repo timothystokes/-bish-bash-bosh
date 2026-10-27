@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { hasObjectiveKit } from './readiness.js';
 import { runInterview } from './interview.js';
-import { BATCH_HINT, formatBatchLog, parseBatch, resolveAnswer } from './questions.js';
+import { BATCH_HINT, formatBatchLog, nextBatch, readQuestions, recordAnswers, renderBatch, resolveAnswer, unanswered, writeQuestions } from './questions.js';
 
 /**
  * @typedef {{
@@ -59,59 +59,29 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
 
   const runDir = join(repoDir, 'runs', runId);
   let round = (existsSync(runDir) ? readdirSync(runDir).filter((d) => /^interview(-\d+)?$/.test(d)).length : 0) + 1;
-  const questionPath = join(repoDir, 'objective', 'QUESTION.md');
   let ran = 0;
   let lastStall = '';
+  let note = '';
   const conversationPath = join(repoDir, 'objective', 'CONVERSATION.md');
-  // Once the owner ends the interview (or the agent has no more questions), rounds check readiness and close the gaps.
+  // Once the owner ends the interview (or no question is left), rounds check readiness and close the gaps.
   let closing = existsSync(conversationPath) && readFileSync(conversationPath, 'utf8').includes(ENDED);
 
   /** @returns {Promise<boolean>} false when the owner stopped answering */
-  const answerPending = async () => {
-    if (!existsSync(questionPath)) return true;
-    const question = readFileSync(questionPath, 'utf8').trim();
-    /** @type {ReturnType<typeof parseBatch>} */
-    let batch = null;
-    try {
-      batch = parseBatch(question);
-    } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
-      say(`\nDiscarded a malformed objective/QUESTION.md: ${reason}\n`);
-      appendFileSync(conversationPath, `\n## Round ${round - 1}\n\nYour QUESTION.md was malformed (${reason}); rewrite it as numbered \`N. <question> Default: <answer>\` lines under \`## <topic>\` headings.\n`);
-      rmSync(questionPath);
-      git(repoDir, 'add', '-A');
-      git(repoDir, 'commit', '-q', '-m', `hodge ${runId}: discard malformed question`);
-      return true;
-    }
-    if (batch) return answerBatch(question, batch);
-    const proposed = /^Default:[ \t]*(.+)$/m.exec(question)?.[1]?.trim();
-    say(`\n${question}\n(${proposed ? 'type y to accept the default, ' : ''}type done to end the interview)\n`);
-    let answer = ((await ask('> ')) ?? '').trim();
-    if (answer === '') return false;
-    if (isDone(answer)) {
-      closing = true;
-      answer = ENDED;
-    } else if (proposed && /^(y|yes)$/i.test(answer)) answer = `Accepted the proposed default: ${proposed}`;
-    appendFileSync(conversationPath, `\n## Round ${round - 1}\n\n**Question:** ${question}\n\n**Answer:** ${answer}\n`);
-    rmSync(questionPath);
-    git(repoDir, 'add', '-A');
-    git(repoDir, 'commit', '-q', '-m', `hodge ${runId}: answer to round ${round - 1}`);
-    return true;
-  };
-
-  /**
-   * @param {string} question
-   * @param {NonNullable<ReturnType<typeof parseBatch>>} batch
-   * @returns {Promise<boolean>}
-   */
-  const answerBatch = async (question, batch) => {
-    say(`\n${question}\n(${BATCH_HINT})\n`);
+  const askBatch = async () => {
+    const qs = readQuestions(repoDir);
+    const batch = nextBatch(qs);
+    if (batch.length === 0) return true;
+    say(`\n${renderBatch(batch)}\n(${BATCH_HINT})\n`);
+    /** @type {import('./questions.js').BatchAnswer[]} */
+    let answers;
     for (;;) {
       const reply = ((await ask('> ')) ?? '').trim();
       if (reply === '') return false;
       if (isDone(reply)) {
         closing = true;
-        appendFileSync(conversationPath, `\n## Round ${round - 1}\n\n${ENDED}\n`);
+        const rest = unanswered(qs).map((q) => ({ n: q.id, topic: q.topic, text: q.text, default: q.default }));
+        answers = rest.map((q) => ({ n: q.n, answer: q.default, source: /** @type {const} */ ('default') }));
+        appendFileSync(conversationPath, `\n## Round ${round - 1}\n\n${ENDED}\n${formatBatchLog(rest, answers)}\n`);
         break;
       }
       const r = resolveAnswer(batch, reply);
@@ -119,28 +89,30 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
         say(`${r.reason}\n`);
         continue;
       }
-      appendFileSync(conversationPath, `\n## Round ${round - 1}\n\n${formatBatchLog(batch, r.answers)}\n`);
+      answers = r.answers;
+      appendFileSync(conversationPath, `\n## Round ${round - 1}\n\n${formatBatchLog(batch, answers)}\n`);
       break;
     }
-    rmSync(questionPath);
+    writeQuestions(repoDir, recordAnswers(qs, answers));
     git(repoDir, 'add', '-A');
     git(repoDir, 'commit', '-q', '-m', `hodge ${runId}: answers to round ${round - 1}`);
     return true;
   };
 
   for (;;) {
-    if (!(await answerPending())) return { status: 'paused', rounds: ran, reason: 'no answer given; run `hodge` again to resume' };
+    if (!(await askBatch())) return { status: 'paused', rounds: ran, reason: 'no answer given; run `hodge` again to resume' };
     if (ran >= maxRounds) return { status: 'max-rounds', rounds: ran, reason: `stopped after ${maxRounds} rounds; run again to continue` };
-    const res = await runInterview({ config, repoDir, runId, adapter, objective: brief, round, closing, inboxDir, identity });
+    const res = await runInterview({ config, repoDir, runId, adapter, objective: brief, round, closing, inboxDir, identity, note });
     ran++;
     round++;
     if (res.status === 'ok') return { status: 'ok', rounds: ran };
     if (res.status !== 'incomplete') return { status: res.status, rounds: ran, ...(res.reason ? { reason: res.reason } : {}) };
-    if (!existsSync(questionPath)) {
+    note = res.reason?.startsWith('invalid ') ? res.reason : '';
+    if (unanswered(readQuestions(repoDir)).length === 0) {
       closing = true;
       // gaps are in the next prompt; retry once, stall only when they did not change
       const gaps = res.reason ?? '';
-      if (gaps === lastStall) return { status: 'stalled', rounds: ran, reason: `agent left gaps but asked no question (objective/QUESTION.md): ${gaps}` };
+      if (gaps === lastStall) return { status: 'stalled', rounds: ran, reason: `agent left gaps but reported no question to ask: ${gaps}` };
       lastStall = gaps;
     }
   }

@@ -49,12 +49,13 @@ test('H-14: objective interview protocol asks for Out of scope per spec', () => 
   assert.match(kit, /Out of scope/);
 });
 
-test('interview drafts specs from each answer, queues perceived gaps and proposes defaults', () => {
+test('interview drafts specs from each answer and reports resolved ids and gaps with defaults in RESPONSE.json, never reading the log', () => {
   const kit = readFileSync(join(snapDir, '..', '..', 'templates', 'objective', 'INTERVIEW.md'), 'utf8');
   for (const text of [loadModePrompt('interview'), kit]) {
     assert.match(text, /draft[^.\n]*spec[^.\n]*(each|every) answer/i);
-    assert.match(text, /perceived gaps?[^.\n]*OPEN-QUESTIONS/i);
-    assert.match(text, /Default: /);
+    assert.match(text, /RESPONSE\.json/);
+    assert.match(text, /"default"/);
+    assert.match(text, /never open objective\/CONVERSATION\.md/i);
   }
 });
 

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateConfig } from './config.js';
@@ -10,11 +10,16 @@ import { loadFormatSkill, loadModePrompt } from './prompts.js';
 import { FORMATS, parseFormats } from './formats.js';
 import { checkReadiness, hasObjectiveKit } from './readiness.js';
 import { consumeInbox, inboxSection, readInbox } from './inbox.js';
+import { applyResponse, parseResponse, pendingAnswers, readQuestions, unanswered, writeQuestions } from './questions.js';
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 
 /** Interview writes specs and objective notes only; tests are the plan stage's job. */
 const ALLOWED = ['specs/', 'objective/'];
+
+/** Files code owns: whatever the agent does to them is discarded. */
+const CODE_OWNED = ['objective/BRIEF.md', 'objective/CONVERSATION.md', 'objective/OPEN-QUESTIONS.md'];
+const RESPONSE_FILE = 'objective/RESPONSE.json';
 
 /**
  * @typedef {{status: 'ok' | 'incomplete' | 'failed' | 'gated' | 'over-budget', sha: string | null, reason?: string}} InterviewResult
@@ -25,16 +30,17 @@ const ALLOWED = ['specs/', 'objective/'];
  * @param {string} objective
  * @param {boolean} [closing] the interview is expected to end this round: list the readiness gaps to close
  * @param {string} [moreQuestions] pending outer-console entries
+ * @param {string} [note] what was wrong with the previous round's response
  * @returns {string}
  */
-export function buildInterviewPrompt(repoDir, objective, closing = false, moreQuestions = '') {
+export function buildInterviewPrompt(repoDir, objective, closing = false, moreQuestions = '', note = '') {
   const specsDir = join(repoDir, 'specs');
   const existing = existsSync(specsDir) ? readdirSync(specsDir).filter((f) => f.endsWith('.md')).sort() : [];
   return [
     loadModePrompt('interview'),
     '## Objective',
     objective.trim(),
-    ...kitSections(repoDir, closing),
+    ...kitSections(repoDir, closing, note),
     ...inboxSection('hodge', moreQuestions),
     ...formatSkillSections(repoDir),
     '## Existing specs',
@@ -71,43 +77,40 @@ export function stageOf(repoDir) {
   return existsSync(specsDir) && readdirSync(specsDir).some((f) => f.endsWith('.md')) ? 'fine' : 'broad';
 }
 
-const CONVERSATION_TAIL_CHARS = 1500;
-const OPEN_QUESTIONS_SHOWN = 10;
-
 /**
  * With an objective kit, the interview prompt carries pointers to the protocol files plus only what changes per
- * round: the brief, the open questions, the conversation tail and the stage. The readiness gaps are listed only
- * once the interview is closing (the owner said done, or the agent had no more questions).
+ * round: the brief, this round's answers keyed by question id and the stage. The question store and the conversation
+ * log are code-owned and never shown. The readiness gaps are listed only once the interview is closing (the owner
+ * said done, or no question was left).
  * @param {string} repoDir
  * @param {boolean} closing
+ * @param {string} note
  * @returns {string[]}
  */
-function kitSections(repoDir, closing) {
+function kitSections(repoDir, closing, note) {
   if (!hasObjectiveKit(repoDir)) return [];
-  const read = (/** @type {string} */ f) => {
-    const p = join(repoDir, 'objective', f);
-    return existsSync(p) ? readFileSync(p, 'utf8').trimEnd() : '';
-  };
+  const briefPath = join(repoDir, 'objective', 'BRIEF.md');
   const gaps = closing ? checkReadiness(repoDir).gaps : [];
-  const open = read('OPEN-QUESTIONS.md').split('\n').filter((l) => /^\s*[-*] \[ \] /.test(l));
-  const convo = read('CONVERSATION.md');
+  const qs = readQuestions(repoDir);
+  const answers = pendingAnswers(qs);
   return [
-    '## Kit (read when needed): objective/PHASES.md, objective/INTERVIEW.md (protocol), objective/READINESS.md (what `ready` checks)',
+    '## Kit (read when needed): objective/PHASES.md, objective/INTERVIEW.md (protocol), objective/READINESS.md (what `ready` checks). Never open objective/CONVERSATION.md or objective/OPEN-QUESTIONS.md: the harness asks the questions, logs the answers and tracks their status.',
     '## objective/BRIEF.md',
-    read('BRIEF.md'),
-    `## Open questions (${open.length} unchecked; objective/OPEN-QUESTIONS.md)`,
-    open.slice(0, OPEN_QUESTIONS_SHOWN).join('\n') || '(none)',
-    `## objective/CONVERSATION.md (tail; the owner's answers so far)`,
-    convo.length > CONVERSATION_TAIL_CHARS ? `...${convo.slice(-CONVERSATION_TAIL_CHARS)}` : convo,
+    existsSync(briefPath) ? readFileSync(briefPath, 'utf8').trimEnd() : '',
+    `## Answers this round (${answers.length}): Q<id> [topic] question: owner's answer`,
+    answers.map((q) => `Q${q.id} [${q.topic}] ${q.text}: ${q.answer}`).join('\n') || '(none)',
+    `## Questions still to ask the owner: ${unanswered(qs).length}`,
     `## Stage: ${stageOf(repoDir)}`,
     stageOf(repoDir) === 'broad'
-      ? 'No specs yet: ask broad questions (purpose, users, capabilities, scope, constraints, success); draft a spec once an answer settles a decision. Write the next question batch to objective/QUESTION.md.'
-      : 'Specs exist: go deeper on the capability with the most gaps; update specs/ from the answers. Write the next question batch to objective/QUESTION.md.',
+      ? 'No specs yet: look for gaps in purpose, users, capabilities, scope, constraints and success; draft a spec once an answer settles a decision.'
+      : 'Specs exist: go deeper on the capability with the most gaps; update specs/ from the answers.',
+    'Finish by writing objective/RESPONSE.json (resolved ids and gaps, see above).',
+    ...(note ? [`## Previous round`, note] : []),
     ...(closing
       ? [
           '## Readiness gaps (the interview is ending: close these this round)',
           gaps.length === 0 ? '(none: confirm and stop)' : gaps.map((g) => `- ${g}`).join('\n'),
-          'Fix gaps the answers already settle; ask the owner about the rest (batch with defaults). Write no question only when no gap remains.',
+          'Fix gaps the answers already settle; report the rest as gaps in RESPONSE.json (with defaults). Report none only when no gap remains.',
         ]
       : []),
   ];
@@ -133,11 +136,12 @@ const git = (dir, ...args) =>
  *   round?: number,
  *   closing?: boolean,
  *   inboxDir?: string,
+ *   note?: string,
  *   identity?: import('./repo-gate.js').HarnessIdentity,
  * }} opts
  * @returns {Promise<InterviewResult>}
  */
-export async function runInterview({ config, repoDir, runId, adapter, objective, round = 1, closing = false, inboxDir, identity }) {
+export async function runInterview({ config, repoDir, runId, adapter, objective, round = 1, closing = false, inboxDir, note = '', identity }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
   const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets}} */ (config);
@@ -154,7 +158,7 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
   if (!budget.ok) return { status: 'over-budget', sha: null, reason: budget.reason };
 
   const moreQuestions = inboxDir ? readInbox(inboxDir, 'hodge') : '';
-  const prompt = buildInterviewPrompt(repoDir, objective, closing, moreQuestions);
+  const prompt = buildInterviewPrompt(repoDir, objective, closing, moreQuestions, note);
   const limits = {
     maxTokens: budget.remaining.tokens,
     maxCostUsd: budget.remaining.cost,
@@ -164,17 +168,41 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
   const result = await adapter.run({ prompt, cwd: repoDir, limits });
   const seconds = (Date.now() - started) / 1000;
 
+  const kit = hasObjectiveKit(repoDir);
+  /** @type {string | null} */
+  let responseText = null;
+  if (kit) {
+    for (const f of CODE_OWNED) git(repoDir, 'checkout', 'HEAD', '--', f);
+    rmSync(join(repoDir, 'objective', 'QUESTION.md'), { force: true });
+    if (existsSync(join(repoDir, RESPONSE_FILE))) {
+      responseText = readFileSync(join(repoDir, RESPONSE_FILE), 'utf8');
+      rmSync(join(repoDir, RESPONSE_FILE));
+    }
+  }
+
   git(repoDir, 'add', '-A');
-  const staged = git(repoDir, 'diff', '--cached', '--name-only').split('\n').filter(Boolean);
-  const diff = git(repoDir, 'diff', '--cached');
+  let staged = git(repoDir, 'diff', '--cached', '--name-only').split('\n').filter(Boolean);
 
   /** @type {InterviewResult['status']} */
   let status = 'ok';
   /** @type {string | undefined} */
   let reason;
   const outside = staged.filter((f) => !ALLOWED.some((p) => f.startsWith(p)));
-  // No question left for the owner means the agent claims the specs are ready.
-  const checking = closing || !existsSync(join(repoDir, 'objective', 'QUESTION.md'));
+  /** @type {string | undefined} */
+  let badResponse;
+  if (kit && result.exitStatus === 0 && outside.length === 0) {
+    // Code, not the agent, updates question status; a missing response is an empty one.
+    const qs = readQuestions(repoDir);
+    const parsed = parseResponse(responseText ?? '{"resolved":[],"gaps":[]}', pendingAnswers(qs).map((q) => q.id));
+    if (parsed.ok) {
+      writeQuestions(repoDir, applyResponse(qs, parsed.response));
+      git(repoDir, 'add', '-A');
+      staged = git(repoDir, 'diff', '--cached', '--name-only').split('\n').filter(Boolean);
+    } else badResponse = `invalid ${RESPONSE_FILE}: ${parsed.reason}`;
+  }
+  const diff = git(repoDir, 'diff', '--cached');
+  // No question left to ask the owner means the agent claims the specs are ready.
+  const checking = closing || (kit ? unanswered(readQuestions(repoDir)).length === 0 : true);
   /** @returns {string | undefined} the gaps that keep the interview open */
   const openGaps = () => {
     const gaps = hasObjectiveKit(repoDir) ? checkReadiness(repoDir).gaps : lintSpecs(repoDir, { testPlan: false }).problems;
@@ -186,6 +214,9 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
   } else if (outside.length > 0) {
     status = 'failed';
     reason = `wrote outside specs/ and objective/: ${outside.join(', ')}`;
+  } else if (badResponse) {
+    status = 'incomplete';
+    reason = badResponse;
   } else if (staged.length === 0 && !(closing && !openGaps())) {
     status = 'failed';
     reason = 'agent made no changes (nothing written to objective/ or specs/)';

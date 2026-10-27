@@ -104,16 +104,6 @@ test('the test-plan mapping is not an interview check: specs without tests/PLAN.
   assert.equal(lintSpecs(dir, { testPlan: false }).ok, true);
 });
 
-test('a round that leaves a question runs no spec-lint, even with a broken spec', async () => {
-  const dir = makeRepo();
-  const res = await runInterview({
-    config: config(), repoDir: dir, runId: 'r1', objective: 'x', identity,
-    adapter: agent({ 'specs/bad.md': 'no title\n', 'objective/QUESTION.md': 'Who?\n' }).adapter,
-  });
-  assert.equal(res.status, 'incomplete');
-  assert.match(res.reason ?? '', /waiting for the owner/);
-});
-
 test('refuses when the agent writes outside specs/ and objective/ (tests are the plan stage)', async () => {
   const dir = makeRepo();
   const res = await runInterview({
@@ -157,6 +147,9 @@ test('gates: empty objective, dirty tree, harness repo, missing role make no age
   assert.equal(a.prompts.length, 0);
 });
 
+const gaps = (/** @type {number[]} */ resolved, /** @type {string} */ question) =>
+  JSON.stringify({ resolved: resolved.map((id) => ({ id, spec: 'specs/greet.md' })), gaps: [{ topic: 'Greeter', question, default: 'Yes' }] });
+
 test('hodge on a repo without a kit scaffolds objective/ and keeps asking until ready', async () => {
   const dir = makeRepo();
   const cfgPath = join(tmpdir(), `hodge-int-cfg-${Date.now()}.json`);
@@ -164,9 +157,9 @@ test('hodge on a repo without a kit scaffolds objective/ and keeps asking until 
   const out = /** @type {string[]} */ ([]);
   /** @type {Record<string, string>[]} */
   const rounds = [
-    { 'objective/QUESTION.md': 'Who uses the greeter?\n' },
-    { 'objective/QUESTION.md': 'Should names be trimmed?\n', 'objective/notes.md': 'n\n' },
-    { 'objective/QUESTION.md': 'Anything out of scope?\n', 'objective/notes.md': 'm\n' },
+    { 'objective/RESPONSE.json': gaps([], 'Who uses the greeter?') },
+    { 'objective/RESPONSE.json': gaps([1], 'Should names be trimmed?'), 'objective/notes.md': 'n\n' },
+    { 'objective/RESPONSE.json': gaps([2], 'Anything out of scope?'), 'objective/notes.md': 'm\n' },
   ];
   const prompts = /** @type {string[]} */ ([]);
   let n = 0;
@@ -181,14 +174,14 @@ test('hodge on a repo without a kit scaffolds objective/ and keeps asking until 
   const code = await main(['hodge', '--dir', sandboxOf(cfgPath, dir)], {
     registry: { iv: () => adapter, f: () => { throw new Error('build role must not be used'); } },
     identity,
-    input: Readable.from(['Build a greeter\n', 'Developers\n', 'Yes\n', '']),
+    input: Readable.from(['Build a greeter\n', 'y\n', 'y\n', '']),
     stdout: (s) => { out.push(s); }, stderr: () => {},
   });
   assert.ok(existsSync(join(dir, 'objective', 'INTERVIEW.md')), 'kit scaffolded');
   assert.equal(code, 1, 'paused at EOF, not ok');
   assert.ok(n >= 3, `agent ran once per answer, ran ${n} times`);
   assert.match(out.join(''), /Who uses the greeter\?[\s\S]*Should names be trimmed\?[\s\S]*Anything out of scope\?/);
-  assert.match(prompts[1], /Developers/);
+  assert.match(prompts[1], /Q1 \[Greeter\] Who uses the greeter\?: Yes/);
   assert.equal(git(dir, 'status', '--porcelain'), '');
   assert.equal(readFileSync(join(dir, 'README.md'), 'utf8'), '# target\n');
 });

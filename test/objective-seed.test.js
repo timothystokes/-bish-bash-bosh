@@ -69,7 +69,7 @@ test('the kit is part of the interview prompt together with stage and current re
   assert.match(p, /READINESS\.md/);
   assert.doesNotMatch(p, /## Readiness gaps/, 'no readiness check until the interview is ending');
   assert.match(p, /## Stage: broad/);
-  assert.match(p, /CONVERSATION\.md/);
+  assert.match(p, /never open objective\/CONVERSATION\.md/i);
   const closing = buildInterviewPrompt(join(dir, 'target'), 'Build a greeter CLI', true);
   assert.match(closing, /## Readiness gaps/);
   assert.match(closing, /specs\/ has no \*\.md specs/);
@@ -135,6 +135,16 @@ test('interview with a kit: lint-clean but not ready is kept as incomplete (a ro
   assert.ok(existsSync(join(repo, 'specs', 'greet.md')), 'progress is kept for the next round');
   assert.equal(git(repo, 'status', '--porcelain'), '');
   assert.equal(JSON.parse(readFileSync(join(repo, 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'incomplete');
+});
+
+test('interview with a kit: a round that leaves a question runs no spec-lint, even with a broken spec', async () => {
+  const { repo, config } = sandbox('Build a greeter');
+  const res = await runInterview({
+    config, repoDir: repo, runId: 'r1', identity, objective: 'Build a greeter',
+    adapter: agent({ 'specs/bad.md': 'no title\n', 'objective/RESPONSE.json': '{"resolved":[],"gaps":[{"topic":"T","question":"Who?","default":"devs"}]}' }),
+  });
+  assert.equal(res.status, 'incomplete');
+  assert.match(res.reason ?? '', /waiting for the owner/);
 });
 
 test('interview with a kit: a ready result is ok; it may write objective/', async () => {
