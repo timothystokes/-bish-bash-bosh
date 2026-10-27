@@ -3,10 +3,18 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**None: no unblocked work remains. Ask the owner what to promote from the `implement later` items (H-7, H-8, H-9, H-12, H-18, H-20, H-24, H-27, H-28, F-12, P0-5b, P0-6b, P5-4b, P5-6); do not pick any of them, and do not check for CLIs, keys or AWS credentials.**
-Why: all Docker tasks are done, the stale `implement` rows were audited as done, and F-9b (JUnit XML) is `Will not implement`.
+**O-1: compare ghuntley prompts with ours and report the content in a table (tests-first where code is added; else a report in `docs/`).**
+Why: owner-requested 2026-10-28; O-2 builds on it, O-3/O-4 are independent.
 Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`.
 Sign: loop context stays minimal (one plan item + spec pointers); byte budgets are tested, so shrink prompts instead of raising budgets.
+
+## Owner requests (2026-10-28)
+| ID | Task | Status | Depends on |
+|---|---|---|---|
+| O-1 | Compare the actual prompts used by the `../../ghuntley` codebases with our defined prompts; report the actual content side by side in a table | todo | |
+| O-2 | Compare the size of the instructional files referenced by his solution and ours (bytes/lines per file, totals) | todo | O-1 |
+| O-3 | Outer console while a loop runs: each entry writes `more-questions.md` (hodge: assessed and added to the questions) or `more-todos.md` (podge: end-of-session checklist adds its items before assessing next best action). Plain console, no model; independent of the running loop | todo | |
+| O-4 | `init` copies prompts and context files into the sandbox (e.g. local npm install into the target dir) so a sandbox has no dependency back on the hodgepodge source | todo | |
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
