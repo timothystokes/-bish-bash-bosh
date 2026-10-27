@@ -16,6 +16,7 @@ import { exportBundle } from './clean-room.js';
 import { createLocalStatusSource, readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
 import { runTui } from './tui.js';
+import { addEntry, INBOX_FILE } from './inbox.js';
 import { stopContainer, dockerRunner } from './kill-switch.js';
 import { createSecretProxy } from './secret-proxy.js';
 import { syncArtifacts, requestPromotion } from './artifacts.js';
@@ -48,6 +49,7 @@ export function helpText() {
     '  hodgepodge ready [--repo <dir> | --dir <sandbox>]',
     '  hodgepodge kill --container <name> [--control <control.json>] [--grace <sec>]',
     '  hodgepodge control --file <control.json> pause|resume|stop|steer <note...>',
+    '  hodgepodge console hodge|podge [--dir <sandbox>]',
     '',
     'Spec formats: a spec may declare `## Formats` bullets, checked by `ready` and the loop. Known formats: `asyncapi`, `ebnf`, `gherkin`, `json-schema`, `openapi`.',
     '',
@@ -72,6 +74,7 @@ export function helpText() {
     '  sync   copy runs/<id>/** to S3 (idempotent, needs the `aws` CLI); prints JSON {uploaded, skipped}',
     '  promote  open a promotion-review PR from --head to --base with the commit and artifacts URI (needs `gh`); never merges; prints JSON {url}',
     '  kill   stop the run container: sets stop in --control first (so no new iteration starts), then `docker stop`; prints JSON {stopped, name};\n         exit 0 when stopped or already gone, 1 on docker failure',
+    '  console  plain outer console (no model, no lock) for a running loop: each line you type is queued as a bullet in <sandbox>/more-questions.md (hodge: assessed and added to the open questions next round) or <sandbox>/more-todos.md (podge: added to plan.md by the end-of-session checklist before the next item is assessed); consumed after a successful round/step; /quit or Ctrl-D ends',
     '  control  write pause/resume/stop/steer to a control file read by `podge --control`; prints JSON {ok}',
     '',
   ].join('\n');
@@ -442,6 +445,34 @@ export async function main(argv, deps = {}) {
     out(`${JSON.stringify(res)}\n`);
     return res.ok ? 0 : 1;
   }
+  if (cmd === 'console') {
+    const [kind, ...flags] = argv.slice(1);
+    if (kind !== 'hodge' && kind !== 'podge') {
+      err('hodgepodge console: expected hodge or podge\n');
+      return 2;
+    }
+    const parsedDir = parseStepArgs(flags);
+    if (!parsedDir.ok || flags.includes('--run-id')) {
+      err(`hodgepodge console: ${parsedDir.ok ? "unknown argument '--run-id'" : parsedDir.error}\n`);
+      return 2;
+    }
+    const dir = resolve(parsedDir.dir);
+    if (!existsSync(join(dir, CONFIG_FILE))) {
+      err(`hodgepodge console: no ${CONFIG_FILE} in ${dir}\n`);
+      return 2;
+    }
+    const file = INBOX_FILE[kind];
+    out(`Writing ${file} in ${dir}. One entry per line; /quit or Ctrl-D ends.\n`);
+    const rl = createInterface({ input: deps.input ?? process.stdin });
+    for await (const line of rl) {
+      if (line.trim() === '/quit') break;
+      if (line.trim() === '') continue;
+      addEntry(dir, kind, line);
+      out(`queued in ${file}\n`);
+    }
+    rl.close();
+    return 0;
+  }
   const phase = deps.program !== 'hodgepodge' && (cmd === 'hodge' || cmd === 'podge');
   if (!['status', 'tui'].includes(cmd) && !phase && !(cmd === 'step' && viaPodge)) {
     err(`hodgepodge: unknown command '${argv[0]}'\n\n${helpText()}`);
@@ -540,6 +571,7 @@ export async function main(argv, deps = {}) {
           adapter: announced,
           ask,
           say: out,
+          inboxDir: sandbox.dir,
           identity: deps.identity,
         });
         out(`${JSON.stringify(res)}\n`);
@@ -568,6 +600,7 @@ export async function main(argv, deps = {}) {
       adapter,
       testCommand: deps.testCommand,
       identity: deps.identity,
+      inboxDir: sandbox.dir,
       ...(cmd === 'podge' && parsed.control ? { controlFile: resolve(parsed.control) } : {}),
       ...(cmd === 'podge' && config.roles['qa'] ? { qaAdapter: debugAdapter(resolveAdapter(config, 'qa', deps.registry ?? defaultRegistry), 'qa', debug, out) } : {}),
       requireTestPlan: /** @type {{requireTestPlan?: boolean}} */ (config).requireTestPlan === true,

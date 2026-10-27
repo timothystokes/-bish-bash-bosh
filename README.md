@@ -30,6 +30,8 @@ podge step       # one iteration only (hodge/podge/podge step share one lock per
 
 Add `--debug` (or set `HODGEPODGE_DEBUG=1`) to `hodge`, `podge` or `podge step` to log to stdout each agent prompt, the agent process raw stdout/stderr live, each call's exit status, usage and parsed transcript, every gate result with its detail, test output on failure, and stack traces. The transcript is whatever the agent printed, so review debug logs before sharing them.
 
+While a loop runs, open a second terminal in the sandbox and run `hodgepodge console hodge` (or `podge`): each line you type is queued in `more-questions.md` (hodge assesses it and adds it to the open questions in its next round) or `more-todos.md` (podge's end-of-session checklist adds it to `plan.md` before assessing the next item). The console is plain (no model, no lock); entries are consumed after a successful round or step and kept after a failed or gated one. `/quit` or Ctrl-D ends it.
+
 `hodge` then `podge` is the whole flow: hodge, then podge, aka hodgepodge.
 
 `hodge`, `podge`, `step`, `status` and `tui` work on the sandbox in `--dir <sandbox>`, which defaults to the current directory (`--run-id`, and `--control` for `podge`/`status`/`tui`, are the only other flags). `spec-lint`, `ready`, `sync` and `promote` also default to the sandbox in the current directory.

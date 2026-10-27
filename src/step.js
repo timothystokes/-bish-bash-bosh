@@ -17,6 +17,7 @@ import { checkHardeningGate } from './hardening-gate.js';
 import { checkCleanRoomGate } from './clean-room.js';
 import { checkTestsNoRegression, isPlanningOnly, runTests } from './test-gate.js';
 import { checkFormatGate, declaresFormats } from './formats.js';
+import { consumeInbox, inboxSection, readInbox } from './inbox.js';
 
 /**
  * @typedef {import('./adapter.js').Adapter} Adapter
@@ -63,14 +64,16 @@ function itemSection(repoDir) {
  * @param {string} repoDir
  * @param {string} [mode]
  * @param {string} [steer] operator note for this iteration only
+ * @param {string} [moreTodos] pending outer-console entries
  * @returns {string}
  */
-export function buildPrompt(repoDir, mode = 'forward', steer) {
+export function buildPrompt(repoDir, mode = 'forward', steer, moreTodos = '') {
   return [
     loadModePrompt(mode),
     itemSection(repoDir),
     buildContext(repoDir),
     ...(steer ? ['## Steer note', steer] : []),
+    ...inboxSection('podge', moreTodos),
   ].join('\n\n');
 }
 
@@ -78,15 +81,17 @@ export function buildPrompt(repoDir, mode = 'forward', steer) {
  * Prompt for the plan step: plan prompt + test-plan template + spec pointers (plan.md is in the repo).
  * @param {string} repoDir
  * @param {string} [steer]
+ * @param {string} [moreTodos]
  * @returns {string}
  */
-export function buildPlanPrompt(repoDir, steer) {
+export function buildPlanPrompt(repoDir, steer, moreTodos = '') {
   return [
     loadModePrompt('plan'),
     '## Test-plan template (templates/tests-PLAN.md)',
     readFileSync(join(templatesDir, 'tests-PLAN.md'), 'utf8').trimEnd(),
     buildContext(repoDir),
     ...(steer ? ['## Steer note', steer] : []),
+    ...inboxSection('podge', moreTodos),
   ].join('\n\n');
 }
 
@@ -129,12 +134,13 @@ function checkPlanStepOutput(repoDir, testCommand) {
  *   typeCommand?: string[],
  *   requireTestPlan?: boolean,
  *   steer?: string,
+ *   inboxDir?: string,
  *   identity?: HarnessIdentity,
  *   log?: (msg: string) => void,
  * }} opts
  * @returns {Promise<StepResult>}
  */
-export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], typeCommand, requireTestPlan = false, steer, identity, log = () => {} }) {
+export async function runStep({ config, repoDir, runId, adapter, testCommand = ['npm', 'test'], typeCommand, requireTestPlan = false, steer, inboxDir, identity, log = () => {} }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
   const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets, allowedPaths: string[], mode?: string, hardenCommand?: string[]}} */ (config);
@@ -178,7 +184,8 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     if (!plan.ok) return gated(plan.reason ?? 'test-plan gate failed');
   }
   const baseline = runTests(testCommand, repoDir);
-  const prompt = planStep ? buildPlanPrompt(repoDir, steer) : buildPrompt(repoDir, cfg.mode, steer);
+  const moreTodos = inboxDir ? readInbox(inboxDir, 'podge') : '';
+  const prompt = planStep ? buildPlanPrompt(repoDir, steer, moreTodos) : buildPrompt(repoDir, cfg.mode, steer, moreTodos);
   const maxTokens = budget.remaining.tokens;
   const maxCostUsd = budget.remaining.cost;
   const maxWallClockSeconds = Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds);
@@ -257,6 +264,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     ...(diagnosis ? { diagnosis } : {}),
   });
   git(repoDir, 'add', '-A');
+  if (inboxDir && status === 'ok') consumeInbox(inboxDir, 'podge', moreTodos);
   git(repoDir, 'commit', '-q', '--allow-empty', '-m', `podge step ${runId}/${String(iteration).padStart(3, '0')}: ${status}`);
 
   return {

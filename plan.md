@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**O-3: outer console while a loop runs: each entry writes `more-questions.md` (hodge) or `more-todos.md` (podge); plain console, no model.**
-Why: O-2 is done; O-3 and O-4 are independent, O-3 first by table order.
+**O-4: `init` copies prompts and context files into the sandbox (e.g. local npm install into the target dir) so a sandbox has no dependency back on the hodgepodge source.**
+Why: the last open owner request; O-3 is done.
 Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`.
 Sign: loop context stays minimal (one plan item + spec pointers); byte budgets are tested, so shrink prompts instead of raising budgets.
 
@@ -13,7 +13,7 @@ Sign: loop context stays minimal (one plan item + spec pointers); byte budgets a
 |---|---|---|---|
 | O-1 | Compare the actual prompts used by the `../../ghuntley` codebases with our defined prompts; report the actual content side by side in a table | done (`docs/ghuntley-prompt-comparison.md`) | |
 | O-2 | Compare the size of the instructional files referenced by his solution and ours (bytes/lines per file, totals) | done (`docs/ghuntley-size-comparison.md`) | O-1 (done) |
-| O-3 | Outer console while a loop runs: each entry writes `more-questions.md` (hodge: assessed and added to the questions) or `more-todos.md` (podge: end-of-session checklist adds its items before assessing next best action). Plain console, no model; independent of the running loop | todo | |
+| O-3 | Outer console while a loop runs: each entry writes `more-questions.md` (hodge: assessed and added to the questions) or `more-todos.md` (podge: end-of-session checklist adds its items before assessing next best action). Plain console, no model; independent of the running loop | done (`hodgepodge console`, `src/inbox.js`) | |
 | O-4 | `init` copies prompts and context files into the sandbox (e.g. local npm install into the target dir) so a sandbox has no dependency back on the hodgepodge source | todo | |
 
 ## Phase 0: Foundations
@@ -390,3 +390,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (owner request: align requirements gathering to Huntley's phases and group questions): interview asks topic-grouped batches with a default per question (`src/questions.js`, `answerBatch` in `src/objective.js`); owner answers `y` or `N: x; M: y`. Index-default answering is our design, not found in Huntley's pages. Claim boundary: unit + scripted adapter (Q-1..Q-4); no full loop run.
 - Session (O-1): wrote `docs/ghuntley-prompt-comparison.md` comparing ghuntley's actual prompts (tutorial one-liners, ralph-to-ralph build/QA/inspect, loop script) with ours in tables. Learned: his only tiny prompts are tutorial inputs; real loop prompts are 4-5 KB with whole files `@`-attached (spec 57 KB). Sign: ghuntley clones live at `/Users/tim/work/ghuntley`. Claim boundary: read-only report, no code, no loop run.
 - Session (O-2): wrote `docs/ghuntley-size-comparison.md` (bytes/lines per instructional file, totals, per-iteration attached context). Learned: prompt text is ~6x smaller than his (6066 vs 14714 B), but the real gap is attached state: his iterations attach 190-265 KB (`prd.json` 127 KB, progress 69 KB, spec 57 KB) vs <1 KB injected by us. Sign: compute table sums with `wc -lc` and re-add them. Claim boundary: read-only measurement, no code, no loop run.
+- Session (O-3): `hodgepodge console hodge|podge` (plain stdin, no model, no lock) appends bullets to `<sandbox>/more-questions.md` / `more-todos.md`; `runInterview`/`runStep` take `inboxDir`, add a `## More questions` / `## More todos` prompt section (assess + add to open questions; end-of-session checklist adds to plan.md first) and consume exactly what was sent only on ok (hodge also incomplete). 10 new tests in `test/inbox.test.js` (failed first: module missing), full suite and `tsc` clean. Claim boundary: scripted fake adapters and unit/CLI tests only; no live adapter, no Docker, full loop not run, so whether a real agent acts on the section is unproven. Sign: sandbox-side queues must be consumed only after a successful round, and by exact text so concurrent appends survive.

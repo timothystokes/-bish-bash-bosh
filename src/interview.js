@@ -9,6 +9,7 @@ import { lintSpecs } from './spec-lint.js';
 import { loadFormatSkill, loadModePrompt } from './prompts.js';
 import { FORMATS, parseFormats } from './formats.js';
 import { checkReadiness, hasObjectiveKit } from './readiness.js';
+import { consumeInbox, inboxSection, readInbox } from './inbox.js';
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 
@@ -23,9 +24,10 @@ const ALLOWED = ['specs/', 'objective/'];
  * @param {string} repoDir
  * @param {string} objective
  * @param {boolean} [closing] the interview is expected to end this round: list the readiness gaps to close
+ * @param {string} [moreQuestions] pending outer-console entries
  * @returns {string}
  */
-export function buildInterviewPrompt(repoDir, objective, closing = false) {
+export function buildInterviewPrompt(repoDir, objective, closing = false, moreQuestions = '') {
   const specsDir = join(repoDir, 'specs');
   const existing = existsSync(specsDir) ? readdirSync(specsDir).filter((f) => f.endsWith('.md')).sort() : [];
   return [
@@ -33,6 +35,7 @@ export function buildInterviewPrompt(repoDir, objective, closing = false) {
     '## Objective',
     objective.trim(),
     ...kitSections(repoDir, closing),
+    ...inboxSection('hodge', moreQuestions),
     ...formatSkillSections(repoDir),
     '## Existing specs',
     existing.length === 0 ? '(none)' : existing.map((f) => `- specs/${f}`).join('\n'),
@@ -129,11 +132,12 @@ const git = (dir, ...args) =>
  *   objective: string,
  *   round?: number,
  *   closing?: boolean,
+ *   inboxDir?: string,
  *   identity?: import('./repo-gate.js').HarnessIdentity,
  * }} opts
  * @returns {Promise<InterviewResult>}
  */
-export async function runInterview({ config, repoDir, runId, adapter, objective, round = 1, closing = false, identity }) {
+export async function runInterview({ config, repoDir, runId, adapter, objective, round = 1, closing = false, inboxDir, identity }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
   const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets}} */ (config);
@@ -149,7 +153,8 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
   const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
   if (!budget.ok) return { status: 'over-budget', sha: null, reason: budget.reason };
 
-  const prompt = buildInterviewPrompt(repoDir, objective, closing);
+  const moreQuestions = inboxDir ? readInbox(inboxDir, 'hodge') : '';
+  const prompt = buildInterviewPrompt(repoDir, objective, closing, moreQuestions);
   const limits = {
     maxTokens: budget.remaining.tokens,
     maxCostUsd: budget.remaining.cost,
@@ -211,6 +216,7 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
     join(dir, 'record.json'),
     `${JSON.stringify({ status, reason, usage: { ...result.usage, seconds }, changedFiles: result.changedFiles }, null, 2)}\n`,
   );
+  if (inboxDir && (status === 'ok' || status === 'incomplete')) consumeInbox(inboxDir, 'hodge', moreQuestions);
   git(repoDir, 'add', '-A');
   git(repoDir, 'commit', '-q', '--allow-empty', '-m', `hodge ${runId}: ${status}`);
 

@@ -35,11 +35,12 @@ const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgs
  *   ask: (prompt: string) => Promise<string | null>,
  *   say: (text: string) => void,
  *   maxRounds?: number,
+ *   inboxDir?: string,
  *   identity?: import('./repo-gate.js').HarnessIdentity,
  * }} opts
  * @returns {Promise<ObjectiveResult>}
  */
-export async function runObjective({ config, repoDir, runId, adapter, ask, say, maxRounds = 30, identity }) {
+export async function runObjective({ config, repoDir, runId, adapter, ask, say, maxRounds = 30, inboxDir, identity }) {
   /** @param {string} reason @returns {ObjectiveResult} */
   const gated = (reason) => ({ status: 'gated', rounds: 0, reason });
   if (!hasObjectiveKit(repoDir)) return gated('no objective kit in the target (create the sandbox with `hodgepodge init --seed objective`)');
@@ -130,7 +131,7 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
   for (;;) {
     if (!(await answerPending())) return { status: 'paused', rounds: ran, reason: 'no answer given; run `hodge` again to resume' };
     if (ran >= maxRounds) return { status: 'max-rounds', rounds: ran, reason: `stopped after ${maxRounds} rounds; run again to continue` };
-    const res = await runInterview({ config, repoDir, runId, adapter, objective: brief, round, closing, identity });
+    const res = await runInterview({ config, repoDir, runId, adapter, objective: brief, round, closing, inboxDir, identity });
     ran++;
     round++;
     if (res.status === 'ok') return { status: 'ok', rounds: ran };
