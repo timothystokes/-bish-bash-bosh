@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**O-5: live-verify one `./podge step` from a fresh `init` sandbox using the Copilot adapter (single step, not a full loop), confirming the `.hodgepodge` runtime copy works with a real agent.**
-Why: O-4 is only proven with scripted adapters; no open plan items remain, so this is the next unproven claim.
+**O-6: `--debug` transcript noise: drop ephemeral `session.*` events (e.g. `session.background_tasks_changed`, 194 lines in one step) from the Copilot adapter's parsed transcript/debug output, tests first.**
+Why: O-5 live step passed but its debug log was dominated by ephemeral events that bury the agent's actual output.
 Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`.
 Sign: loop context stays minimal (one plan item + spec pointers); byte budgets are tested, so shrink prompts instead of raising budgets.
 
@@ -15,7 +15,8 @@ Sign: loop context stays minimal (one plan item + spec pointers); byte budgets a
 | O-2 | Compare the size of the instructional files referenced by his solution and ours (bytes/lines per file, totals) | done (`docs/ghuntley-size-comparison.md`) | O-1 (done) |
 | O-3 | Outer console while a loop runs: each entry writes `more-questions.md` (hodge: assessed and added to the questions) or `more-todos.md` (podge: end-of-session checklist adds its items before assessing next best action). Plain console, no model; independent of the running loop | done (`hodgepodge console`, `src/inbox.js`) | |
 | O-4 | `init` copies prompts and context files into the sandbox (e.g. local npm install into the target dir) so a sandbox has no dependency back on the hodgepodge source | done (`<dir>/.hodgepodge` runtime copy) | |
-| O-5 | Live-verify one `./podge step` from a fresh sandbox with the Copilot adapter | todo | O-4 (done) |
+| O-5 | Live-verify one `./podge step` from a fresh sandbox with the Copilot adapter | done (live Copilot adapter, local driver, no Docker, no full loop) | O-4 (done) |
+| O-6 | Drop ephemeral events from Copilot `--debug` transcript output | todo | O-5 (done) |
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -393,3 +394,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (O-2): wrote `docs/ghuntley-size-comparison.md` (bytes/lines per instructional file, totals, per-iteration attached context). Learned: prompt text is ~6x smaller than his (6066 vs 14714 B), but the real gap is attached state: his iterations attach 190-265 KB (`prd.json` 127 KB, progress 69 KB, spec 57 KB) vs <1 KB injected by us. Sign: compute table sums with `wc -lc` and re-add them. Claim boundary: read-only measurement, no code, no loop run.
 - Session (O-3): `hodgepodge console hodge|podge` (plain stdin, no model, no lock) appends bullets to `<sandbox>/more-questions.md` / `more-todos.md`; `runInterview`/`runStep` take `inboxDir`, add a `## More questions` / `## More todos` prompt section (assess + add to open questions; end-of-session checklist adds to plan.md first) and consume exactly what was sent only on ok (hodge also incomplete). 10 new tests in `test/inbox.test.js` (failed first: module missing), full suite and `tsc` clean. Claim boundary: scripted fake adapters and unit/CLI tests only; no live adapter, no Docker, full loop not run, so whether a real agent acts on the section is unproven. Sign: sandbox-side queues must be consumed only after a successful round, and by exact text so concurrent appends survive.
 - Session (O-4): `init` now copies `bin/`, `src/`, `prompts/`, `templates/`, `package*.json` and the production dependency closure (from `package-lock.json`, no network) into `<dir>/.hodgepodge`; `hodge.json` `hodgepodge` is `.hodgepodge` (relative) and launchers run the copy via `$(dirname "$0")`. Tests failed first (copy present, no dev deps, no root path in config/launchers); suite and `tsc` clean. Docs updated (README, `specs/loop.md`, CLI help). Claim boundary: scripted fixtures and the launcher running `status` only; no live adapter, no Docker, full loop not run. Learned: README must not use `hodgepodge <word>` prose (G-4 reads it as a command). Sign: re-run `init` to refresh a sandbox's copy; sandbox runtime must never import from the checkout.
+- Session (O-5): `hodgepodge init --dir ~/sandboxes/o5 --adapter copilot --model auto`, then one `./podge step --debug`: live Copilot agent implemented `src/add.js`, ticked `plan.md`; all gates ok (repo, budget, test-plan, scope, anti-stub, tests; types skipped, no tsconfig), commit `podge step default/001: ok`, 257,649 tokens. Launchers ran only `.hodgepodge/bin`. Learned: `cost` reports 0 for Copilot (premium requests, not USD); debug stdout is flooded by ephemeral `session.background_tasks_changed` events. Claim boundary: live Copilot adapter, local driver, single step; Docker and full loop not run. New item O-6.
