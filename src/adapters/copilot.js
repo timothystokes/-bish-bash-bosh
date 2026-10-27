@@ -55,6 +55,39 @@ export function parseCopilotOutput(stdout) {
 }
 
 /**
+ * Wrap a live-output sink so ephemeral `session.*` JSONL events (pure noise in debug logs) are dropped.
+ * Lines are buffered per stream; everything else passes through unchanged.
+ * @param {((stream: 'stdout' | 'stderr', chunk: string) => void) | undefined} sink
+ * @returns {{write: (stream: 'stdout' | 'stderr', chunk: string) => void, flush: () => void} | undefined}
+ */
+export function dropEphemeralEvents(sink) {
+  if (!sink) return undefined;
+  const buf = { stdout: '', stderr: '' };
+  const noise = (/** @type {string} */ line) => {
+    if (!line.startsWith('{')) return false;
+    try {
+      return String(JSON.parse(line)?.type ?? '').startsWith('session.');
+    } catch {
+      return false;
+    }
+  };
+  return {
+    write(stream, chunk) {
+      buf[stream] += chunk;
+      const lines = buf[stream].split('\n');
+      buf[stream] = lines.pop() ?? '';
+      for (const l of lines) if (!noise(l)) sink(stream, `${l}\n`);
+    },
+    flush() {
+      for (const stream of /** @type {const} */ (['stdout', 'stderr'])) {
+        if (buf[stream] && !noise(buf[stream])) sink(stream, buf[stream]);
+        buf[stream] = '';
+      }
+    },
+  };
+}
+
+/**
  * Adapter driving the Copilot CLI in non-interactive mode.
  * @param {CopilotOptions} [opts]
  * @returns {import('../adapter.js').Adapter}
@@ -65,14 +98,16 @@ export function createCopilotAdapter(opts = {}) {
   return {
     async run({ prompt, cwd, limits, onOutput }) {
       const args = [...prefix, ...buildCopilotArgs({ prompt, model: opts.model })];
+      const live = dropEphemeralEvents(onOutput);
       const { code, stdout, stderr, timedOut, changedFiles } = await runProcessAgent({
         command,
         args,
         cwd,
         env: opts.env,
         maxWallClockSeconds: limits.maxWallClockSeconds,
-        onOutput,
+        onOutput: live?.write,
       });
+      live?.flush();
       const parsed = parseCopilotOutput(stdout);
       const over =
         (limits.maxTokens !== undefined && parsed.usage.tokens > limits.maxTokens) ||

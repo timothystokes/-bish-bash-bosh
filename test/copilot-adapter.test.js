@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createCopilotAdapter, buildCopilotArgs, parseCopilotOutput } from '../src/adapters/copilot.js';
+import { createCopilotAdapter, buildCopilotArgs, parseCopilotOutput, dropEphemeralEvents } from '../src/adapters/copilot.js';
 import { adapterContract } from './helpers/adapter-contract.js';
 
 const fake = fileURLToPath(new URL('./fixtures/fake-copilot.js', import.meta.url));
@@ -73,4 +73,29 @@ test('missing command yields a failed result, not a throw', async () => {
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
+});
+
+test('dropEphemeralEvents hides session.* events across chunk splits and keeps the rest', () => {
+  /** @type {string[]} */
+  const out = [];
+  const f = dropEphemeralEvents((stream, chunk) => out.push(`${stream}:${chunk}`));
+  assert.ok(f);
+  const noisy = JSON.stringify({ type: 'session.background_tasks_changed', ephemeral: true, data: {} });
+  const msg = JSON.stringify({ type: 'assistant.message', data: { content: 'hi' } });
+  f.write('stdout', `${noisy}\n${msg.slice(0, 10)}`);
+  f.write('stdout', `${msg.slice(10)}\nplain junk\n${noisy}\n`);
+  f.write('stderr', 'warn\n');
+  f.flush();
+  assert.deepEqual(out, [`stdout:${msg}\n`, 'stdout:plain junk\n', 'stderr:warn\n']);
+});
+
+test('dropEphemeralEvents flushes a trailing partial line and passes through when no sink', () => {
+  /** @type {string[]} */
+  const out = [];
+  const f = dropEphemeralEvents((_s, c) => out.push(c));
+  assert.ok(f);
+  f.write('stdout', 'tail without newline');
+  f.flush();
+  assert.deepEqual(out, ['tail without newline']);
+  assert.equal(dropEphemeralEvents(undefined), undefined);
 });

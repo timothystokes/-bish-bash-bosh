@@ -3,8 +3,8 @@
 Update this file at the end of every session. Status: `todo` | `doing` | `done` | `blocked`.
 
 ## >>> Next best action
-**O-6: `--debug` transcript noise: drop ephemeral `session.*` events (e.g. `session.background_tasks_changed`, 194 lines in one step) from the Copilot adapter's parsed transcript/debug output, tests first.**
-Why: O-5 live step passed but its debug log was dominated by ephemeral events that bury the agent's actual output.
+**No unblocked non-deferred task remains: break down the next phase (owner to promote Phase 5 or add requests).**
+Why: O-1..O-6 are done; remaining items are `implement later` or Phase 5 (AWS, not promoted).
 Sign: Docker needs `colima start` here; bind mounts must live under `$HOME` (not `/tmp`); the derived image is `Dockerfile.agents`.
 Sign: loop context stays minimal (one plan item + spec pointers); byte budgets are tested, so shrink prompts instead of raising budgets.
 
@@ -16,7 +16,7 @@ Sign: loop context stays minimal (one plan item + spec pointers); byte budgets a
 | O-3 | Outer console while a loop runs: each entry writes `more-questions.md` (hodge: assessed and added to the questions) or `more-todos.md` (podge: end-of-session checklist adds its items before assessing next best action). Plain console, no model; independent of the running loop | done (`hodgepodge console`, `src/inbox.js`) | |
 | O-4 | `init` copies prompts and context files into the sandbox (e.g. local npm install into the target dir) so a sandbox has no dependency back on the hodgepodge source | done (`<dir>/.hodgepodge` runtime copy) | |
 | O-5 | Live-verify one `./podge step` from a fresh sandbox with the Copilot adapter | done (live Copilot adapter, local driver, no Docker, no full loop) | O-4 (done) |
-| O-6 | Drop ephemeral events from Copilot `--debug` transcript output | todo | O-5 (done) |
+| O-6 | Drop ephemeral events from Copilot `--debug` transcript output | done (`dropEphemeralEvents`, unit-tested; scripted only) | O-5 (done) |
 
 ## Phase 0: Foundations
 | ID | Task | Status | Depends on |
@@ -395,3 +395,4 @@ Later phases: none yet. See `docs/PLAN.md`.
 - Session (O-3): `hodgepodge console hodge|podge` (plain stdin, no model, no lock) appends bullets to `<sandbox>/more-questions.md` / `more-todos.md`; `runInterview`/`runStep` take `inboxDir`, add a `## More questions` / `## More todos` prompt section (assess + add to open questions; end-of-session checklist adds to plan.md first) and consume exactly what was sent only on ok (hodge also incomplete). 10 new tests in `test/inbox.test.js` (failed first: module missing), full suite and `tsc` clean. Claim boundary: scripted fake adapters and unit/CLI tests only; no live adapter, no Docker, full loop not run, so whether a real agent acts on the section is unproven. Sign: sandbox-side queues must be consumed only after a successful round, and by exact text so concurrent appends survive.
 - Session (O-4): `init` now copies `bin/`, `src/`, `prompts/`, `templates/`, `package*.json` and the production dependency closure (from `package-lock.json`, no network) into `<dir>/.hodgepodge`; `hodge.json` `hodgepodge` is `.hodgepodge` (relative) and launchers run the copy via `$(dirname "$0")`. Tests failed first (copy present, no dev deps, no root path in config/launchers); suite and `tsc` clean. Docs updated (README, `specs/loop.md`, CLI help). Claim boundary: scripted fixtures and the launcher running `status` only; no live adapter, no Docker, full loop not run. Learned: README must not use `hodgepodge <word>` prose (G-4 reads it as a command). Sign: re-run `init` to refresh a sandbox's copy; sandbox runtime must never import from the checkout.
 - Session (O-5): `hodgepodge init --dir ~/sandboxes/o5 --adapter copilot --model auto`, then one `./podge step --debug`: live Copilot agent implemented `src/add.js`, ticked `plan.md`; all gates ok (repo, budget, test-plan, scope, anti-stub, tests; types skipped, no tsconfig), commit `podge step default/001: ok`, 257,649 tokens. Launchers ran only `.hodgepodge/bin`. Learned: `cost` reports 0 for Copilot (premium requests, not USD); debug stdout is flooded by ephemeral `session.background_tasks_changed` events. Claim boundary: live Copilot adapter, local driver, single step; Docker and full loop not run. New item O-6.
+- Session (O-6): `dropEphemeralEvents` in `src/adapters/copilot.js` line-buffers live stdout/stderr and drops `session.*` JSONL events before they reach `--debug`; the parsed transcript already excluded them (only assistant messages). Tests first (2 new, failed on missing export), `npm run check` and `npm test` (585) pass. Claim boundary: scripted/unit only; live Copilot and Docker not re-run, no full loop. Sign: noise was in the live raw stream, not the parsed transcript.
