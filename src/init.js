@@ -13,6 +13,18 @@ const templates = join(root, 'templates');
 const DEFAULT_BUDGETS = { maxWallClockSeconds: 7200, maxIterations: 20 };
 const DEFAULT_ALLOWED_PATHS = ['src/', 'bin/', 'lib/', 'package.json'];
 
+// Suggested picks shown by `hodgepodge init`'s interactive prompt (src/hodgepodge.js). This is a
+// convenience catalog only, not enforced anywhere: any adapter/model string still works (see
+// src/adapters/index.js's registry and specs/adapters.md's documented exception for this list).
+// It goes stale as vendors release models; update it by hand when that happens.
+export const ADAPTER_CHOICES = ['copilot', 'claude-code', 'codex', 'openai-http'];
+export const MODEL_CHOICES = {
+  copilot: ['gpt-5', 'claude-sonnet-4.5', 'claude-opus-4.1', 'auto'],
+  'claude-code': ['claude-opus-4-1-20250805', 'claude-sonnet-4-5-20250929'],
+  codex: ['gpt-5-codex', 'gpt-5'],
+  // openai-http hits an arbitrary /chat/completions endpoint: no catalog, type the model directly.
+};
+
 // `hodgepodge init`: writes <dir>/hodgepodge.yml (default dir: cwd) for the build role (and optionally
 // qa) the owner chose, with default budgets and allowedPaths. The same adapter/model also seed the
 // `interview` and `reverse` roles `hodge` needs, so `hodge` works right after init (hand-edit

@@ -4,7 +4,7 @@ import { createInterface } from 'node:readline';
 import { CONFIG_FILE } from './project-config.js';
 import { lintSpecs } from './spec-lint.js';
 import { checkReadiness } from './readiness.js';
-import { initProject } from './init.js';
+import { initProject, ADAPTER_CHOICES, MODEL_CHOICES } from './init.js';
 import { exportBundle } from './clean-room.js';
 import { createLocalStatusSource, readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
@@ -14,7 +14,7 @@ import { stopContainer, dockerRunner } from './kill-switch.js';
 import { createSecretProxy } from './secret-proxy.js';
 import { syncArtifacts, requestPromotion } from './artifacts.js';
 import { createAwsCliS3Client, createGhPrOpener, defaultRun } from './cloud-clients.js';
-import { repoFor, parseFlags, parseRunArgs, loadRunProject, createAsker } from './cli-lib.js';
+import { repoFor, parseFlags, parseRunArgs, loadRunProject, createAsker, askChoice } from './cli-lib.js';
 
 // Every top-level command other than `hodge` and `podge`/`podge step`: project init, run observability
 // (status, tui, console), cloud sync/promotion, spec/readiness checks, the pause/resume/stop control
@@ -77,21 +77,32 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
     }
     const input = deps.input ?? process.stdin;
     const { ask, close } = createAsker(input, out);
+    // Picks for both adapter and model: a numbered list of known options, falling back to whatever
+    // is typed (so an unlisted adapter/model, or scripted stdin, still works).
+    const askModel = async (adapter, label) => {
+      const choices = MODEL_CHOICES[adapter];
+      return choices ? askChoice(ask, out, label, choices) : ask(`${label}: `);
+    };
     try {
-      const buildAdapter = await ask('build adapter: ');
+      const buildAdapter = await askChoice(ask, out, 'build adapter', ADAPTER_CHOICES);
       if (!buildAdapter) {
         err('hodgepodge init: aborted (no build adapter given)\n');
         return 2;
       }
-      const buildModel = await ask('build model: ');
+      const buildModel = await askModel(buildAdapter, 'build model');
       if (!buildModel) {
         err('hodgepodge init: aborted (no build model given)\n');
         return 2;
       }
-      const qaAdapter = await ask('qa adapter (optional, press Enter to skip): ');
+      const addQa = await ask('add a qa role? (y/N): ');
       let qa;
-      if (qaAdapter) {
-        const qaModel = await ask('qa model: ');
+      if (/^y(es)?$/i.test(addQa ?? '')) {
+        const qaAdapter = await askChoice(ask, out, 'qa adapter', ADAPTER_CHOICES);
+        if (!qaAdapter) {
+          err('hodgepodge init: aborted (no qa adapter given)\n');
+          return 2;
+        }
+        const qaModel = await askModel(qaAdapter, 'qa model');
         if (!qaModel) {
           err('hodgepodge init: aborted (no qa model given)\n');
           return 2;

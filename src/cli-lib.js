@@ -169,6 +169,17 @@ export function createAsker(input, out) {
   return { ask, close: () => shared?.close() };
 }
 
+// Prompt with a numbered list of suggested choices (e.g. `init`'s adapter/model picker): prints the
+// list, then accepts either the choice's number or any typed value (so a value outside the list, or
+// scripted stdin, still works). Returns the chosen string, or '' if the answer is blank.
+export async function askChoice(ask, out, label, choices) {
+  for (const [i, choice] of choices.entries()) out(`  ${i + 1}) ${choice}\n`);
+  const answer = await ask(`${label} (1-${choices.length}, or type your own): `);
+  if (!answer) return '';
+  const n = Number(answer);
+  return Number.isInteger(n) && n >= 1 && n <= choices.length ? choices[n - 1] : answer;
+}
+
 // Shared argument shape for hodge/podge/step/status/tui: the display label for error messages, whether
 // `hodge --reverse` was passed, debug mode, and the parsed --run-id(/--control) flags.
 export function parseRunArgs(cmd, argv) {

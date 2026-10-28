@@ -95,22 +95,30 @@ test('cli init asks for build adapter/model, then writes hodgepodge.yml and prin
   const dir = freshDir('init-');
   const r = await withCwd(dir, () => run(['init'], ['copilot', 'm1', '']));
   assert.equal(r.code, 0, r.err);
-  assert.match(r.out, /build adapter:.*build model:.*qa adapter/s, 'prompts are shown');
+  assert.match(r.out, /build adapter.*build model.*add a qa role/s, 'prompts are shown');
   const j = JSON.parse(r.out.match(/\{.*\}/s)[0]);
   assert.equal(j.ok, true);
   assert.equal(j.dir, realpathSync(dir));
   assert.equal(j.config, join(realpathSync(dir), 'hodgepodge.yml'));
   const cfg = parseYaml(readFileSync(join(dir, 'hodgepodge.yml'), 'utf8'));
   assert.deepEqual(cfg.roles.build, { adapter: 'copilot', model: 'm1' });
-  assert.ok(!cfg.roles.qa, 'qa is skipped when its adapter prompt is left blank');
+  assert.ok(!cfg.roles.qa, 'qa is skipped when the "add a qa role?" prompt is left blank (not y)');
 });
 
-test('cli init also asks for an optional qa adapter/model', async () => {
+test('cli init also asks for an optional qa adapter/model when "y" is given', async () => {
   const dir = freshDir('init-');
-  const r = await withCwd(dir, () => run(['init'], ['copilot', 'm1', 'copilot', 'm2']));
+  const r = await withCwd(dir, () => run(['init'], ['copilot', 'm1', 'y', 'copilot', 'm2']));
   assert.equal(r.code, 0, r.err);
   const cfg = parseYaml(readFileSync(join(dir, 'hodgepodge.yml'), 'utf8'));
   assert.deepEqual(cfg.roles.qa, { adapter: 'copilot', model: 'm2' });
+});
+
+test('cli init picks adapter/model by number from the suggested list', async () => {
+  const dir = freshDir('init-');
+  const r = await withCwd(dir, () => run(['init'], ['1', '1', '']));
+  assert.equal(r.code, 0, r.err);
+  const cfg = parseYaml(readFileSync(join(dir, 'hodgepodge.yml'), 'utf8'));
+  assert.deepEqual(cfg.roles.build, { adapter: 'copilot', model: 'gpt-5' });
 });
 
 test('cli init refuses when hodgepodge.yml already exists (exit 1, no prompts)', async () => {
