@@ -73,13 +73,13 @@ function makeTarget({ tests = TESTS, planMd = PLAN_MD } = {}) {
 const cfg = (extra = {}) => ({
   targetRepo: 'git@example.com:o/toy.git',
   roles: { build: { adapter: 'builder', model: 'm' }, qa: { adapter: 'checker', model: 'm2' } },
-  budgets: { maxTokens: 100000, maxCostUsd: 10, maxWallClockSeconds: 120, maxIterations: 4 },
+  budgets: { maxWallClockSeconds: 120, maxIterations: 4 },
   allowedPaths: ['src/', 'out/'],
   requireTestPlan: true,
   ...extra,
 });
 
-const result = (/** @type {string} */ transcript) => ({ exitStatus: 0, transcript, usage: { tokens: 10, cost: 0.01 }, changedFiles: [] });
+const result = (/** @type {string} */ transcript) => ({ exitStatus: 0, transcript, changedFiles: [] });
 const findingsBlock = (/** @type {unknown[]} */ f) => `report\n\`\`\`findings\n${JSON.stringify(f)}\n\`\`\`\n`;
 const FINDING = {
   classification: 'unimplemented-requirement',
@@ -221,7 +221,7 @@ test('phase 6 regression: a requirement with no passing test keeps a ticked plan
     },
   ]);
   const qa = scripted([() => findingsBlock([])]);
-  const { res } = await run('podge', dir, cfg({ budgets: { maxTokens: 100000, maxCostUsd: 10, maxWallClockSeconds: 120, maxIterations: 2 } }), {
+  const { res } = await run('podge', dir, cfg({ budgets: { maxWallClockSeconds: 120, maxIterations: 2 } }), {
     builder: () => build.adapter,
     checker: () => qa.adapter,
   });

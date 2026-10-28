@@ -12,7 +12,7 @@ import { validateAdapterResult } from '../../src/adapter.js';
  * @param {(fixture: import('../../src/adapter.js').FakeFixture) => import('../../src/adapter.js').Adapter} makeAdapter
  */
 export function adapterContract(name, makeAdapter) {
-  const limits = { maxTokens: 1000, maxCostUsd: 1, maxWallClockSeconds: 60 };
+  const limits = { maxWallClockSeconds: 60 };
   /**
    * @param {(cwd: string) => Promise<void>} fn
    */
@@ -30,14 +30,12 @@ export function adapterContract(name, makeAdapter) {
       const adapter = makeAdapter({
         exitStatus: 0,
         transcript: 'did the thing',
-        usage: { tokens: 120, cost: 0.01 },
         writes: { 'src/a.js': 'x', 'b.txt': 'y' },
       });
       const r = await adapter.run({ prompt: 'p', cwd, limits });
       assert.deepEqual(validateAdapterResult(r), { ok: true, errors: [] });
       assert.equal(r.exitStatus, 0);
       assert.equal(r.transcript, 'did the thing');
-      assert.deepEqual(r.usage, { tokens: 120, cost: 0.01 });
       assert.deepEqual([...r.changedFiles].sort(), ['b.txt', 'src/a.js']);
       assert.equal(readFileSync(join(cwd, 'src/a.js'), 'utf8'), 'x');
     }));
@@ -47,7 +45,6 @@ export function adapterContract(name, makeAdapter) {
       const adapter = makeAdapter({
         exitStatus: 2,
         transcript: 'boom',
-        usage: { tokens: 5, cost: 0 },
         writes: {},
       });
       const r = await adapter.run({ prompt: 'p', cwd, limits });
@@ -56,26 +53,11 @@ export function adapterContract(name, makeAdapter) {
       assert.deepEqual(r.changedFiles, []);
     }));
 
-  test(`${name}: usage over limits is reported as non-zero exit`, () =>
-    withDir(async (/** @type {string} */ cwd) => {
-      const adapter = makeAdapter({
-        exitStatus: 0,
-        transcript: 'big',
-        usage: { tokens: 5000, cost: 0.5 },
-        writes: {},
-      });
-      const r = await adapter.run({ prompt: 'p', cwd, limits });
-      assert.equal(validateAdapterResult(r).ok, true);
-      assert.notEqual(r.exitStatus, 0);
-      assert.equal(r.usage.tokens, 5000);
-    }));
-
   test(`${name}: changedFiles are relative paths inside cwd`, () =>
     withDir(async (/** @type {string} */ cwd) => {
       const adapter = makeAdapter({
         exitStatus: 0,
         transcript: '',
-        usage: { tokens: 1, cost: 0 },
         writes: { 'deep/er/file.js': 'z' },
       });
       const r = await adapter.run({ prompt: 'p', cwd, limits });

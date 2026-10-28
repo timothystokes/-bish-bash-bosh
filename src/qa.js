@@ -115,13 +115,11 @@ export async function runQaCycle({ config, repoDir, runId, adapter, identity }) 
   if (!budget.ok) return { status: 'over-budget', cycle, reason: budget.reason };
 
   const prompt = [loadQaPrompt(), buildContext(repoDir)].join('\n\n');
-  const maxTokens = budget.remaining.tokens;
-  const maxCostUsd = budget.remaining.cost;
   const started = Date.now();
   const result = await adapter.run({
     prompt,
     cwd: repoDir,
-    limits: { maxTokens, maxCostUsd, maxWallClockSeconds: Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds) },
+    limits: { maxWallClockSeconds: Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds) },
   });
   const seconds = (Date.now() - started) / 1000;
 
@@ -132,11 +130,8 @@ export async function runQaCycle({ config, repoDir, runId, adapter, identity }) 
     git(repoDir, 'reset', '-q', '--hard', 'HEAD');
     git(repoDir, 'clean', '-fdq');
   }
-  const overBudget = result.usage.tokens > maxTokens || result.usage.cost > maxCostUsd;
   const parsed = parseFindings(result.transcript);
-  if (overBudget) {
-    res = { status: 'over-budget', cycle, reason: 'qa call exceeded the remaining budget' };
-  } else if (result.exitStatus !== 0) {
+  if (result.exitStatus !== 0) {
     res = { status: 'failed', cycle, reason: 'qa agent call exited non-zero' };
   } else if (touched) {
     res = { status: 'failed', cycle, reason: 'qa modified the workspace (read-only role); changes discarded' };
@@ -153,7 +148,7 @@ export async function runQaCycle({ config, repoDir, runId, adapter, identity }) 
   writeFileSync(join(tmp, 'prompt.md'), prompt);
   writeFileSync(join(tmp, 'transcript.txt'), result.transcript);
   writeFileSync(join(tmp, 'findings.json'), `${JSON.stringify(res.findings ?? [], null, 2)}\n`);
-  writeFileSync(join(tmp, 'record.json'), `${JSON.stringify({ status: res.status, cycle, ...(res.reason ? { reason: res.reason } : {}), usage: { ...result.usage, seconds } }, null, 2)}\n`);
+  writeFileSync(join(tmp, 'record.json'), `${JSON.stringify({ status: res.status, cycle, ...(res.reason ? { reason: res.reason } : {}), usage: { seconds } }, null, 2)}\n`);
   renameSync(tmp, dir);
   if (res.status === 'findings' && res.findings) {
     const planPath = join(repoDir, 'plan.md');

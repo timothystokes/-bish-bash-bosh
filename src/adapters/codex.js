@@ -17,17 +17,13 @@ export function buildCodexArgs({ prompt, model }) {
 }
 
 /**
- * Parse `codex exec --json` JSONL: agent_message items form the transcript and
- * `turn.completed` usage is summed (cached input excluded). USD cost is read from an optional `usage.cost_usd` (Codex does not report one today, so it is usually 0).
+ * Parse `codex exec --json` JSONL: agent_message items form the transcript.
  * Non-JSON lines are ignored; output with no events becomes the transcript.
  * @param {string} stdout
- * @returns {{transcript: string, usage: import('../adapter.js').Usage}}
+ * @returns {{transcript: string}}
  */
 export function parseCodexOutput(stdout) {
-  const pos = (/** @type {unknown} */ n) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0);
   const messages = [];
-  let tokens = 0;
-  let cost = 0;
   let events = 0;
   for (const line of stdout.split('\n')) {
     let ev;
@@ -39,13 +35,9 @@ export function parseCodexOutput(stdout) {
     if (!ev || typeof ev !== 'object' || typeof ev.type !== 'string') continue;
     events++;
     if (ev.type === 'item.completed' && ev.item?.type === 'agent_message' && typeof ev.item.text === 'string') messages.push(ev.item.text);
-    else if (ev.type === 'turn.completed') {
-      tokens += pos(ev.usage?.input_tokens) + pos(ev.usage?.output_tokens);
-      cost += pos(ev.usage?.cost_usd);
-    }
   }
-  if (events === 0) return { transcript: stdout.trim(), usage: { tokens: 0, cost: 0 } };
-  return { transcript: messages.join('\n'), usage: { tokens, cost } };
+  if (events === 0) return { transcript: stdout.trim() };
+  return { transcript: messages.join('\n') };
 }
 
 /**
@@ -67,12 +59,9 @@ export function createCodexAdapter(opts = {}) {
         onOutput,
       });
       const parsed = parseCodexOutput(stdout);
-      const over =
-        (limits.maxTokens !== undefined && parsed.usage.tokens > limits.maxTokens) ||
-        (limits.maxCostUsd !== undefined && parsed.usage.cost > limits.maxCostUsd);
-      const exitStatus = timedOut ? 124 : code !== 0 ? code : over ? 1 : 0;
+      const exitStatus = timedOut ? 124 : code;
       const transcript = stderr ? `${parsed.transcript}\n[stderr]\n${stderr}` : parsed.transcript;
-      return { exitStatus, transcript, usage: parsed.usage, changedFiles };
+      return { exitStatus, transcript, changedFiles };
     },
   };
 }

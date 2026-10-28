@@ -144,10 +144,9 @@ test('default budgets fit a live agent: one conversation round plus several step
   const dir = fresh();
   assert.equal(initSandbox({ dir, ...base }).ok, true);
   const b = JSON.parse(readFileSync(join(dir, 'hodge.json'), 'utf8')).budgets;
-  assert.ok(b.maxTokens >= 2_000_000, 'a single live agent call can use over 100k tokens');
+  assert.deepEqual(Object.keys(b).sort(), ['maxIterations', 'maxWallClockSeconds']);
   assert.ok(b.maxWallClockSeconds >= 3600);
   assert.ok(b.maxIterations >= 10);
-  assert.ok(b.maxCostUsd >= 10);
 });
 
 test('copies the runtime (code, prompts, templates, production deps) into the sandbox', () => {

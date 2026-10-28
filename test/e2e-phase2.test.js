@@ -56,7 +56,7 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
     JSON.stringify({
       targetRepo: 'git@example.com:o/toy.git',
       roles: { interview: { adapter: 'interviewer', model: 'm' }, build: { adapter: 'builder', model: 'm' } },
-      budgets: { maxTokens: 10000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 3 },
+      budgets: { maxWallClockSeconds: 60, maxIterations: 3 },
       allowedPaths: ['src/'],
       requireTestPlan: true,
     }),
@@ -65,7 +65,6 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
   const interviewFixture = {
     exitStatus: 0,
     transcript: 'wrote specs',
-    usage: { tokens: 10, cost: 0.01 },
     writes: {
       'specs/add.md':
         '# Spec: add(a, b) returns the sum\nImplementation: none\n\n## Purpose\nAdd two numbers.\n\n## Requirements\n- R-add-1: `add` must return the sum of two finite numbers.\n- R-add-2: `add` must return the other operand when one operand is 0.\n- R-add-3: `add` must throw a TypeError when an operand is not a number.\n\n## Examples\n- `add(2, 3)` -> `5`\n- `add(\'a\', 1)` -> throws TypeError\n\n## Dimensions\n- Actors and goals: covered\n- Behaviour: covered\n- Inputs and outputs: covered\n- Failure paths: covered\n- Edge cases: n/a: single-purpose pure function\n- Interfaces and data: n/a: one in-process function\n- Non-functional: n/a: no runtime limits for a pure function\n- Constraints: n/a: no platform constraints\n- Acceptance: covered\n- Out of scope: covered\n\n## Out of scope\n- Big numbers.\n',
@@ -80,7 +79,6 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
   const buildFixture = {
     exitStatus: 0,
     transcript: 'implemented add',
-    usage: { tokens: 10, cost: 0.01 },
     writes: {
       'src/add.js': 'export const add = (a, b) => a + b;\n',
       'plan.md': '- [x] implement add\n',

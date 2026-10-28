@@ -75,11 +75,7 @@ export async function runReverse({ config, repoDir, runId, adapter, focus, testC
   if (!budget.ok) return { status: 'over-budget', sha: null, reason: budget.reason };
 
   const prompt = buildReversePrompt(repoDir, focus);
-  const limits = {
-    maxTokens: budget.remaining.tokens,
-    maxCostUsd: budget.remaining.cost,
-    maxWallClockSeconds: Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds),
-  };
+  const limits = { maxWallClockSeconds: Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds) };
   const started = Date.now();
   const result = await adapter.run({ prompt, cwd: repoDir, limits });
   const seconds = (Date.now() - started) / 1000;
@@ -130,7 +126,7 @@ export async function runReverse({ config, repoDir, runId, adapter, focus, testC
   writeFileSync(join(dir, 'diff.patch'), diff);
   writeFileSync(
     join(dir, 'record.json'),
-    `${JSON.stringify({ status, reason, test, usage: { ...result.usage, seconds }, changedFiles: result.changedFiles }, null, 2)}\n`,
+    `${JSON.stringify({ status, reason, test, usage: { seconds }, changedFiles: result.changedFiles }, null, 2)}\n`,
   );
   git(repoDir, 'add', '-A');
   git(repoDir, 'commit', '-q', '-m', `hodge --reverse ${runId}: ${status}`);

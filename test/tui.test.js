@@ -10,12 +10,12 @@ import { createLocalStatusSource } from '../src/status.js';
 import { renderFrame, createTui, runTui } from '../src/tui.js';
 import { main } from '../src/cli.js';
 
-const budgets = { maxTokens: 1000, maxCostUsd: 2, maxWallClockSeconds: 100, maxIterations: 5 };
+const budgets = { maxWallClockSeconds: 100, maxIterations: 5 };
 
 /** @param {string} transcript */
 const rec = (transcript) => ({
   status: /** @type {'ok'} */ ('ok'),
-  usage: { tokens: 100, cost: 0.5, seconds: 10 },
+  usage: { seconds: 10 },
   changedFiles: [],
   gates: [],
   prompt: 'p',
@@ -44,11 +44,12 @@ test('local status source tails the latest transcript', () => {
   assert.deepEqual(src.tail('none', 2), []);
 });
 
-test('renderFrame shows cost meter vs budget, control state, log tail and keys', () => {
+test('renderFrame shows seconds and iterations vs budget, control state, log tail and keys', () => {
   const { tui } = setup();
   const f = tui.frame();
   assert.match(f, /r1/);
-  assert.match(f, /cost\s+\$1\.00 \/ \$2\.00/);
+  assert.match(f, /seconds\s+20 \/ 100/);
+  assert.doesNotMatch(f, /cost|tokens/);
   assert.match(f, /iterations\s+2 \/ 5/);
   assert.match(f, /RUNNING/);
   assert.match(f, /l2\nl3\nl4/);
@@ -57,7 +58,7 @@ test('renderFrame shows cost meter vs budget, control state, log tail and keys',
 });
 
 test('renderFrame flags over-budget and bad control file', () => {
-  const status = { runId: 'r', iterations: 6, lastStatus: 'ok', totals: { tokens: 0, cost: 3, seconds: 0, iterations: 6 }, budgets, remaining: { tokens: 1000, cost: -1, seconds: 100, iterations: -1 }, details: readRunDetails(makeRun(), 'r') };
+  const status = { runId: 'r', iterations: 6, lastStatus: 'ok', totals: { seconds: 0, iterations: 6 }, budgets, remaining: { seconds: 100, iterations: -1 }, details: readRunDetails(makeRun(), 'r') };
   assert.match(renderFrame({ status, control: { ok: true, paused: false, stop: false }, tail: [], prompt: null }), /OVER BUDGET/);
   assert.match(renderFrame({ status, control: { ok: false, reason: 'invalid control file: x' }, tail: [], prompt: null }), /STOPPED.*invalid control file/);
 });

@@ -37,7 +37,7 @@ export function initSandbox(opts) {
       interview: { adapter: opts.adapter, model: opts.model },
       reverse: { adapter: opts.adapter, model: opts.model },
     },
-    budgets: { maxTokens: 5000000, maxCostUsd: 20, maxWallClockSeconds: 7200, maxIterations: 20 },
+    budgets: { maxWallClockSeconds: 7200, maxIterations: 20 },
     allowedPaths: seed === 'objective' ? ['src/', 'bin/', 'lib/', 'package.json'] : ['src/'],
     requireTestPlan: seed !== 'empty',
   };

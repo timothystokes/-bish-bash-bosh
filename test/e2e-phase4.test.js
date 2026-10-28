@@ -37,7 +37,7 @@ async function hodge(argv, registry) {
   return { code, res: JSON.parse(outs.join('')) };
 }
 
-const budgets = { maxTokens: 10000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 3 };
+const budgets = { maxWallClockSeconds: 60, maxIterations: 3 };
 /** @param {Record<string, unknown>} extra */
 const writeConfig = (extra) => {
   const p = join(mkdtempSync(join(tmpdir(), 'hodge-cfg-')), 'hodge.json');
@@ -45,7 +45,6 @@ const writeConfig = (extra) => {
   return p;
 };
 const pkg = JSON.stringify({ name: 'toy', type: 'module', scripts: { test: 'node --test tests/*.test.js' } });
-const usage = { tokens: 10, cost: 0.01 };
 
 test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite passes', async () => {
   // existing project with code only
@@ -63,7 +62,6 @@ test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite pas
   const reverseFixture = {
     exitStatus: 0,
     transcript: 'wrote specs and characterization tests',
-    usage,
     writes: {
       'specs/greet.md': '# Spec: greet(name) returns a greeting\nImplementation: none\n\n## Purpose\nGreet a person.\n\n## Requirements\n- R-greet-1: greet(name) returns "hello <name>"\n',
       'tests/PLAN.md': '- specs/greet.md -> tests/greet.test.js: greeting text\n- R-greet-1 -> tests/greet.test.js\n',
@@ -91,7 +89,6 @@ test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite pas
   const buildFixture = {
     exitStatus: 0,
     transcript: 'implemented greet from the spec',
-    usage,
     writes: { 'plan.md': '- [x] implement greet\n', 'package.json': pkg, 'src/greet.js': 'export const greet = (name) => "hello " + name;\n' },
   };
   const bCfg = writeConfig({ mode: 'clean-room', roles: { build: { adapter: 'builder', model: 'm' } } });

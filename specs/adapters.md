@@ -1,11 +1,11 @@
 # Spec: Agent/model adapters
 - Adapters v1: Copilot CLI, Claude Code, Codex, generic OpenAI-compatible HTTP.
-- Common interface: take a prompt + working dir + limits; return `{exitStatus, transcript, usage{tokens,cost}, changedFiles}`.
+- Common interface: take a prompt + working dir + limits (`{maxWallClockSeconds?}` only); return `{exitStatus, transcript, changedFiles}`. Adapters do not parse or report tokens or cost.
 - Models and agents are chosen by config **roles** (e.g. `build`, `interview`, `reverse`, `qa`) mapping to adapter + model. Harness logic never names a model or vendor.
 - Swapping agent or model is a config-only change.
 - Every adapter passes the same contract test suite (fake agent fixtures; no network in unit tests).
 - Cheapest start: CLI agents under existing subscriptions locally; pay-per-token small model for routine loops in cloud. Check vendor terms before unattended/cloud use of subscription-backed agents.
 - Process-based adapters take injectable `command`/`prefixArgs`/`env` for fake-agent tests. `changedFiles` is derived from a before/after file-hash snapshot of cwd. Wall-clock limit kills the agent (exit 124); spawn failure is exit 127.
-- Process-based adapters share `runProcessAgent` (`src/adapters/process.js`); each adapter only supplies args and an output parser. The Copilot adapter drops ephemeral `session.*` JSONL events from the live `--debug` output (the parsed transcript never contained them). Registry ids: `copilot`, `claude-code`.
+- Process-based adapters share `runProcessAgent` (`src/adapters/process.js`); each adapter only supplies args and an output parser. The Copilot adapter drops JSONL events flagged `"ephemeral":true` (`session.*`, `assistant.reasoning_delta`) from the live `--debug` output (the parsed transcript never contained them). Registry ids: `copilot`, `claude-code`.
 - `openai-http` (any `/chat/completions` endpoint): no tools, so the model returns files as `<<<FILE path>>>`/`<<<END>>>` blocks that the adapter writes; paths outside cwd are rejected (exit 1). HTTP error => exit 2, unreachable => 127, wall-clock => 124. Endpoint and key from env `HODGE_HTTP_BASE_URL` / `HODGE_HTTP_API_KEY`; keys never live in config. Registry ids: `copilot`, `claude-code`, `codex`, `openai-http`.
 - Adapter smoke check (`src/smoke.js`, `runSmoke`): asks an adapter to create `fizzbuzz.js` (FizzBuzz 1..15) and run it, then the harness re-runs the file and compares stdout; fails on non-zero exit, missing/extra files or wrong output. For owner-run live checks and a future `hodgepodge doctor`; unit tests use the scripted adapter only.

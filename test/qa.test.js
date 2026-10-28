@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { validateFinding, parseFindings, findingsToPlanItems, runQaCycle, qaCycles } from '../src/qa.js';
 import { runLoop } from '../src/driver.js';
 import { sumRunUsage } from '../src/budget-gate.js';
+import { writeIterationRecord } from '../src/run-record.js';
 import { validateConfig } from '../src/config.js';
 import { loadQaPrompt } from '../src/prompts.js';
 import { main } from '../src/cli.js';
@@ -42,18 +43,18 @@ function makeRepo(plan = '- [x] one\n') {
 const config = (extra = {}) => ({
   targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'b', model: 'm' }, qa: { adapter: 'q', model: 'm2' } },
-  budgets: { maxTokens: 1000, maxCostUsd: 10, maxWallClockSeconds: 60, maxIterations: 20 },
+  budgets: { maxWallClockSeconds: 60, maxIterations: 20 },
   allowedPaths: ['src/'],
   ...extra,
 });
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 const pass = ['node', '-e', 'process.exit(0)'];
 
-/** @param {string} transcript @param {{exitStatus?: number, tokens?: number, write?: boolean}} [o] */
-const qaAdapter = (transcript, { exitStatus = 0, tokens = 5, write = false } = {}) => ({
+/** @param {string} transcript @param {{exitStatus?: number, write?: boolean}} [o] */
+const qaAdapter = (transcript, { exitStatus = 0, write = false } = {}) => ({
   async run(/** @type {any} */ req) {
     if (write) writeFileSync(join(req.cwd, 'src.js'), 'x');
-    return { exitStatus, transcript, usage: { tokens, cost: 0.1 }, changedFiles: [] };
+    return { exitStatus, transcript, changedFiles: [] };
   },
 });
 
@@ -98,7 +99,7 @@ test('config accepts an optional qa role and maxQaCycles; rejects a non-positive
   assert.equal(validateConfig(config({ maxQaCycles: 0 })).ok, false);
 });
 
-test('runQaCycle: a [] report is clean; findings are handed to plan.md and committed; the record counts toward usage', async () => {
+test('runQaCycle: a [] report is clean; findings are handed to plan.md and committed; the record counts toward run seconds', async () => {
   const dir = makeRepo();
   const clean = await runQaCycle({ config: config(), repoDir: dir, runId: 'r', adapter: qaAdapter(block([])), identity });
   assert.equal(clean.status, 'clean');
@@ -114,7 +115,8 @@ test('runQaCycle: a [] report is clean; findings are handed to plan.md and commi
   assert.ok(existsSync(join(dir, 'runs', 'r', 'qa-2', 'findings.json')));
   assert.equal(JSON.parse(readFileSync(join(dir, 'runs', 'r', 'qa-2', 'findings.json'), 'utf8'))[0].diagnosis.fix, 'Handle empty input');
   assert.equal(git(dir, 'status', '--porcelain'), '');
-  assert.equal(sumRunUsage(dir, 'r').tokens, 10);
+  assert.ok(sumRunUsage(dir, 'r').seconds >= 0);
+  assert.equal(JSON.parse(readFileSync(join(dir, 'runs', 'r', 'qa-2', 'record.json'), 'utf8')).usage.seconds >= 0, true);
 });
 
 test('runQaCycle fails (no pass by silence) on a missing report, non-zero exit, or a modified tree; tree stays clean', async () => {
@@ -133,9 +135,12 @@ test('runQaCycle fails (no pass by silence) on a missing report, non-zero exit, 
   assert.equal(readFileSync(join(dir, 'plan.md'), 'utf8'), '- [x] one\n');
 });
 
-test('runQaCycle reports over-budget when usage exceeds the remaining budget, and gates the harness repo', async () => {
+test('runQaCycle reports over-budget when wall-clock is exhausted, and gates the harness repo', async () => {
   const dir = makeRepo();
-  const over = await runQaCycle({ config: config(), repoDir: dir, runId: 'r', adapter: qaAdapter(block([]), { tokens: 5000 }), identity });
+  writeIterationRecord(dir, 'r', 1, { status: 'ok', usage: { seconds: 60 }, changedFiles: [], gates: [], prompt: '', transcript: '', diff: '', test: {} });
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-qm', 'spent');
+  const over = await runQaCycle({ config: config(), repoDir: dir, runId: 'r', adapter: qaAdapter(block([])), identity });
   assert.equal(over.status, 'over-budget');
   const self = await runQaCycle({ config: config(), repoDir: dir, runId: 'r2', adapter: qaAdapter(block([])), identity: { root: dir, remotes: [] } });
   assert.equal(self.status, 'gated');
@@ -146,7 +151,7 @@ const builder = () => ({
   async run(/** @type {any} */ req) {
     const p = join(req.cwd, 'plan.md');
     writeFileSync(p, readFileSync(p, 'utf8').replace(/- \[ \]/g, '- [x]'));
-    return { exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0.01 }, changedFiles: ['plan.md'] };
+    return { exitStatus: 0, transcript: 't', changedFiles: ['plan.md'] };
   },
 });
 
@@ -155,7 +160,7 @@ test('runLoop with a qa adapter: done needs a clean QA report; findings go back 
   /** @type {string[]} */
   const reports = [block([finding]), block([])];
   let qaCalls = 0;
-  const qa = { async run() { qaCalls += 1; return { exitStatus: 0, transcript: reports.shift() ?? block([]), usage: { tokens: 1, cost: 0.01 }, changedFiles: [] }; } };
+  const qa = { async run() { qaCalls += 1; return { exitStatus: 0, transcript: reports.shift() ?? block([]), changedFiles: [] }; } };
   const res = await runLoop({ config: config(), repoDir: dir, runId: 'r', adapter: builder(), qaAdapter: qa, testCommand: pass, identity });
   assert.equal(res.status, 'done');
   assert.equal(qaCalls, 2);
@@ -174,7 +179,7 @@ test('runLoop without a qa adapter finishes as before', async () => {
 test('runLoop stops failed once maxQaCycles QA reports have been spent', async () => {
   const dir = makeRepo('- [x] one\n');
   let qaCalls = 0;
-  const qa = { async run() { qaCalls += 1; return { exitStatus: 0, transcript: block([finding]), usage: { tokens: 1, cost: 0.01 }, changedFiles: [] }; } };
+  const qa = { async run() { qaCalls += 1; return { exitStatus: 0, transcript: block([finding]), changedFiles: [] }; } };
   const res = await runLoop({ config: config({ maxQaCycles: 2 }), repoDir: dir, runId: 'r', adapter: builder(), qaAdapter: qa, testCommand: pass, identity });
   assert.equal(res.status, 'failed');
   assert.match(res.reason ?? '', /qa cycle limit \(2\)/);
@@ -193,8 +198,8 @@ test('podge uses the configured qa role adapter, distinct from build', async () 
   /** @type {string[]} */
   const used = [];
   const registry = {
-    b: () => ({ async run() { used.push('build'); return { exitStatus: 0, transcript: '', usage: { tokens: 1, cost: 0 }, changedFiles: [] }; } }),
-    q: () => ({ async run() { used.push('qa'); return { exitStatus: 0, transcript: block([]), usage: { tokens: 1, cost: 0 }, changedFiles: [] }; } }),
+    b: () => ({ async run() { used.push('build'); return { exitStatus: 0, transcript: '', changedFiles: [] }; } }),
+    q: () => ({ async run() { used.push('qa'); return { exitStatus: 0, transcript: block([]), changedFiles: [] }; } }),
   };
   const sb = sandboxOf(config(), dir);
   let out = '';

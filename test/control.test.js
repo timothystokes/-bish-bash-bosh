@@ -27,7 +27,7 @@ function makeRepo() {
 const config = {
   targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'f', model: 'm' } },
-  budgets: { maxTokens: 1000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 10 },
+  budgets: { maxWallClockSeconds: 60, maxIterations: 10 },
   allowedPaths: ['src/'],
 };
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
@@ -41,7 +41,7 @@ function recordingAdapter(prompts) {
       const n = prompts.length;
       mkdirSync(join(req.cwd, 'src'), { recursive: true });
       writeFileSync(join(req.cwd, 'src', `f${n}.txt`), 'x');
-      return { exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0 }, changedFiles: [] };
+      return { exitStatus: 0, transcript: 't', changedFiles: [] };
     },
   };
 }

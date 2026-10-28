@@ -10,8 +10,8 @@ import { rebuildPointers } from '../src/pointers.js';
 /** @param {string} dir @param {string[]} args */
 const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { encoding: 'utf8' }).trim();
 
-/** @param {'ok'|'failed'|'gated'|'over-budget'} status @param {number} cost */
-const rec = (status, cost) => ({ status, usage: { tokens: 10, cost, seconds: 1 }, changedFiles: [], gates: [], prompt: 'p', transcript: 't', diff: '', test: {} });
+/** @param {'ok'|'failed'|'gated'|'over-budget'} status */
+const rec = (status) => ({ status, usage: { seconds: 1 }, changedFiles: [], gates: [], prompt: 'p', transcript: 't', diff: '', test: {} });
 
 function makeRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'hodge-ptr-'));
@@ -25,29 +25,28 @@ function makeRepo() {
 test('a new run reports head sha, zero iterations and status new', () => {
   const dir = makeRepo();
   const p = rebuildPointers(dir, 'r1', join(dir, 'control.json'));
-  assert.deepEqual(p, { sha: git(dir, 'rev-parse', 'HEAD'), iteration: 0, cost: 0, status: 'new', paused: false, stop: false });
+  assert.deepEqual(p, { sha: git(dir, 'rev-parse', 'HEAD'), iteration: 0, status: 'new', paused: false, stop: false });
 });
 
-test('iteration, cost and status come from run records', () => {
+test('iteration and status come from run records', () => {
   const dir = makeRepo();
-  writeIterationRecord(dir, 'r1', 1, rec('ok', 0.5));
-  writeIterationRecord(dir, 'r1', 2, rec('failed', 0.25));
+  writeIterationRecord(dir, 'r1', 1, rec('ok'));
+  writeIterationRecord(dir, 'r1', 2, rec('failed'));
   const p = rebuildPointers(dir, 'r1', join(dir, 'control.json'));
   assert.equal(p.iteration, 2);
-  assert.equal(p.cost, 0.75);
   assert.equal(p.status, 'failed');
 });
 
 test('a fully ticked plan reports done', () => {
   const dir = makeRepo();
-  writeIterationRecord(dir, 'r1', 1, rec('ok', 0.1));
+  writeIterationRecord(dir, 'r1', 1, rec('ok'));
   writeFileSync(join(dir, 'plan.md'), '- [x] a\n');
   assert.equal(rebuildPointers(dir, 'r1', join(dir, 'control.json')).status, 'done');
 });
 
 test('a gated or over-budget last step is surfaced as is', () => {
   const dir = makeRepo();
-  writeIterationRecord(dir, 'r1', 1, rec('gated', 0));
+  writeIterationRecord(dir, 'r1', 1, rec('gated'));
   assert.equal(rebuildPointers(dir, 'r1', join(dir, 'control.json')).status, 'gated');
 });
 

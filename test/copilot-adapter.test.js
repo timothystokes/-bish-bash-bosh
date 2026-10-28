@@ -28,34 +28,20 @@ test('buildCopilotArgs is non-interactive and passes model', () => {
   assert.ok(a.includes('--no-ask-user'));
 });
 
-test('parseCopilotOutput sums usage, joins messages, tolerates junk lines', () => {
+test('parseCopilotOutput joins assistant messages, keeps junk lines and ignores usage events', () => {
   const out = [
     'not json',
     JSON.stringify({ type: 'assistant.message', data: { content: 'hi' } }),
     JSON.stringify({ type: 'assistant.usage', data: { inputTokens: 10, outputTokens: 5, cost: 0.2 } }),
-    JSON.stringify({ type: 'assistant.usage', data: { inputTokens: 1, outputTokens: 1 } }),
+    JSON.stringify({ type: 'session.usage_checkpoint', data: {} }),
   ].join('\n');
-  const p = parseCopilotOutput(out);
-  assert.deepEqual(p.usage, { tokens: 17, cost: 0.2 });
-  assert.match(p.transcript, /hi/);
-});
-
-test('parseCopilotOutput reads the real session.usage_checkpoint shape (last checkpoint wins)', () => {
-  const cp = (/** @type {number} */ i, /** @type {number} */ o) =>
-    JSON.stringify({
-      type: 'session.usage_checkpoint',
-      data: { accountingSnapshot: { modelMetrics: { m1: { usage: { inputTokens: i, outputTokens: o, cacheReadTokens: 999 } }, m2: { usage: { inputTokens: 1, outputTokens: 2 } } } } },
-    });
-  const out = [cp(10, 1), JSON.stringify({ type: 'assistant.message', data: { content: 'Done.' } }), cp(51531, 90)].join('\n');
-  const p = parseCopilotOutput(out);
-  assert.deepEqual(p.usage, { tokens: 51531 + 90 + 3, cost: 0 });
-  assert.match(p.transcript, /Done\./);
+  assert.deepEqual(parseCopilotOutput(out), { transcript: 'not json\nhi' });
 });
 
 test('wall-clock limit kills the agent and reports non-zero exit', async () => {
   const cwd = mkdtempSync(join(tmpdir(), 'hodge-cop-'));
   try {
-    const adapter = make(/** @type {any} */ ({ exitStatus: 0, transcript: '', usage: { tokens: 0, cost: 0 }, writes: {}, hang: true }));
+    const adapter = make(/** @type {any} */ ({ exitStatus: 0, transcript: '', writes: {}, hang: true }));
     const r = await adapter.run({ prompt: 'p', cwd, limits: { maxWallClockSeconds: 0.3 } });
     assert.notEqual(r.exitStatus, 0);
   } finally {
@@ -75,7 +61,7 @@ test('missing command yields a failed result, not a throw', async () => {
   }
 });
 
-test('dropEphemeralEvents hides session.* events across chunk splits and keeps the rest', () => {
+test('dropEphemeralEvents hides ephemeral events across chunk splits and keeps the rest', () => {
   /** @type {string[]} */
   const out = [];
   const f = dropEphemeralEvents((stream, chunk) => out.push(`${stream}:${chunk}`));
@@ -87,6 +73,18 @@ test('dropEphemeralEvents hides session.* events across chunk splits and keeps t
   f.write('stderr', 'warn\n');
   f.flush();
   assert.deepEqual(out, [`stdout:${msg}\n`, 'stdout:plain junk\n', 'stderr:warn\n']);
+});
+
+test('dropEphemeralEvents drops any ephemeral event, not only session.*, and keeps non-ephemeral ones', () => {
+  /** @type {string[]} */
+  const out = [];
+  const f = dropEphemeralEvents((_s, c) => out.push(c));
+  assert.ok(f);
+  const delta = JSON.stringify({ type: 'assistant.reasoning_delta', ephemeral: true, data: { deltaContent: 'x' } });
+  const session = JSON.stringify({ type: 'session.tools_updated', data: {} });
+  f.write('stdout', `${delta}\n${session}\n`);
+  f.flush();
+  assert.deepEqual(out, [`${session}\n`]);
 });
 
 test('dropEphemeralEvents flushes a trailing partial line and passes through when no sink', () => {

@@ -109,7 +109,7 @@ const config = () => ({
   mode: 'clean-room',
   targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'f', model: 'm' } },
-  budgets: { maxTokens: 1000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 5 },
+  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],
 });
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
@@ -124,7 +124,7 @@ test('runStep in clean-room mode is gated, with no agent call, on a leaky builde
   git(dest, 'add', '-A');
   git(dest, 'commit', '--amend', '-qm', 'leak');
   let calls = 0;
-  const adapter = { async run() { calls++; return createFakeAdapter({ exitStatus: 0, transcript: '', usage: { tokens: 0, cost: 0 }, writes: {} }).run(/** @type {any} */ ({})); } };
+  const adapter = { async run() { calls++; return createFakeAdapter({ exitStatus: 0, transcript: '', writes: {} }).run(/** @type {any} */ ({})); } };
   const res = await runStep({ config: config(), repoDir: dest, runId: 'r', adapter, testCommand: ['node', '-e', 'process.exit(0)'], identity });
   assert.equal(res.status, 'gated');
   assert.match(res.reason ?? '', /clean-room/);

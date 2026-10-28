@@ -8,7 +8,7 @@ const valid = () => ({
     build: { adapter: 'cli-agent', model: 'model-a' },
     review: { adapter: 'http-agent', model: 'model-b' },
   },
-  budgets: { maxTokens: 1000, maxCostUsd: 5, maxWallClockSeconds: 600, maxIterations: 10 },
+  budgets: { maxWallClockSeconds: 600, maxIterations: 10 },
   allowedPaths: ['src/**', 'test/**'],
 });
 
@@ -47,8 +47,14 @@ test('budgets must be positive numbers and all present', () => {
   c.budgets.maxIterations = 0;
   assert.equal(validateConfig(c).ok, false);
   const d = valid();
-  delete (/** @type {any} */ (d.budgets)).maxCostUsd;
+  delete (/** @type {any} */ (d.budgets)).maxWallClockSeconds;
   assert.equal(validateConfig(d).ok, false);
+  const e = /** @type {any} */ (valid());
+  e.budgets.maxTokens = 1000;
+  assert.equal(validateConfig(e).ok, false, 'token and cost budgets are not harness config');
+  const f = /** @type {any} */ (valid());
+  f.budgets.maxCostUsd = 5;
+  assert.equal(validateConfig(f).ok, false);
 });
 
 test('allowedPaths must be a non-empty array of strings', () => {

@@ -17,24 +17,20 @@ export function buildClaudeArgs({ prompt, model }) {
 
 /**
  * Parse `--output-format json` output: a result object (or an array containing one).
- * Cache tokens are excluded from the token count. Unparseable output becomes the transcript.
+ * Unparseable output becomes the transcript.
  * @param {string} stdout
- * @returns {{transcript: string, usage: import('../adapter.js').Usage}}
+ * @returns {{transcript: string}}
  */
 export function parseClaudeOutput(stdout) {
   let parsed;
   try {
     parsed = JSON.parse(stdout);
   } catch {
-    return { transcript: stdout.trim(), usage: { tokens: 0, cost: 0 } };
+    return { transcript: stdout.trim() };
   }
   const ev = Array.isArray(parsed) ? [...parsed].reverse().find((/** @type {any} */ e) => e?.type === 'result') : parsed;
-  if (!ev || typeof ev !== 'object') return { transcript: stdout.trim(), usage: { tokens: 0, cost: 0 } };
-  const pos = (/** @type {unknown} */ n) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0);
-  return {
-    transcript: typeof ev.result === 'string' ? ev.result : '',
-    usage: { tokens: pos(ev.usage?.input_tokens) + pos(ev.usage?.output_tokens), cost: pos(ev.total_cost_usd) },
-  };
+  if (!ev || typeof ev !== 'object') return { transcript: stdout.trim() };
+  return { transcript: typeof ev.result === 'string' ? ev.result : '' };
 }
 
 /**
@@ -56,12 +52,9 @@ export function createClaudeCodeAdapter(opts = {}) {
         onOutput,
       });
       const parsed = parseClaudeOutput(stdout);
-      const over =
-        (limits.maxTokens !== undefined && parsed.usage.tokens > limits.maxTokens) ||
-        (limits.maxCostUsd !== undefined && parsed.usage.cost > limits.maxCostUsd);
-      const exitStatus = timedOut ? 124 : code !== 0 ? code : over ? 1 : 0;
+      const exitStatus = timedOut ? 124 : code;
       const transcript = stderr ? `${parsed.transcript}\n[stderr]\n${stderr}` : parsed.transcript;
-      return { exitStatus, transcript, usage: parsed.usage, changedFiles };
+      return { exitStatus, transcript, changedFiles };
     },
   };
 }

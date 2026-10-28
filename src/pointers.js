@@ -6,7 +6,7 @@ import { isPlanDone } from './driver.js';
 import { createLocalStatusSource } from './status.js';
 
 /**
- * @typedef {{sha: string | null, iteration: number, cost: number, status: string, paused: boolean, stop: boolean}} Pointers
+ * @typedef {{sha: string | null, iteration: number, status: string, paused: boolean, stop: boolean}} Pointers
  */
 
 /**
@@ -39,7 +39,6 @@ export function rebuildPointers(repoDir, runId, controlFile) {
   return {
     sha: headSha(repoDir),
     iteration: totals.iterations,
-    cost: totals.cost,
     status: planDone ? 'done' : (source.lastStatus(runId) ?? 'new'),
     paused: ctl.ok ? ctl.paused : false,
     stop: ctl.ok ? ctl.stop : true,

@@ -53,7 +53,6 @@ export function createOpenAiHttpAdapter(opts = {}) {
       const fail = (/** @type {number} */ exitStatus, /** @type {string} */ transcript) => ({
         exitStatus,
         transcript,
-        usage: { tokens: 0, cost: 0 },
         changedFiles: /** @type {string[]} */ ([]),
       });
       const headers = { 'content-type': 'application/json', ...(opts.apiKeyEnv && env[opts.apiKeyEnv] ? { authorization: `Bearer ${env[opts.apiKeyEnv]}` } : {}) };
@@ -80,13 +79,8 @@ export function createOpenAiHttpAdapter(opts = {}) {
       }
       if (!res.ok) return fail(2, `HTTP ${res.status}: ${JSON.stringify(json?.error ?? json)}`);
 
-      const pos = (/** @type {unknown} */ n) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0);
-      const usage = {
-        tokens: pos(json?.usage?.prompt_tokens) + pos(json?.usage?.completion_tokens),
-        cost: pos(json?.usage?.cost),
-      };
       const content = json?.choices?.[0]?.message?.content;
-      if (typeof content !== 'string') return { ...fail(2, 'response had no message content'), usage };
+      if (typeof content !== 'string') return fail(2, 'response had no message content');
 
       const { transcript, files } = parseFileBlocks(content);
       const root = resolve(cwd);
@@ -103,11 +97,8 @@ export function createOpenAiHttpAdapter(opts = {}) {
         writeFileSync(join(root, r), text);
         changedFiles.push(r.split('\\').join('/'));
       }
-      const over =
-        (limits.maxTokens !== undefined && usage.tokens > limits.maxTokens) ||
-        (limits.maxCostUsd !== undefined && usage.cost > limits.maxCostUsd);
       const note = rejected.length ? `\n[rejected paths outside repo: ${rejected.join(', ')}]` : '';
-      return { exitStatus: rejected.length || over ? 1 : 0, transcript: transcript + note, usage, changedFiles };
+      return { exitStatus: rejected.length ? 1 : 0, transcript: transcript + note, changedFiles };
     },
   };
 }

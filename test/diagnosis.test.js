@@ -63,7 +63,7 @@ test('diagnose covers non-gate failures and agent-reported fields override defau
 test('writeIterationRecord writes diagnosis.json and rejects an invalid diagnosis', () => {
   const repo = mkdtempSync(join(tmpdir(), 'hodge-dg-'));
   const rec = {
-    status: /** @type {const} */ ('failed'), usage: { tokens: 1, cost: 0 }, changedFiles: [], gates: [],
+    status: /** @type {const} */ ('failed'), usage: { seconds: 1 }, changedFiles: [], gates: [],
     prompt: 'p', transcript: 't', diff: '', test: null,
   };
   assert.throws(() => writeIterationRecord(repo, 'r', 1, { ...rec, diagnosis: /** @type {any} */ ({ rootCause: 'x' }) }), /diagnosis/);
@@ -85,11 +85,11 @@ test('runStep: a gated failure records diagnosis.json and returns its root cause
     config: {
       targetRepo: 'git@example.com:o/t.git',
       roles: { build: { adapter: 'x', model: 'y' } },
-      budgets: { maxTokens: 1000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 5 },
+      budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
       allowedPaths: ['src/'],
     },
     repoDir: dir, runId: 'r1',
-    adapter: createFakeAdapter({ exitStatus: 0, transcript: 'ok', usage: { tokens: 1, cost: 0 }, writes: { 'other/x.js': 'x\n' } }),
+    adapter: createFakeAdapter({ exitStatus: 0, transcript: 'ok', writes: { 'other/x.js': 'x\n' } }),
     testCommand: ['node', '-e', 'process.exit(0)'],
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
   });

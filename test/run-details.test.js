@@ -10,7 +10,7 @@ import { writeDoneReport } from '../src/done.js';
 import { main } from '../src/cli.js';
 import { sandboxOf } from './support/sandbox.js';
 
-const budgets = { maxTokens: 1000, maxCostUsd: 2, maxWallClockSeconds: 100, maxIterations: 5 };
+const budgets = { maxWallClockSeconds: 100, maxIterations: 5 };
 const control = /** @type {const} */ ({ ok: true, paused: false, stop: false });
 
 const diagnosis = { rootCause: 'rc', evidence: 'ev', fix: 'fx', test: 't', prevention: 'pv' };
@@ -37,10 +37,10 @@ function makeRepo() {
   );
   writeFileSync(join(dir, 'specs', 'b.md'), '# B\n## Requirements\n- R-b-1: it must work\n');
   mkdirSync(join(dir, 'runs', 'r1', 'qa-1'), { recursive: true });
-  writeFileSync(join(dir, 'runs', 'r1', 'qa-1', 'record.json'), JSON.stringify({ status: 'findings', cycle: 1, usage: { tokens: 1, cost: 0, seconds: 1 } }));
+  writeFileSync(join(dir, 'runs', 'r1', 'qa-1', 'record.json'), JSON.stringify({ status: 'findings', cycle: 1, usage: { seconds: 1 } }));
   writeFileSync(join(dir, 'runs', 'r1', 'qa-1', 'findings.json'), JSON.stringify([finding]));
   mkdirSync(join(dir, 'runs', 'r1', 'qa-2'), { recursive: true });
-  writeFileSync(join(dir, 'runs', 'r1', 'qa-2', 'record.json'), JSON.stringify({ status: 'clean', cycle: 2, usage: { tokens: 1, cost: 0, seconds: 1 } }));
+  writeFileSync(join(dir, 'runs', 'r1', 'qa-2', 'record.json'), JSON.stringify({ status: 'clean', cycle: 2, usage: { seconds: 1 } }));
   writeFileSync(join(dir, 'runs', 'r1', 'qa-2', 'findings.json'), '[]');
   writeDoneReport(dir, 'r1', {
     ok: false,

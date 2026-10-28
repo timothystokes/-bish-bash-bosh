@@ -22,7 +22,7 @@ import { consumeInbox, inboxSection, readInbox } from './inbox.js';
 /**
  * @typedef {import('./adapter.js').Adapter} Adapter
  * @typedef {import('./repo-gate.js').HarnessIdentity} HarnessIdentity
- * @typedef {{sha: string | null, iteration: number, cost: number, status: 'ok' | 'failed' | 'gated' | 'over-budget', reason?: string}} StepResult
+ * @typedef {{sha: string | null, iteration: number, status: 'ok' | 'failed' | 'gated' | 'over-budget', reason?: string}} StepResult
  */
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
@@ -146,7 +146,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets, allowedPaths: string[], mode?: string, hardenCommand?: string[]}} */ (config);
 
   const self = identity ?? harnessIdentity();
-  const gated = (/** @type {string} */ reason) => (log(`step gated: ${reason}`), { sha: null, iteration: 0, cost: 0, status: /** @type {const} */ ('gated'), reason });
+  const gated = (/** @type {string} */ reason) => (log(`step gated: ${reason}`), { sha: null, iteration: 0, status: /** @type {const} */ ('gated'), reason });
   for (const target of [cfg.targetRepo, repoDir]) {
     const g = checkRepoGate(target, self);
     if (!g.ok) return gated(g.reason);
@@ -173,7 +173,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
   if (!budget.ok) {
     log(`budget gate: ${budget.reason}`);
-    return { sha: null, iteration: 0, cost: 0, status: 'over-budget', reason: budget.reason };
+    return { sha: null, iteration: 0, status: 'over-budget', reason: budget.reason };
   }
 
   const iteration = nextIteration(repoDir, runId);
@@ -186,14 +186,12 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   const baseline = runTests(testCommand, repoDir);
   const moreTodos = inboxDir ? readInbox(inboxDir, 'podge') : '';
   const prompt = planStep ? buildPlanPrompt(repoDir, steer, moreTodos) : buildPrompt(repoDir, cfg.mode, steer, moreTodos);
-  const maxTokens = budget.remaining.tokens;
-  const maxCostUsd = budget.remaining.cost;
   const maxWallClockSeconds = Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds);
   const started = Date.now();
   const result = await adapter.run({
     prompt,
     cwd: repoDir,
-    limits: { maxTokens, maxCostUsd, maxWallClockSeconds },
+    limits: { maxWallClockSeconds },
   });
   const seconds = (Date.now() - started) / 1000;
 
@@ -204,7 +202,6 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   let status = 'ok';
   /** @type {unknown} */
   let test = { skipped: true };
-  const overBudget = result.usage.tokens > maxTokens || result.usage.cost > maxCostUsd;
   /** @type {{name: string, ok: boolean, detail?: string}[]} */
   const gates = [{ name: 'repo', ok: true }, { name: 'budget', ok: true }];
   if (requireTestPlan && !planStep) gates.push({ name: 'test-plan', ok: true });
@@ -215,7 +212,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     return c.ok;
   };
   if (result.exitStatus !== 0) {
-    status = overBudget ? 'over-budget' : 'failed';
+    status = 'failed';
   } else {
     const staged = git(repoDir, 'diff', '--cached', '--name-only').split('\n').filter(Boolean);
     const diffOk = [
@@ -254,7 +251,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   const diagnosis = diagnose({ status, gates: finalGates, transcript: result.transcript });
   writeIterationRecord(repoDir, runId, iteration, {
     status,
-    usage: { ...result.usage, seconds },
+    usage: { seconds },
     changedFiles: result.changedFiles,
     gates: finalGates,
     prompt,
@@ -268,7 +265,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   git(repoDir, 'commit', '-q', '--allow-empty', '-m', `podge step ${runId}/${String(iteration).padStart(3, '0')}: ${status}`);
 
   return {
-    sha: git(repoDir, 'rev-parse', 'HEAD').trim(), iteration, cost: result.usage.cost, status,
+    sha: git(repoDir, 'rev-parse', 'HEAD').trim(), iteration, status,
     ...(diagnosis ? { reason: diagnosis.rootCause } : {}),
   };
 }

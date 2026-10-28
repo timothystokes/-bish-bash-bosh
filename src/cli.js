@@ -34,7 +34,7 @@ export function helpText() {
     '  hodge  [--dir <sandbox>] [--run-id <id>] [--reverse] [--debug]',
     '  podge  [--dir <sandbox>] [--run-id <id>] [--control <control.json>] [--debug]   (with a `qa` role in hodge.json, done also needs a clean independent QA report; findings return to the plan, up to maxQaCycles)',
     '  podge step [--dir <sandbox>] [--run-id <id>] [--debug]',
-    '  --debug (or HODGEPODGE_DEBUG=1) on hodge/podge/podge step: log to stdout the agent prompt, the agent process raw stdout/stderr live, each call\'s exit status, usage and parsed transcript, every gate result with its detail, test output on failure, and stack traces. The transcript is agent output, not the environment, but it may contain whatever the agent printed: do not share debug logs unreviewed.',
+    '  --debug (or HODGEPODGE_DEBUG=1) on hodge/podge/podge step: log to stdout the agent prompt, the agent process raw stdout/stderr live, each call\'s exit status and parsed transcript, every gate result with its detail, test output on failure, and stack traces. The transcript is agent output, not the environment, but it may contain whatever the agent printed: do not share debug logs unreviewed.',
     '  hodgepodge <command> ...   (the commands below)',
     '  hodge, podge and podge step hold a single-run lock (<sandbox>/.hodge.lock, PID; stale locks are cleared) and refuse to start while another live run holds the sandbox.',
     '  Sandbox commands take --dir <sandbox> (default: the current directory). `hodgepodge init` writes <sandbox>/hodge.json holding the target repo,',
@@ -61,12 +61,12 @@ export function helpText() {
     '         spec-lint passes and the test suite is green); prints JSON {status, ...}; exit 0 only when ok',
     '  podge  planning and implementation: with specs but no tests/PLAN.md the first step writes the test plan, red tests and plan.md; then loops steps until the plan is done and verified (suite, types, every R-<spec>-<n> named by a passing test; writes runs/<id>/done.json) (plus a clean independent QA report when config has a `qa` role) or a step fails/gates/runs out of budget (failed iterations write diagnosis.json: root cause, evidence, fix, test, prevention) (--control <file> honours control.json);',
     '         prints JSON {status, steps, reason?}; exit 0 only when done',
-    '  podge step  run one loop iteration (the unit `podge` and the cloud driver repeat); prints JSON {sha, iteration, cost, status}',
+    '  podge step  run one loop iteration (the unit `podge` and the cloud driver repeat); prints JSON {sha, iteration, status}',
     '         (--dir defaults to ., --run-id defaults to "default")',
     '  clean-room  export only specs/ + tests/ from --source into a fresh git repo at --repo (the builder never sees source); prints JSON {ok, sha, files};',
     '         exit 0 only when ok. Then run `podge` there with config mode clean-room (firewall gate checks the bundle first)',
-    '  status  print JSON run status: iterations, tokens, cost, seconds vs budgets, plus `details` (declared formats, readiness by dimension, QA findings, done evidence) and control state with --control',
-    '  tui    live terminal view: log tail, cost meter vs budget, declared formats, readiness by dimension, QA findings, done evidence; keys p pause, r resume, s steer, x stop (confirmed), q quit',
+    '  status  print JSON run status: iterations, seconds vs budgets, plus `details` (declared formats, readiness by dimension, QA findings, done evidence) and control state with --control',
+    '  tui    live terminal view: log tail, seconds and iterations vs budget, declared formats, readiness by dimension, QA findings, done evidence; keys p pause, r resume, s steer, x stop (confirmed), q quit',
     '  proxy  secret-redacting, usage-metering proxy in front of a model endpoint; prints JSON {port} then serves until SIGINT/SIGTERM',
     '  ready  check the specs are captured at a fine grain (granularity, testable/atomic requirements, negative paths, no vague words or unmeasured non-functional requirements, all ten dimensions covered or n/a with a reason per spec, no placeholders,\n         no open questions); prints JSON {ready, gaps}; exit 0 only when ready. `podge` is gated by it when the target has an objective kit',
     '  spec-lint  check specs/*.md structure, Implementation field, requirement IDs and tests/PLAN.md mapping; prints JSON {ok, problems};',
@@ -159,7 +159,7 @@ function resetTty(input) {
 }
 
 /**
- * In debug mode, print to stdout the agent process raw stdout/stderr live, then each call's exit status, usage, changed files and parsed transcript.
+ * In debug mode, print to stdout the agent process raw stdout/stderr live, then each call's exit status, changed files and parsed transcript.
  * @param {import('./adapter.js').Adapter} adapter
  * @param {string} role
  * @param {boolean} debug
@@ -172,7 +172,7 @@ function debugAdapter(adapter, role, debug, out) {
     run: async (req) => {
       out(`[debug] ${role}: agent start (cwd ${req.cwd}, limits ${JSON.stringify(req.limits)})\n[debug] ${role}: prompt begin\n${req.prompt}\n[debug] ${role}: prompt end\n`);
       const res = await adapter.run({ ...req, onOutput: (stream, chunk) => out(stream === 'stdout' ? chunk : `[${role} stderr] ${chunk}`) });
-      out(`\n[debug] ${role}: exit ${res.exitStatus}, usage ${JSON.stringify(res.usage)}, changed ${JSON.stringify(res.changedFiles)}\n`);
+      out(`\n[debug] ${role}: exit ${res.exitStatus}, changed ${JSON.stringify(res.changedFiles)}\n`);
       out(`[debug] ${role}: transcript begin\n${res.transcript}\n[debug] ${role}: transcript end\n`);
       return res;
     },

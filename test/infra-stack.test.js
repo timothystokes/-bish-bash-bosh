@@ -6,7 +6,7 @@ import { HodgeStack } from '../infra/stack.js';
 
 const props = {
   env: { account: '111111111111', region: 'ap-southeast-2' },
-  budgets: { maxCostUsd: 50, maxIterations: 100 },
+  budgets: { maxIterations: 100 },
   iterationsPerExecution: 20,
   pollSeconds: 30,
   secretNames: ['hodge/agent-key'],
@@ -60,5 +60,5 @@ test('synth is deterministic', () => {
 });
 
 test('rejects invalid budgets', () => {
-  assert.throws(() => new HodgeStack(new App(), 'Bad', { ...props, budgets: { maxCostUsd: 0, maxIterations: 1 } }), /maxCostUsd/);
+  assert.throws(() => new HodgeStack(new App(), 'Bad', { ...props, budgets: { maxIterations: 0 } }), /maxIterations/);
 });

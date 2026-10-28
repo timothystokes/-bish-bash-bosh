@@ -29,7 +29,7 @@ test('buildClaudeArgs is non-interactive JSON and passes model', () => {
   assert.ok(a.includes('--dangerously-skip-permissions'));
 });
 
-test('parseClaudeOutput reads result, cost and token usage (cache excluded)', () => {
+test('parseClaudeOutput reads the result text and ignores cost and token fields', () => {
   const out = JSON.stringify({
     type: 'result',
     result: 'Done.',
@@ -37,21 +37,19 @@ test('parseClaudeOutput reads result, cost and token usage (cache excluded)', ()
     usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 999 },
   });
   const p = parseClaudeOutput(out);
-  assert.deepEqual(p.usage, { tokens: 15, cost: 0.25 });
   assert.equal(p.transcript, 'Done.');
 });
 
 test('parseClaudeOutput tolerates junk and picks the result entry from an array', () => {
-  assert.deepEqual(parseClaudeOutput('not json').usage, { tokens: 0, cost: 0 });
   assert.equal(parseClaudeOutput('not json').transcript, 'not json');
   const arr = JSON.stringify([{ type: 'system' }, { type: 'result', result: 'ok', total_cost_usd: 1, usage: { input_tokens: 1, output_tokens: 1 } }]);
-  assert.deepEqual(parseClaudeOutput(arr), { transcript: 'ok', usage: { tokens: 2, cost: 1 } });
+  assert.deepEqual(parseClaudeOutput(arr), { transcript: 'ok' });
 });
 
 test('wall-clock limit kills the agent and reports non-zero exit', async () => {
   const cwd = mkdtempSync(join(tmpdir(), 'hodge-cc-'));
   try {
-    const adapter = make(/** @type {any} */ ({ exitStatus: 0, transcript: '', usage: { tokens: 0, cost: 0 }, writes: {}, hang: true }));
+    const adapter = make(/** @type {any} */ ({ exitStatus: 0, transcript: '', writes: {}, hang: true }));
     const r = await adapter.run({ prompt: 'p', cwd, limits: { maxWallClockSeconds: 0.3 } });
     assert.equal(r.exitStatus, 124);
   } finally {
@@ -73,7 +71,7 @@ test('registered in defaultRegistry as claude-code', () => {
   assert.equal(typeof defaultRegistry['claude-code'], 'function');
 });
 
-test('parses real claude 2.1.310 error result (not logged in): transcript kept, zero usage', () => {
+test('parses real claude 2.1.310 error result (not logged in): transcript kept', () => {
   const real = JSON.stringify({ type: 'result', subtype: 'success', is_error: true, result: 'Not logged in · Please run /login', total_cost_usd: 0, usage: { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } });
-  assert.deepEqual(parseClaudeOutput(real), { transcript: 'Not logged in · Please run /login', usage: { tokens: 0, cost: 0 } });
+  assert.deepEqual(parseClaudeOutput(real), { transcript: 'Not logged in · Please run /login' });
 });

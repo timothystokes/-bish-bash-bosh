@@ -30,7 +30,7 @@ const config = (/** @type {object} */ extra = {}) => ({
   mode: 'test-hardening',
   targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'f', model: 'm' } },
-  budgets: { maxTokens: 1000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 5 },
+  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/', 'tests/'],
   ...extra,
 });
@@ -39,7 +39,7 @@ const pass = ['node', '-e', 'process.exit(0)'];
 const fail = ['node', '-e', 'console.log("score 40%"); process.exit(1)'];
 const testWrite = { 'tests/extra.test.js': 'export const t = 1;\n' };
 const adapterWith = (/** @type {Record<string,string>} */ writes) =>
-  createFakeAdapter({ exitStatus: 0, transcript: 't', writes, usage: { tokens: 1, cost: 0 } });
+  createFakeAdapter({ exitStatus: 0, transcript: 't', writes });
 
 test('prompt carries hardening rules', () => {
   const p = loadModePrompt('test-hardening');

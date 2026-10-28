@@ -1,12 +1,11 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "hodgepodge-usage",
+  "description": "Wall-clock timing only; the harness does not track tokens or cost.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["tokens", "cost"],
+  "required": ["seconds"],
   "properties": {
-    "tokens": { "type": "number", "minimum": 0 },
-    "cost": { "type": "number", "minimum": 0 },
     "seconds": { "type": "number", "minimum": 0 }
   }
 }

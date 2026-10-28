@@ -77,8 +77,6 @@ export function readRunStatus(source, runId, budgets) {
     budgets,
     details: source.details(runId),
     remaining: {
-      tokens: budgets.maxTokens - totals.tokens,
-      cost: budgets.maxCostUsd - totals.cost,
       seconds: budgets.maxWallClockSeconds - totals.seconds,
       iterations: budgets.maxIterations - totals.iterations,
     },

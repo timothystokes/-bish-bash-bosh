@@ -16,7 +16,7 @@ const MOUNT = '/mnt/work';
 
 /**
  * @typedef {import('aws-cdk-lib').StackProps & {
- *   budgets: {maxCostUsd: number, maxIterations: number},
+ *   budgets: {maxIterations: number},
  *   iterationsPerExecution: number,
  *   pollSeconds: number,
  *   secretNames?: string[],

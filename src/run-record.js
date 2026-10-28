@@ -6,7 +6,7 @@ import { validateDiagnosis } from './diagnosis.js';
  * @typedef {{name: string, ok: boolean, detail?: string}} GateResult
  * @typedef {{
  *   status: 'ok' | 'failed' | 'gated' | 'over-budget',
- *   usage: {tokens: number, cost: number, seconds?: number},
+ *   usage: {seconds: number},
  *   changedFiles: string[],
  *   gates: GateResult[],
  *   prompt: string,
@@ -32,9 +32,7 @@ export function validateRunRecord(r) {
   if (typeof r !== 'object' || r === null) return { ok: false, errors: ['record must be an object'] };
   const o = /** @type {Record<string, any>} */ (r);
   if (!STATUSES.includes(o.status)) errors.push(`status must be one of ${STATUSES.join(', ')}`);
-  if (typeof o.usage !== 'object' || o.usage === null || !isNum(o.usage.tokens) || !isNum(o.usage.cost)) {
-    errors.push('usage must have non-negative numeric tokens and cost');
-  } else if ('seconds' in o.usage && !isNum(o.usage.seconds)) {
+  if (typeof o.usage !== 'object' || o.usage === null || !isNum(o.usage.seconds)) {
     errors.push('usage.seconds must be a non-negative number');
   }
   if (!Array.isArray(o.changedFiles) || o.changedFiles.some((f) => typeof f !== 'string')) {

@@ -28,7 +28,7 @@ function makeRepo() {
 const config = (/** @type {Record<string, {adapter: string, model: string}>} */ roles = { reverse: { adapter: 'f', model: 'm' } }) => ({
   targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'f', model: 'm' }, ...roles },
-  budgets: { maxTokens: 1000, maxCostUsd: 5, maxWallClockSeconds: 60, maxIterations: 5 },
+  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],
 });
 
@@ -51,7 +51,7 @@ const agent = (writes, exitStatus = 0) => {
       async run(req) {
         prompts.push(req.prompt);
         const { createFakeAdapter } = await import('../src/adapter.js');
-        return createFakeAdapter({ exitStatus, transcript: 't', usage: { tokens: 5, cost: 0.1 }, writes }).run(req);
+        return createFakeAdapter({ exitStatus, transcript: 't', writes }).run(req);
       },
     },
   };

@@ -30,7 +30,7 @@ function makeRepo(plan) {
 const config = (maxIterations = 5) => ({
   targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'f', model: 'm' } },
-  budgets: { maxTokens: 1000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations },
+  budgets: { maxWallClockSeconds: 60, maxIterations },
   allowedPaths: ['src/'],
 });
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
@@ -49,7 +49,7 @@ test('runLoop stops gated when the agent records an unresolved CONFLICT item in 
     async run(/** @type {any} */ req) {
       n += 1;
       writeFileSync(join(req.cwd, 'plan.md'), '- [ ] one\n- [ ] two\n\n- [ ] CONFLICT: specs/a.md:2 vs tests/a.test.js:3\n');
-      return { exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0.1 }, changedFiles: ['plan.md'] };
+      return { exitStatus: 0, transcript: 't', changedFiles: ['plan.md'] };
     },
   };
   const res = await runLoop({ config: config(), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity });
@@ -68,7 +68,7 @@ test('runLoop stops with done when the agent ticks the last plan item', async ()
       writeFileSync(join(req.cwd, 'plan.md'), plan);
       mkdirSync(join(req.cwd, 'src'), { recursive: true });
       writeFileSync(join(req.cwd, 'src', `f${n}.txt`), 'x');
-      return { exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0.1 }, changedFiles: ['plan.md'] };
+      return { exitStatus: 0, transcript: 't', changedFiles: ['plan.md'] };
     },
   };
   const res = await runLoop({ config: config(), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity });
@@ -79,7 +79,7 @@ test('runLoop stops with done when the agent ticks the last plan item', async ()
 
 test('runLoop stops over-budget when iterations are exhausted', async () => {
   const dir = makeRepo('- [ ] one\n');
-  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0.1 }, writes: {} });
+  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 't', writes: {} });
   const res = await runLoop({ config: config(2), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity });
   assert.equal(res.status, 'over-budget');
   assert.equal(res.steps.filter((s) => s.status === 'ok').length, 2);
@@ -88,7 +88,7 @@ test('runLoop stops over-budget when iterations are exhausted', async () => {
 
 test('runLoop stops on the first failed step without retrying', async () => {
   const dir = makeRepo('- [ ] one\n');
-  const adapter = createFakeAdapter({ exitStatus: 1, transcript: 'no', usage: { tokens: 1, cost: 0 }, writes: {} });
+  const adapter = createFakeAdapter({ exitStatus: 1, transcript: 'no', writes: {} });
   const res = await runLoop({ config: config(), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity });
   assert.equal(res.status, 'failed');
   assert.equal(res.steps.length, 1);
@@ -97,7 +97,7 @@ test('runLoop stops on the first failed step without retrying', async () => {
 test('runLoop stops on a gated step', async () => {
   const dir = makeRepo('- [ ] one\n');
   writeFileSync(join(dir, 'dirty.txt'), 'x');
-  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0 }, writes: {} });
+  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 't', writes: {} });
   const res = await runLoop({ config: config(), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity });
   assert.equal(res.status, 'gated');
   assert.equal(res.steps.length, 1);
@@ -105,7 +105,7 @@ test('runLoop stops on a gated step', async () => {
 
 test('runLoop with requireTestPlan gates when tests/PLAN.md is missing', async () => {
   const dir = makeRepo('- [ ] one\n');
-  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0 }, writes: {} });
+  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 't', writes: {} });
   const res = await runLoop({ config: config(), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity, requireTestPlan: true });
   assert.equal(res.status, 'gated');
 });
@@ -113,7 +113,7 @@ test('runLoop with requireTestPlan gates when tests/PLAN.md is missing', async (
 test('runLoop with requireTestPlan refuses to start when spec-lint fails, without calling the agent', async () => {
   const dir = makeRepo('- [ ] one\n');
   let called = false;
-  const adapter = { async run() { called = true; return { exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0 }, changedFiles: [] }; } };
+  const adapter = { async run() { called = true; return { exitStatus: 0, transcript: 't', changedFiles: [] }; } };
   const res = await runLoop({ config: config(), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity, requireTestPlan: true });
   assert.equal(res.status, 'gated');
   assert.deepEqual(res.steps, []);
@@ -123,7 +123,7 @@ test('runLoop with requireTestPlan refuses to start when spec-lint fails, withou
 
 test('runLoop without requireTestPlan does not run spec-lint', async () => {
   const dir = makeRepo('- [x] one\n');
-  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0 }, writes: {} });
+  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 't', writes: {} });
   const res = await runLoop({ config: config(), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity });
   assert.notEqual(res.status, 'gated');
 });
@@ -139,7 +139,7 @@ test('podge prints loop JSON, exit 0 when done, 1 otherwise', async () => {
   writeFileSync(cfgPath, JSON.stringify(config(2)));
   const out = /** @type {string[]} */ ([]);
   const code = await main(['podge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r'], {
-    registry: { f: () => createFakeAdapter({ exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0.1 }, writes: {} }) },
+    registry: { f: () => createFakeAdapter({ exitStatus: 0, transcript: 't', writes: {} }) },
     testCommand: pass,
     identity,
     stdout: (s) => { out.push(s); },

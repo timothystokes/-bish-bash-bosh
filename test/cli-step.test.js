@@ -28,7 +28,7 @@ function makeRepo() {
 const cfg = (/** @type {string} */ adapter) => ({
   targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter, model: 'm' } },
-  budgets: { maxTokens: 1000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 5 },
+  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],
 });
 
@@ -46,7 +46,7 @@ test('parseStepArgs rejects missing values and unknown flags', () => {
 });
 
 test('resolveAdapter maps role adapter id through the registry', () => {
-  const fake = createFakeAdapter({ exitStatus: 0, transcript: '', usage: { tokens: 1, cost: 0 }, writes: {} });
+  const fake = createFakeAdapter({ exitStatus: 0, transcript: '', writes: {} });
   const a = resolveAdapter(cfg('f'), 'build', { f: () => fake });
   assert.equal(a, fake);
 });
@@ -63,13 +63,13 @@ test('resolveAdapter throws on unknown adapter id or missing role', () => {
   assert.throws(() => resolveAdapter(cfg('f'), 'review', { f: () => /** @type {any} */ ({}) }), /no role 'review'/);
 });
 
-test('podge step prints JSON {sha, iteration, cost, status} and exits 0', async () => {
+test('podge step prints JSON {sha, iteration, status} and exits 0', async () => {
   const dir = makeRepo();
   const cfgPath = join(tmpdir(), `hodge-cfg-${Date.now()}.json`);
   writeFileSync(cfgPath, JSON.stringify(cfg('f')));
   const out = /** @type {string[]} */ ([]);
   const code = await main(['podge', 'step', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r1'], {
-    registry: { f: () => createFakeAdapter({ exitStatus: 0, transcript: 'ok', usage: { tokens: 5, cost: 0.1 }, writes: { 'src/a.js': 'x\n' } }) },
+    registry: { f: () => createFakeAdapter({ exitStatus: 0, transcript: 'ok', writes: { 'src/a.js': 'x\n' } }) },
     testCommand: ['node', '-e', 'process.exit(0)'],
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
     stdout: capture(out),
@@ -79,7 +79,7 @@ test('podge step prints JSON {sha, iteration, cost, status} and exits 0', async 
   const res = JSON.parse(out.join(''));
   assert.equal(res.status, 'ok');
   assert.equal(res.iteration, 1);
-  assert.equal(res.cost, 0.1);
+  assert.deepEqual(Object.keys(res).sort(), ['iteration', 'sha', 'status']);
   assert.equal(res.sha, git(dir, 'rev-parse', 'HEAD'));
 });
 
@@ -89,7 +89,7 @@ test('podge step exits non-zero when the step fails or is gated', async () => {
   writeFileSync(cfgPath, JSON.stringify(cfg('f')));
   const out = /** @type {string[]} */ ([]);
   const code = await main(['podge', 'step', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r1'], {
-    registry: { f: () => createFakeAdapter({ exitStatus: 1, transcript: 'no', usage: { tokens: 1, cost: 0 }, writes: {} }) },
+    registry: { f: () => createFakeAdapter({ exitStatus: 1, transcript: 'no', writes: {} }) },
     testCommand: ['node', '-e', 'process.exit(0)'],
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
     stdout: capture(out),
@@ -162,7 +162,7 @@ test('podge --control passes the control file so a stop is honoured', async () =
   writeFileSync(cfgFile, JSON.stringify(cfg('fake')));
   const o = /** @type {string[]} */ ([]);
   const code = await main(['podge', '--dir', sandboxOf(cfgFile, dir), '--control', f], {
-    registry: { fake: () => createFakeAdapter({ exitStatus: 0, transcript: '', usage: { tokens: 0, cost: 0 }, writes: {} }) },
+    registry: { fake: () => createFakeAdapter({ exitStatus: 0, transcript: '', writes: {} }) },
     stdout: capture(o),
     stderr: capture([]),
   });
@@ -177,7 +177,7 @@ test('--debug logs the agent transcript and gate results to stdout; off by defau
     writeFileSync(cfgPath, JSON.stringify(cfg('f')));
     const err = /** @type {string[]} */ ([]);
     const code = await main(['podge', 'step', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r1', ...extra], {
-      registry: { f: () => createFakeAdapter({ exitStatus: 1, transcript: 'SECRET-LOOKING-TRANSCRIPT', usage: { tokens: 1, cost: 0 }, writes: {} }) },
+      registry: { f: () => createFakeAdapter({ exitStatus: 1, transcript: 'SECRET-LOOKING-TRANSCRIPT', writes: {} }) },
       testCommand: ['node', '-e', 'process.exit(0)'],
       identity: { root: '/nonexistent/hodgepodge', remotes: [] },
       stdout: capture(err),

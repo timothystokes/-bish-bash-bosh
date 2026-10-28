@@ -12,11 +12,5 @@ else {
     writeFileSync(full, content);
   }
   console.log(JSON.stringify({ type: 'assistant.message', data: { content: fx.transcript } }));
-  console.log(
-    JSON.stringify({
-      type: 'assistant.usage',
-      data: { inputTokens: fx.usage.tokens, outputTokens: 0, cost: fx.usage.cost },
-    }),
-  );
   process.exit(fx.exitStatus);
 }

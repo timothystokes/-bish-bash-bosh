@@ -8,7 +8,6 @@ import { createFakeAdapter } from '../src/adapter.js';
 
 const tmp = () => mkdtempSync(join(tmpdir(), 'hodge-smoke-'));
 const limits = { maxWallClockSeconds: 60 };
-const usage = { tokens: 1, cost: 0 };
 
 const GOOD = `for (let i = 1; i <= 15; i++) console.log(i % 15 === 0 ? 'FizzBuzz' : i % 3 === 0 ? 'Fizz' : i % 5 === 0 ? 'Buzz' : i);\n`;
 
@@ -25,7 +24,7 @@ test('X-11: expected output is FizzBuzz for 1..15', () => {
 
 test('X-11: a conforming agent passes the smoke check', async () => {
   const cwd = tmp();
-  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 'ok', usage, writes: { [SMOKE_FILE]: GOOD } });
+  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 'ok', writes: { [SMOKE_FILE]: GOOD } });
   const r = await runSmoke(adapter, { cwd, limits });
   assert.deepEqual(r.errors, []);
   assert.equal(r.ok, true);
@@ -33,14 +32,14 @@ test('X-11: a conforming agent passes the smoke check', async () => {
 });
 
 test('X-11: a non-zero agent exit fails the check', async () => {
-  const adapter = createFakeAdapter({ exitStatus: 3, transcript: 'x', usage, writes: { [SMOKE_FILE]: GOOD } });
+  const adapter = createFakeAdapter({ exitStatus: 3, transcript: 'x', writes: { [SMOKE_FILE]: GOOD } });
   const r = await runSmoke(adapter, { cwd: tmp(), limits });
   assert.equal(r.ok, false);
   assert.match(r.errors.join('\n'), /exited 3/);
 });
 
 test('X-11: a missing file fails the check', async () => {
-  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 'x', usage, writes: {} });
+  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 'x', writes: {} });
   const r = await runSmoke(adapter, { cwd: tmp(), limits });
   assert.equal(r.ok, false);
   assert.match(r.errors.join('\n'), /fizzbuzz\.js was not created/);
@@ -48,21 +47,21 @@ test('X-11: a missing file fails the check', async () => {
 
 test('X-11: wrong output fails the check', async () => {
   const bad = GOOD.replace('FizzBuzz', 'Fizzbuzz');
-  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 'x', usage, writes: { [SMOKE_FILE]: bad } });
+  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 'x', writes: { [SMOKE_FILE]: bad } });
   const r = await runSmoke(adapter, { cwd: tmp(), limits });
   assert.equal(r.ok, false);
   assert.match(r.errors.join('\n'), /output differs/);
 });
 
 test('X-11: a script that crashes fails the check', async () => {
-  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 'x', usage, writes: { [SMOKE_FILE]: 'throw new Error("boom");\n' } });
+  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 'x', writes: { [SMOKE_FILE]: 'throw new Error("boom");\n' } });
   const r = await runSmoke(adapter, { cwd: tmp(), limits });
   assert.equal(r.ok, false);
   assert.match(r.errors.join('\n'), /exited non-zero/);
 });
 
 test('X-11: extra files fail the check', async () => {
-  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 'x', usage, writes: { [SMOKE_FILE]: GOOD, 'extra.txt': 'x' } });
+  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 'x', writes: { [SMOKE_FILE]: GOOD, 'extra.txt': 'x' } });
   const r = await runSmoke(adapter, { cwd: tmp(), limits });
   assert.equal(r.ok, false);
   assert.match(r.errors.join('\n'), /unexpected files: extra\.txt/);
@@ -71,7 +70,7 @@ test('X-11: extra files fail the check', async () => {
 test('X-11: a stale fizzbuzz.js left in cwd is not trusted', async () => {
   const cwd = tmp();
   writeFileSync(join(cwd, SMOKE_FILE), GOOD);
-  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 'x', usage, writes: {} });
+  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 'x', writes: {} });
   const r = await runSmoke(adapter, { cwd, limits });
   assert.equal(r.ok, false);
   assert.match(r.errors.join('\n'), /fizzbuzz\.js was not created/);

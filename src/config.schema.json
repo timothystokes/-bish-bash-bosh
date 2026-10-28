@@ -19,10 +19,8 @@
     "budgets": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["maxTokens", "maxCostUsd", "maxWallClockSeconds", "maxIterations"],
+      "required": ["maxWallClockSeconds", "maxIterations"],
       "properties": {
-        "maxTokens": { "type": "integer", "minimum": 1 },
-        "maxCostUsd": { "type": "number", "exclusiveMinimum": 0 },
         "maxWallClockSeconds": { "type": "number", "exclusiveMinimum": 0 },
         "maxIterations": { "type": "integer", "minimum": 1 }
       }

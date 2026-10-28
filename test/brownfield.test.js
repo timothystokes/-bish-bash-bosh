@@ -31,7 +31,7 @@ const config = () => ({
   mode: 'brownfield',
   targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'f', model: 'm' } },
-  budgets: { maxTokens: 1000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 5 },
+  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],
 });
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
@@ -62,7 +62,7 @@ test('gate: passes when a spec exists', () => {
 test('runStep in brownfield mode without specs is gated before any agent call', async () => {
   const dir = makeRepo(false);
   let called = false;
-  const inner = createFakeAdapter({ exitStatus: 0, transcript: 't', writes: { 'src/x.js': 'export const x = 1;\n' }, usage: { tokens: 1, cost: 0 } });
+  const inner = createFakeAdapter({ exitStatus: 0, transcript: 't', writes: { 'src/x.js': 'export const x = 1;\n' } });
   const adapter = { ...inner, run: (/** @type {any} */ r) => { called = true; return inner.run(r); } };
   const res = await runStep({ config: config(), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity });
   assert.equal(res.status, 'gated');
@@ -71,7 +71,7 @@ test('runStep in brownfield mode without specs is gated before any agent call', 
 });
 
 test('runLoop in brownfield mode without specs is gated; with specs it runs', async () => {
-  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 't', writes: { 'src/x.js': 'export const x = 1;\n' }, usage: { tokens: 1, cost: 0 } });
+  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 't', writes: { 'src/x.js': 'export const x = 1;\n' } });
   const bad = await runLoop({ config: config(), repoDir: makeRepo(false), runId: 'r', adapter, testCommand: pass, identity });
   assert.equal(bad.status, 'gated');
   assert.match(bad.reason ?? '', /hodge --reverse/);

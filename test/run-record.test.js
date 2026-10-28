@@ -8,7 +8,7 @@ import { validateRunRecord, writeIterationRecord, iterationDir } from '../src/ru
 /** @returns {import('../src/run-record.js').RunRecord} */
 const record = () => ({
   status: 'ok',
-  usage: { tokens: 10, cost: 0.5 },
+  usage: { seconds: 2.5 },
   changedFiles: ['a.js'],
   gates: [{ name: 'scope', ok: true }],
   prompt: 'do it',
@@ -24,10 +24,11 @@ test('validateRunRecord accepts a good record', () => {
 });
 
 test('validateRunRecord rejects bad fields', () => {
-  const bad = { ...record(), status: 'weird', changedFiles: [1], gates: [{ name: 'x' }], usage: { tokens: -1, cost: 0 } };
+  const bad = { ...record(), status: 'weird', changedFiles: [1], gates: [{ name: 'x' }], usage: { seconds: -1 } };
   const r = validateRunRecord(bad);
   assert.equal(r.ok, false);
   assert.ok(r.errors.length >= 4);
+  assert.match(r.errors.join(), /usage\.seconds/);
   assert.equal(validateRunRecord(null).ok, false);
 });
 
@@ -43,7 +44,7 @@ test('writeIterationRecord writes the spec layout', () => {
   assert.equal(readFileSync(join(dir, 'transcript'), 'utf8'), 'done');
   assert.equal(readFileSync(join(dir, 'diff'), 'utf8'), 'diff --git a b');
   assert.deepEqual(JSON.parse(readFileSync(join(dir, 'test.json'), 'utf8')), { passed: 3, failed: 0 });
-  assert.deepEqual(JSON.parse(readFileSync(join(dir, 'usage.json'), 'utf8')), { tokens: 10, cost: 0.5 });
+  assert.deepEqual(JSON.parse(readFileSync(join(dir, 'usage.json'), 'utf8')), { seconds: 2.5 });
   const meta = JSON.parse(readFileSync(join(dir, 'record.json'), 'utf8'));
   assert.equal(meta.status, 'ok');
   assert.equal(meta.iteration, 1);

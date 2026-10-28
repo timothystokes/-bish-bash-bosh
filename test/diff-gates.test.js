@@ -86,13 +86,13 @@ function makeRepo() {
 const config = {
   targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'x', model: 'y' } },
-  budgets: { maxTokens: 1000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 5 },
+  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],
 };
 const pass = ['node', '-e', 'process.exit(0)'];
 const self = { root: '/nonexistent/hodgepodge', remotes: [] };
 const fake = (/** @type {Record<string, string>} */ writes) =>
-  createFakeAdapter({ exitStatus: 0, transcript: 't', usage: { tokens: 1, cost: 0.1 }, writes });
+  createFakeAdapter({ exitStatus: 0, transcript: 't', writes });
 
 /** @param {string} dir */
 const record = (dir) => JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));

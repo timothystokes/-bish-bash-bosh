@@ -10,7 +10,7 @@ const config = {
   containerName: 'hodge',
   readPointersFunctionArn: 'arn:aws:lambda:ap-southeast-2:1:function:read-pointers',
   stateMachineArn: 'arn:aws:states:ap-southeast-2:1:stateMachine:hodge',
-  budgets: { maxCostUsd: 5, maxIterations: 50 },
+  budgets: { maxIterations: 50 },
   iterationsPerExecution: 10,
   pollSeconds: 30,
 };
@@ -80,13 +80,11 @@ test('pause flag waits then re-reads pointers', () => {
   assert.equal(w.Next, 'ReadPointers');
 });
 
-test('budget exhaustion on cost or iterations ends the run', () => {
+test('budget exhaustion on the iteration cap ends the run', () => {
   const sm = buildStateMachine(config);
   const c = choiceTo(sm, 'BudgetExhausted');
-  assert.deepEqual(c.Or.map((/** @type {any} */ x) => [x.Variable, x.NumericGreaterThanEqualsPath ?? x.NumericGreaterThanEquals]).sort(), [
-    ['$.pointers.cost', 5],
-    ['$.pointers.iteration', 50],
-  ]);
+  assert.equal(c.Variable, '$.pointers.iteration');
+  assert.equal(c.NumericGreaterThanEquals, 50);
   assert.equal(state(sm, 'BudgetExhausted').Type, 'Succeed');
 });
 
@@ -128,5 +126,5 @@ test('the default path counts the iteration and runs another step', () => {
 test('invalid config is rejected', () => {
   assert.throws(() => buildStateMachine({ ...config, iterationsPerExecution: 0 }), /iterationsPerExecution/);
   assert.throws(() => buildStateMachine({ ...config, subnets: [] }), /subnets/);
-  assert.throws(() => buildStateMachine({ ...config, budgets: { maxCostUsd: -1, maxIterations: 5 } }), /maxCostUsd/);
+  assert.throws(() => buildStateMachine({ ...config, budgets: { maxIterations: -1 } }), /maxIterations/);
 });

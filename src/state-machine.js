@@ -2,7 +2,7 @@
  * @typedef {{
  *   clusterArn: string, taskDefinitionArn: string, subnets: string[], securityGroups: string[],
  *   containerName: string, readPointersFunctionArn: string, stateMachineArn: string,
- *   budgets: {maxCostUsd: number, maxIterations: number},
+ *   budgets: {maxIterations: number},
  *   iterationsPerExecution: number, pollSeconds: number,
  * }} StateMachineConfig
  */
@@ -20,7 +20,6 @@ function validate(c) {
   const positive = (/** @type {string} */ k, /** @type {unknown} */ v) => {
     if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) throw new Error(`${k} must be a positive number`);
   };
-  positive('maxCostUsd', c.budgets?.maxCostUsd);
   positive('maxIterations', c.budgets?.maxIterations);
   positive('iterationsPerExecution', c.iterationsPerExecution);
   positive('pollSeconds', c.pollSeconds);
@@ -29,7 +28,7 @@ function validate(c) {
 /**
  * Builds the Amazon States Language definition that loops `podge step`, one Fargate Spot
  * task per iteration. The execution context holds pointers only (`$.pointers`: sha,
- * iteration, cost, status, paused, stop), re-read from git and run records each loop.
+ * iteration, status, paused, stop), re-read from git and run records each loop.
  * Input: `{runId, executionIterations: 0}`.
  * @param {StateMachineConfig} config
  * @returns {Record<string, any>}
@@ -45,7 +44,7 @@ export function buildStateMachine(config) {
         Type: 'Task',
         Resource: 'arn:aws:states:::lambda:invoke',
         Parameters: { FunctionName: config.readPointersFunctionArn, 'Payload.$': '$' },
-        ResultSelector: { 'sha.$': '$.Payload.sha', 'iteration.$': '$.Payload.iteration', 'cost.$': '$.Payload.cost', 'status.$': '$.Payload.status', 'paused.$': '$.Payload.paused', 'stop.$': '$.Payload.stop' },
+        ResultSelector: { 'sha.$': '$.Payload.sha', 'iteration.$': '$.Payload.iteration', 'status.$': '$.Payload.status', 'paused.$': '$.Payload.paused', 'stop.$': '$.Payload.stop' },
         ResultPath: '$.pointers',
         Next: 'Decide',
       },
@@ -62,13 +61,7 @@ export function buildStateMachine(config) {
             ],
             Next: 'Halted',
           },
-          {
-            Or: [
-              { Variable: '$.pointers.cost', NumericGreaterThanEquals: budgets.maxCostUsd },
-              { Variable: '$.pointers.iteration', NumericGreaterThanEquals: budgets.maxIterations },
-            ],
-            Next: 'BudgetExhausted',
-          },
+          { Variable: '$.pointers.iteration', NumericGreaterThanEquals: budgets.maxIterations, Next: 'BudgetExhausted' },
           { Variable: '$.executionIterations', NumericGreaterThanEquals: config.iterationsPerExecution, Next: 'StartSuccessor' },
         ],
         Default: 'CountIteration',

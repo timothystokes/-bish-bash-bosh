@@ -111,7 +111,7 @@ const agent = (writes) => ({
       mkdirSync(dirname(join(req.cwd, f)), { recursive: true });
       writeFileSync(join(req.cwd, f), text);
     }
-    return { transcript: 't', usage: { tokens: 1, cost: 0 }, exitStatus: 0, changedFiles: Object.keys(writes) };
+    return { transcript: 't', exitStatus: 0, changedFiles: Object.keys(writes) };
   },
 });
 
@@ -163,7 +163,7 @@ test('interview with a kit: a ready result is ok; it may write objective/', asyn
 test('run is gated until the objective is ready (no agent call)', async () => {
   const { repo, config } = sandbox('Build a greeter');
   let called = 0;
-  const adapter = { async run() { called++; return { transcript: '', usage: { tokens: 0, cost: 0 }, exitStatus: 0, changedFiles: [] }; } };
+  const adapter = { async run() { called++; return { transcript: '', exitStatus: 0, changedFiles: [] }; } };
   const res = await runLoop({ config, repoDir: repo, runId: 'r1', adapter, identity, requireTestPlan: true });
   assert.equal(res.status, 'gated');
   assert.match(String(res.reason), /not ready/);

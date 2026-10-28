@@ -30,7 +30,7 @@ test('buildCodexArgs is non-interactive exec with JSONL, model and prompt last',
   assert.equal(a.at(-1), 'do it');
 });
 
-test('parseCodexOutput sums turn usage (cache excluded) and joins agent messages', () => {
+test('parseCodexOutput joins agent messages and ignores turn usage', () => {
   const out = [
     { type: 'thread.started', thread_id: 't' },
     { type: 'item.completed', item: { type: 'agent_message', text: 'One.' } },
@@ -41,12 +41,10 @@ test('parseCodexOutput sums turn usage (cache excluded) and joins agent messages
     .map((e) => JSON.stringify(e))
     .join('\n');
   const p = parseCodexOutput(out);
-  assert.deepEqual(p.usage, { tokens: 20, cost: 0 });
   assert.equal(p.transcript, 'One.\nTwo.');
 });
 
 test('parseCodexOutput tolerates junk lines', () => {
-  assert.deepEqual(parseCodexOutput('not json').usage, { tokens: 0, cost: 0 });
   assert.equal(parseCodexOutput('not json').transcript, 'not json');
 });
 
@@ -54,7 +52,7 @@ test('parseCodexOutput tolerates junk lines', () => {
 test('wall-clock limit kills the agent and reports non-zero exit', async () => {
   const cwd = mkdtempSync(join(tmpdir(), 'hodge-cx-'));
   try {
-    const adapter = make(/** @type {any} */ ({ exitStatus: 0, transcript: '', usage: { tokens: 0, cost: 0 }, writes: {}, hang: true }));
+    const adapter = make(/** @type {any} */ ({ exitStatus: 0, transcript: '', writes: {}, hang: true }));
     const r = await adapter.run({ prompt: 'p', cwd, limits: { maxWallClockSeconds: 0.3 } });
     assert.equal(r.exitStatus, 124);
   } finally {

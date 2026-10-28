@@ -111,11 +111,11 @@ test('syncImplementation derives Implementation and Evidence from per-requiremen
 const config = {
   targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'x', model: 'y' } },
-  budgets: { maxTokens: 1000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 5 },
+  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/', 'plan.md', 'tests/', 'specs/'],
 };
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
-const fake = (/** @type {Record<string, string>} */ writes) => createFakeAdapter({ exitStatus: 0, transcript: 'ok', usage: { tokens: 1, cost: 0 }, writes });
+const fake = (/** @type {Record<string, string>} */ writes) => createFakeAdapter({ exitStatus: 0, transcript: 'ok', writes });
 
 test('runLoop: a fully ticked plan is not done while a requirement is unproven; plan gets unchecked gap items', async () => {
   const dir = makeRepo();

@@ -104,7 +104,7 @@ function makeRepo() {
 const cfg = {
   targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'fake', model: 'm' }, interview: { adapter: 'fake', model: 'm' } },
-  budgets: { maxTokens: 1000000, maxCostUsd: 100, maxWallClockSeconds: 600, maxIterations: 5 },
+  budgets: { maxWallClockSeconds: 600, maxIterations: 5 },
   allowedPaths: ['src/'],
 };
 
@@ -118,7 +118,7 @@ test('O-3: runStep sends the sandbox todos in its prompt and consumes them after
     run: async (/** @type {{prompt: string}} */ req) => {
       prompts.push(req.prompt);
       writeFileSync(join(repo, 'src.txt'), 'x');
-      return { exitStatus: 0, transcript: '', usage: { tokens: 1, cost: 0 }, changedFiles: [] };
+      return { exitStatus: 0, transcript: '', changedFiles: [] };
     },
   };
   const res = await runStep({ config: cfg, repoDir: repo, runId: 'r', adapter: /** @type {any} */ (adapter), testCommand: ['true'], inboxDir: sb });
@@ -132,7 +132,7 @@ test('O-3: a gated or failed step keeps the todos for the next one', async () =>
   writeFileSync(join(repo, 'dirty'), 'x');
   const sb = sandboxOf(cfg, repo);
   addEntry(sb, 'podge', 'keep me');
-  const res = await runStep({ config: cfg, repoDir: repo, runId: 'r', adapter: createFakeAdapter({ exitStatus: 0, transcript: '', usage: { tokens: 0, cost: 0 }, writes: {} }), testCommand: ['true'], inboxDir: sb });
+  const res = await runStep({ config: cfg, repoDir: repo, runId: 'r', adapter: createFakeAdapter({ exitStatus: 0, transcript: '', writes: {} }), testCommand: ['true'], inboxDir: sb });
   assert.equal(res.status, 'gated');
   assert.equal(readInbox(sb, 'podge'), '- keep me\n');
 });
@@ -146,7 +146,7 @@ test('O-3: runInterview sends the sandbox questions and consumes them unless the
   const adapter = {
     run: async (/** @type {{prompt: string}} */ req) => {
       prompts.push(req.prompt);
-      return { exitStatus: 1, transcript: '', usage: { tokens: 1, cost: 0 }, changedFiles: [] };
+      return { exitStatus: 1, transcript: '', changedFiles: [] };
     },
   };
   const res = await runInterview({ config: cfg, repoDir: repo, runId: 'r', adapter: /** @type {any} */ (adapter), objective: 'obj', inboxDir: sb });
@@ -157,7 +157,7 @@ test('O-3: runInterview sends the sandbox questions and consumes them unless the
   const ok = {
     run: async () => {
       writeFileSync(join(repo, 'specs', 'b.md'), '# Spec: b\n');
-      return { exitStatus: 0, transcript: '', usage: { tokens: 1, cost: 0 }, changedFiles: [] };
+      return { exitStatus: 0, transcript: '', changedFiles: [] };
     },
   };
   await runInterview({ config: cfg, repoDir: repo, runId: 'r', adapter: /** @type {any} */ (ok), objective: 'obj', round: 2, inboxDir: sb });

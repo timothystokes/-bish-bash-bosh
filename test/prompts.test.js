@@ -12,7 +12,7 @@ import { createFakeAdapter } from '../src/adapter.js';
 const baseConfig = () => ({
   targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'a', model: 'm' } },
-  budgets: { maxTokens: 1000, maxCostUsd: 5, maxWallClockSeconds: 60, maxIterations: 5 },
+  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/**'],
 });
 
@@ -60,7 +60,7 @@ test('runStep sends the configured mode prompt to the adapter', async () => {
   git('commit', '-qm', 'init');
   /** @type {string[]} */
   const seen = [];
-  const inner = createFakeAdapter({ exitStatus: 0, transcript: 't', writes: { 'src/x.js': 'x' }, usage: { tokens: 1, cost: 0 } });
+  const inner = createFakeAdapter({ exitStatus: 0, transcript: 't', writes: { 'src/x.js': 'x' } });
   const adapter = { ...inner, run: (/** @type {any} */ req) => { seen.push(req.prompt); return inner.run(req); } };
   await runStep({
     config: { ...baseConfig(), mode: 'forward' }, repoDir: dir, runId: 'r',

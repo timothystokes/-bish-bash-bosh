@@ -65,7 +65,7 @@ function scripted(/** @type {Record<string, string | null>[]} */ rounds) {
         prompts.push(req.prompt);
         const writes = rounds[prompts.length - 1] ?? {};
         write(req.cwd, writes);
-        return { transcript: 't', usage: { tokens: 10, cost: 0.1 }, exitStatus: 0, changedFiles: Object.keys(writes) };
+        return { transcript: 't', exitStatus: 0, changedFiles: Object.keys(writes) };
       },
     },
   };
@@ -146,8 +146,8 @@ test('each round has its own record and all rounds count toward the run budget',
   await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted(fullRounds).adapter, ...owner(['d', '1: a', '2: b']), identity });
   for (const d of ['interview', 'interview-2', 'interview-3']) assert.ok(existsSync(join(repo, 'runs', 'r1', d, 'record.json')), d);
   const t = sumRunUsage(repo, 'r1');
-  assert.equal(t.tokens, 30);
-  assert.ok(Math.abs(t.cost - 0.3) < 1e-9);
+  assert.ok(t.seconds >= 0);
+  assert.equal(t.iterations, 0, 'interview rounds are not iterations');
 });
 
 test('an empty answer pauses; rerunning re-asks the pending question and resumes numbering', async () => {

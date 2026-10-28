@@ -17,8 +17,6 @@ else {
       subtype: fx.exitStatus === 0 ? 'success' : 'error_during_execution',
       is_error: fx.exitStatus !== 0,
       result: fx.transcript,
-      total_cost_usd: fx.usage.cost,
-      usage: { input_tokens: fx.usage.tokens, output_tokens: 0 },
     }),
   );
   process.exit(fx.exitStatus);

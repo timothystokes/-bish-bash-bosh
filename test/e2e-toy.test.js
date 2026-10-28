@@ -46,7 +46,7 @@ test('toy objective: podge takes a red target to green unattended', async () => 
     JSON.stringify({
       targetRepo: 'git@example.com:o/toy.git',
       roles: { build: { adapter: 'agent', model: 'm' } },
-      budgets: { maxTokens: 10000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 3 },
+      budgets: { maxWallClockSeconds: 60, maxIterations: 3 },
       allowedPaths: ['src/'],
       requireTestPlan: true,
     }),
@@ -54,7 +54,6 @@ test('toy objective: podge takes a red target to green unattended', async () => 
   const fixture = {
     exitStatus: 0,
     transcript: 'implemented add',
-    usage: { tokens: 10, cost: 0.01 },
     writes: {
       'src/add.js': 'export const add = (a, b) => a + b;\n',
       'plan.md': '- [x] implement add\n',
@@ -98,7 +97,7 @@ test('toy objective: green-from-the-start suite is gated (tests must fail first)
     JSON.stringify({
       targetRepo: 'git@example.com:o/toy.git',
       roles: { build: { adapter: 'agent', model: 'm' } },
-      budgets: { maxTokens: 10000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 3 },
+      budgets: { maxWallClockSeconds: 60, maxIterations: 3 },
       allowedPaths: ['src/'],
       requireTestPlan: true,
     }),

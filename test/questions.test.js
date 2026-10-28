@@ -98,7 +98,7 @@ test('Q-7: a round is driven by code: the agent gets only the answers by id, nev
     async run(req) {
       prompts.push(req.prompt);
       if (prompts.length === 1) writeFileSync(join(req.cwd, 'objective', 'RESPONSE.json'), JSON.stringify(batch));
-      return { transcript: 't', usage: { tokens: 1, cost: 0.01 }, exitStatus: 0, changedFiles: [] };
+      return { transcript: 't', exitStatus: 0, changedFiles: [] };
     },
   };
   const replies = ['desc', '2: 64'];

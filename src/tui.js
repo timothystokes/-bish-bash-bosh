@@ -10,9 +10,6 @@ import { readControl, writeControl } from './control.js';
 
 const KEYS = '[p]ause  [r]esume  [s]teer  [x] stop  [q]uit';
 
-/** @param {number} n */
-const usd = (n) => `$${n.toFixed(2)}`;
-
 /** @param {string} label @param {string} text */
 const row = (label, text) => `${label.padEnd(12)}${text}`;
 
@@ -58,8 +55,6 @@ export function renderFrame({ status, control, tail, prompt, message }) {
   const state = !control.ok ? `STOPPED (${control.reason})` : control.stop ? 'STOPPED' : control.paused ? 'PAUSED' : 'RUNNING';
   return [
     `run ${status.runId}  ${state}${over ? '  OVER BUDGET' : ''}  last: ${status.lastStatus ?? '-'}`,
-    `cost        ${usd(t.cost)} / ${usd(b.maxCostUsd)}`,
-    `tokens      ${t.tokens} / ${b.maxTokens}`,
     `seconds     ${t.seconds} / ${b.maxWallClockSeconds}`,
     `iterations  ${t.iterations} / ${b.maxIterations}`,
     ...renderDetails(status.details),

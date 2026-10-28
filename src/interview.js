@@ -159,11 +159,7 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
 
   const moreQuestions = inboxDir ? readInbox(inboxDir, 'hodge') : '';
   const prompt = buildInterviewPrompt(repoDir, objective, closing, moreQuestions, note);
-  const limits = {
-    maxTokens: budget.remaining.tokens,
-    maxCostUsd: budget.remaining.cost,
-    maxWallClockSeconds: Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds),
-  };
+  const limits = { maxWallClockSeconds: Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds) };
   const started = Date.now();
   const result = await adapter.run({ prompt, cwd: repoDir, limits });
   const seconds = (Date.now() - started) / 1000;
@@ -245,7 +241,7 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
   writeFileSync(join(dir, 'diff.patch'), diff);
   writeFileSync(
     join(dir, 'record.json'),
-    `${JSON.stringify({ status, reason, usage: { ...result.usage, seconds }, changedFiles: result.changedFiles }, null, 2)}\n`,
+    `${JSON.stringify({ status, reason, usage: { seconds }, changedFiles: result.changedFiles }, null, 2)}\n`,
   );
   if (inboxDir && (status === 'ok' || status === 'incomplete')) consumeInbox(inboxDir, 'hodge', moreQuestions);
   git(repoDir, 'add', '-A');

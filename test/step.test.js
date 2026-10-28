@@ -27,7 +27,7 @@ function makeRepo() {
 const config = (/** @type {string} */ targetRepo) => ({
   targetRepo,
   roles: { build: { adapter: 'x', model: 'y' } },
-  budgets: { maxTokens: 1000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 5 },
+  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],
 });
 
@@ -35,7 +35,6 @@ const adapter = (/** @type {Partial<import('../src/adapter.js').FakeFixture>} */
   createFakeAdapter({
     exitStatus: 0,
     transcript: 'done',
-    usage: { tokens: 10, cost: 0.25 },
     writes: { 'src/new.js': 'export const x = 1;\n' },
     ...f,
   });
@@ -62,7 +61,7 @@ test('successful step commits work and the run record, emits status', async () =
   });
   assert.equal(res.status, 'ok');
   assert.equal(res.iteration, 1);
-  assert.equal(res.cost, 0.25);
+  assert.deepEqual(Object.keys(res).sort(), ['iteration', 'sha', 'status'], 'no cost or token fields');
   assert.equal(res.sha, git(dir, 'rev-parse', 'HEAD'));
   assert.equal(git(dir, 'status', '--porcelain'), '');
   assert.ok(existsSync(join(dir, 'src', 'new.js')));
@@ -118,15 +117,6 @@ test('adapter failure gives failed status and does not run tests', async () => {
   });
   assert.equal(res.status, 'failed');
   assert.ok(!existsSync(join(dir, 'src', 'new.js')));
-});
-
-test('over-limit adapter usage is reported as over-budget', async () => {
-  const dir = makeRepo();
-  const res = await runStep({
-    config: config('o/target'), repoDir: dir, runId: 'r1',
-    adapter: adapter({ usage: { tokens: 5000, cost: 0.1 } }), testCommand: pass, identity: self,
-  });
-  assert.equal(res.status, 'over-budget');
 });
 
 test('repo gate refuses hodgepodge as target before touching anything', async () => {
@@ -195,15 +185,14 @@ test('step refuses and writes nothing once the run budget is exhausted', async (
 test('step caps adapter limits to the remaining run budget and records wall-clock seconds', async () => {
   const dir = makeRepo();
   const cfg = config('git@example.com:o/target.git');
-  await runStep({ config: cfg, repoDir: dir, runId: 'rc', adapter: adapter({ usage: { tokens: 400, cost: 0.25 } }), testCommand: pass, identity: self });
+  await runStep({ config: cfg, repoDir: dir, runId: 'rc', adapter: adapter(), testCommand: pass, identity: self });
   /** @type {any} */
   let seen;
   await runStep({
     config: cfg, repoDir: dir, runId: 'rc', testCommand: pass, identity: self,
-    adapter: { run: async (req) => { seen = req.limits; return { exitStatus: 0, transcript: '', usage: { tokens: 0, cost: 0 }, changedFiles: [] }; } },
+    adapter: { run: async (req) => { seen = req.limits; return { exitStatus: 0, transcript: '', changedFiles: [] }; } },
   });
-  assert.equal(seen.maxTokens, 600);
-  assert.equal(seen.maxCostUsd, 0.75);
+  assert.deepEqual(Object.keys(seen), ['maxWallClockSeconds']);
   assert.ok(seen.maxWallClockSeconds <= 60);
   const u = JSON.parse(readFileSync(join(dir, 'runs/rc/iterations/001/usage.json'), 'utf8'));
   assert.equal(typeof u.seconds, 'number');

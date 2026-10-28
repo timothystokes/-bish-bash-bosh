@@ -16,16 +16,12 @@ export function buildCopilotArgs({ prompt, model }) {
 }
 
 /**
- * Parse JSONL output: join assistant messages, sum usage events. Non-JSON lines are kept in the transcript.
+ * Parse JSONL output: join assistant messages. Non-JSON lines are kept in the transcript.
  * @param {string} stdout
- * @returns {{transcript: string, usage: import('../adapter.js').Usage}}
+ * @returns {{transcript: string}}
  */
 export function parseCopilotOutput(stdout) {
   const parts = [];
-  let tokens = 0;
-  let cost = 0;
-  /** Live CLI output carries cumulative usage in session.usage_checkpoint; the last one wins. */
-  let checkpointTokens = 0;
   for (const line of stdout.split('\n')) {
     if (!line.trim()) continue;
     let ev;
@@ -37,25 +33,12 @@ export function parseCopilotOutput(stdout) {
     }
     const d = ev?.data ?? {};
     if (ev?.type === 'assistant.message' && typeof d.content === 'string') parts.push(d.content);
-    if (ev?.type === 'assistant.usage') {
-      for (const k of ['inputTokens', 'outputTokens']) if (Number.isFinite(d[k]) && d[k] > 0) tokens += d[k];
-      if (Number.isFinite(d.cost) && d.cost > 0) cost += d.cost;
-    }
-    if (ev?.type === 'session.usage_checkpoint') {
-      const metrics = Object.values(d.accountingSnapshot?.modelMetrics ?? {});
-      let t = 0;
-      for (const m of metrics) {
-        const u = /** @type {any} */ (m)?.usage ?? {};
-        for (const k of ['inputTokens', 'outputTokens']) if (Number.isFinite(u[k]) && u[k] > 0) t += u[k];
-      }
-      checkpointTokens = t;
-    }
   }
-  return { transcript: parts.join('\n'), usage: { tokens: tokens + checkpointTokens, cost } };
+  return { transcript: parts.join('\n') };
 }
 
 /**
- * Wrap a live-output sink so ephemeral `session.*` JSONL events (pure noise in debug logs) are dropped.
+ * Wrap a live-output sink so JSONL events flagged `"ephemeral":true` (session.* and assistant.reasoning_delta: pure noise in debug logs) are dropped.
  * Lines are buffered per stream; everything else passes through unchanged.
  * @param {((stream: 'stdout' | 'stderr', chunk: string) => void) | undefined} sink
  * @returns {{write: (stream: 'stdout' | 'stderr', chunk: string) => void, flush: () => void} | undefined}
@@ -66,7 +49,7 @@ export function dropEphemeralEvents(sink) {
   const noise = (/** @type {string} */ line) => {
     if (!line.startsWith('{')) return false;
     try {
-      return String(JSON.parse(line)?.type ?? '').startsWith('session.');
+      return JSON.parse(line)?.ephemeral === true;
     } catch {
       return false;
     }
@@ -109,12 +92,9 @@ export function createCopilotAdapter(opts = {}) {
       });
       live?.flush();
       const parsed = parseCopilotOutput(stdout);
-      const over =
-        (limits.maxTokens !== undefined && parsed.usage.tokens > limits.maxTokens) ||
-        (limits.maxCostUsd !== undefined && parsed.usage.cost > limits.maxCostUsd);
-      const exitStatus = timedOut ? 124 : code !== 0 ? code : over ? 1 : 0;
+      const exitStatus = timedOut ? 124 : code;
       const transcript = stderr ? `${parsed.transcript}\n[stderr]\n${stderr}` : parsed.transcript;
-      return { exitStatus, transcript, usage: parsed.usage, changedFiles };
+      return { exitStatus, transcript, changedFiles };
     },
   };
 }

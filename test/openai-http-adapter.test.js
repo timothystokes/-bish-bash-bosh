@@ -33,8 +33,8 @@ async function startServer(reply) {
 const blocks = (text, writes) =>
   text + '\n' + Object.entries(writes).map(([p, c]) => `<<<FILE ${p}>>>\n${c}\n<<<END>>>`).join('\n');
 
-/** @param {string} content @param {{prompt_tokens: number, completion_tokens: number, cost?: number}} usage */
-const completion = (content, usage) => ({ choices: [{ message: { role: 'assistant', content } }], usage });
+/** @param {string} content */
+const completion = (content) => ({ choices: [{ message: { role: 'assistant', content } }] });
 
 /** @type {(() => void)[]} */
 const closers = [];
@@ -51,11 +51,7 @@ const make = (f) => {
         f.exitStatus !== 0
           ? { status: 500, json: { error: { message: f.transcript } } }
           : {
-              json: completion(blocks(f.transcript, f.writes), {
-                prompt_tokens: f.usage.tokens - Math.floor(f.usage.tokens / 2),
-                completion_tokens: Math.floor(f.usage.tokens / 2),
-                cost: f.usage.cost,
-              }),
+              json: completion(blocks(f.transcript, f.writes)),
             },
       );
       const s = await started;
@@ -78,7 +74,7 @@ test('sends bearer key from the named env var, model and prompt', async () => {
   let seen;
   const s = await startServer((r) => {
     seen = r;
-    return { json: completion('ok', { prompt_tokens: 1, completion_tokens: 1 }) };
+    return { json: completion('ok') };
   });
   const cwd = mkdtempSync(join(tmpdir(), 'hodge-http-'));
   try {
@@ -98,7 +94,7 @@ test('paths escaping cwd are rejected and not written', async () => {
   const cwd = mkdtempSync(join(tmpdir(), 'hodge-http-'));
   const outside = join(cwd, '..', 'hodge-escape.txt');
   const s = await startServer(() => ({
-    json: completion(blocks('x', { '../hodge-escape.txt': 'bad', '/tmp/hodge-abs.txt': 'bad', 'ok.txt': 'fine' }), { prompt_tokens: 1, completion_tokens: 1 }),
+    json: completion(blocks('x', { '../hodge-escape.txt': 'bad', '/tmp/hodge-abs.txt': 'bad', 'ok.txt': 'fine' })),
   }));
   try {
     const r = await createOpenAiHttpAdapter({ model: 'm', baseUrl: s.baseUrl }).run({ prompt: 'p', cwd, limits: {} });
@@ -113,7 +109,7 @@ test('paths escaping cwd are rejected and not written', async () => {
 });
 
 test('wall-clock limit aborts the request with exit 124', async () => {
-  const s = await startServer(() => ({ delayMs: 2000, json: completion('late', { prompt_tokens: 1, completion_tokens: 1 }) }));
+  const s = await startServer(() => ({ delayMs: 2000, json: completion('late') }));
   const cwd = mkdtempSync(join(tmpdir(), 'hodge-http-'));
   try {
     const r = await createOpenAiHttpAdapter({ model: 'm', baseUrl: s.baseUrl }).run({ prompt: 'p', cwd, limits: { maxWallClockSeconds: 0.2 } });

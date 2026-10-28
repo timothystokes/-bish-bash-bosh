@@ -51,7 +51,7 @@ test('phase 3 exit: pause, steer and stop via hodgepodge control drive podge', a
     JSON.stringify({
       targetRepo: 'git@example.com:o/toy.git',
       roles: { build: { adapter: 'scripted', model: 'm' } },
-      budgets: { maxTokens: 10000, maxCostUsd: 1, maxWallClockSeconds: 60, maxIterations: 5 },
+      budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
       allowedPaths: ['src/'],
     }),
   );
@@ -68,7 +68,7 @@ test('phase 3 exit: pause, steer and stop via hodgepodge control drive podge', a
       writeFileSync(join(req.cwd, 'src', `f${n}.txt`), `${n}\n`);
       // the operator stops the run while iteration 2 is in flight
       if (n === 2) await hodge(['control', '--file', ctl, 'stop']);
-      return { exitStatus: 0, transcript: `iter ${n}`, usage: { tokens: 1, cost: 0 }, changedFiles: [`src/f${n}.txt`, 'plan.md'] };
+      return { exitStatus: 0, transcript: `iter ${n}`, changedFiles: [`src/f${n}.txt`, 'plan.md'] };
     },
   };
 

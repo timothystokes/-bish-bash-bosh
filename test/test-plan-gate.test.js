@@ -76,14 +76,14 @@ test('red check is skipped once build iterations exist (green allowed)', () => {
 const config = (/** @type {string} */ dir) => ({
   targetRepo: dir,
   roles: { build: { adapter: 'fake', model: 'm' } },
-  budgets: { maxTokens: 1e6, maxCostUsd: 100, maxWallClockSeconds: 600, maxIterations: 10 },
+  budgets: { maxWallClockSeconds: 600, maxIterations: 10 },
   allowedPaths: ['src/'],
 });
 const identity = { remotes: [], root: '/nonexistent-harness' };
 
 test('runStep with requireTestPlan gates on an incomplete tests/PLAN.md, without calling the adapter or writing records', async () => {
   const d = target({ 'specs/a.md': '# A\n', 'tests/PLAN.md': '# Test plan\n' });
-  const adapter = createFakeAdapter({ exitStatus: 0, transcript: '', usage: { tokens: 0, cost: 0 }, writes: { 'src/x.js': 'export const x = 1;\n' } });
+  const adapter = createFakeAdapter({ exitStatus: 0, transcript: '', writes: { 'src/x.js': 'export const x = 1;\n' } });
   const r = await runStep({ config: config(d), repoDir: d, runId: 'r1', adapter, testCommand: RED, requireTestPlan: true, identity });
   assert.equal(r.status, 'gated');
   assert.match(r.reason ?? '', /PLAN\.md/);
@@ -103,7 +103,7 @@ const PLAN_WRITES = {
 function planAdapter(writes) {
   /** @type {string[]} */
   const prompts = [];
-  const inner = createFakeAdapter({ exitStatus: 0, transcript: '', usage: { tokens: 1, cost: 0 }, writes });
+  const inner = createFakeAdapter({ exitStatus: 0, transcript: '', writes });
   /** @type {import('../src/adapter.js').Adapter} */
   const adapter = { run: async (req) => (prompts.push(req.prompt), inner.run(req)) };
   return { prompts, adapter };

@@ -14,6 +14,6 @@ else {
   const emit = (/** @type {unknown} */ e) => console.log(JSON.stringify(e));
   emit({ type: 'thread.started', thread_id: 't1' });
   emit({ type: 'item.completed', item: { id: 'i1', type: 'agent_message', text: fx.transcript } });
-  emit({ type: 'turn.completed', usage: { input_tokens: fx.usage.tokens, cached_input_tokens: 0, output_tokens: 0, cost_usd: fx.usage.cost } });
+  emit({ type: 'turn.completed' });
   process.exit(fx.exitStatus);
 }

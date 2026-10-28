@@ -8,12 +8,12 @@ import { createLocalStatusSource, readRunStatus } from '../src/status.js';
 import { main } from '../src/cli.js';
 import { sandboxOf } from './support/sandbox.js';
 
-const budgets = { maxTokens: 1000, maxCostUsd: 2, maxWallClockSeconds: 100, maxIterations: 5 };
+const budgets = { maxWallClockSeconds: 100, maxIterations: 5 };
 
-/** @param {'ok'|'failed'} status @param {number} tokens @param {number} cost @param {number} seconds */
-const rec = (status, tokens, cost, seconds) => ({
+/** @param {'ok'|'failed'} status @param {number} seconds */
+const rec = (status, seconds) => ({
   status,
-  usage: { tokens, cost, seconds },
+  usage: { seconds },
   changedFiles: [],
   gates: [],
   prompt: 'p',
@@ -24,18 +24,18 @@ const rec = (status, tokens, cost, seconds) => ({
 
 function makeRun() {
   const dir = mkdtempSync(join(tmpdir(), 'hodge-status-'));
-  writeIterationRecord(dir, 'r1', 1, rec('ok', 100, 0.5, 10));
-  writeIterationRecord(dir, 'r1', 2, rec('failed', 200, 0.25, 20));
+  writeIterationRecord(dir, 'r1', 1, rec('ok', 10));
+  writeIterationRecord(dir, 'r1', 2, rec('failed', 20));
   return dir;
 }
 
-test('readRunStatus totals usage and reports cost vs budget', () => {
+test('readRunStatus totals seconds and iterations vs budget', () => {
   const s = readRunStatus(createLocalStatusSource(makeRun()), 'r1', budgets);
   assert.equal(s.iterations, 2);
   assert.equal(s.lastStatus, 'failed');
-  assert.deepEqual(s.totals, { tokens: 300, cost: 0.75, seconds: 30, iterations: 2 });
-  assert.deepEqual(s.remaining, { tokens: 700, cost: 1.25, seconds: 70, iterations: 3 });
-  assert.equal(s.budgets.maxCostUsd, 2);
+  assert.deepEqual(s.totals, { seconds: 30, iterations: 2 });
+  assert.deepEqual(s.remaining, { seconds: 70, iterations: 3 });
+  assert.equal(s.budgets.maxWallClockSeconds, 100);
 });
 
 test('readRunStatus on an unknown run is empty, not an error', () => {

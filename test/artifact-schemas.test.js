@@ -32,7 +32,7 @@ test('config schema accepts the qa role and maxQaCycles', () => {
   const cfg = {
     targetRepo: '/r',
     roles: { build: { adapter: 'a', model: 'm' }, qa: { adapter: 'b', model: 'n' } },
-    budgets: { maxTokens: 1, maxCostUsd: 1, maxWallClockSeconds: 1, maxIterations: 1 },
+    budgets: { maxWallClockSeconds: 1, maxIterations: 1 },
     allowedPaths: ['src/**'],
     maxQaCycles: 3,
   };
@@ -43,7 +43,7 @@ test('config schema accepts the qa role and maxQaCycles', () => {
 test('files written by writeIterationRecord conform (with and without diagnosis)', () => {
   const repo = mkdtempSync(join(tmpdir(), 'hodge-schema-'));
   try {
-    const base = { status: 'ok', usage: { tokens: 1, cost: 0.5, seconds: 2 }, changedFiles: ['a.js'], gates: [{ name: 'scope', ok: true }], prompt: 'p', transcript: 't', diff: 'd', test: { exitStatus: 0 } };
+    const base = { status: 'ok', usage: { seconds: 2 }, changedFiles: ['a.js'], gates: [{ name: 'scope', ok: true }], prompt: 'p', transcript: 't', diff: 'd', test: { exitStatus: 0 } };
     const d1 = writeIterationRecord(repo, 'run1', 1, /** @type {any} */ (base));
     const d2 = writeIterationRecord(repo, 'run1', 2, /** @type {any} */ ({ ...base, status: 'failed', gates: [{ name: 'tests', ok: false, detail: 'x' }], diagnosis }));
     for (const dir of [d1, d2]) {
@@ -69,10 +69,11 @@ test('record schema rejects bad status, missing gates and extra keys', () => {
   assert.equal(check('record', { ...rec, extra: 1 }).ok, false);
 });
 
-test('usage schema rejects negative numbers and missing cost', () => {
-  assert.equal(check('usage', { tokens: 1, cost: 0 }).ok, true);
-  assert.equal(check('usage', { tokens: -1, cost: 0 }).ok, false);
-  assert.equal(check('usage', { tokens: 1 }).ok, false);
+test('usage schema rejects negative or missing seconds and the old token/cost keys', () => {
+  assert.equal(check('usage', { seconds: 1.5 }).ok, true);
+  assert.equal(check('usage', { seconds: -1 }).ok, false);
+  assert.equal(check('usage', {}).ok, false);
+  assert.equal(check('usage', { seconds: 1, tokens: 1 }).ok, false);
 });
 
 test('diagnosis schema requires all five non-blank fields', () => {
