@@ -84,20 +84,18 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
       return choices ? askChoice(ask, out, label, choices) : ask(`${label}: `);
     };
     try {
-      const roles = {};
-      for (const name of ROLE_NAMES) {
-        const adapter = await askChoice(ask, out, `${name} adapter`, ADAPTER_CHOICES);
-        if (!adapter) {
-          err(`hodgepodge init: aborted (no ${name} adapter given)\n`);
-          return 2;
-        }
-        const model = await askModel(adapter, `${name} model`);
-        if (!model) {
-          err(`hodgepodge init: aborted (no ${name} model given)\n`);
-          return 2;
-        }
-        roles[name] = { adapter, model };
+      const adapter = await askChoice(ask, out, 'adapter', ADAPTER_CHOICES);
+      if (!adapter) {
+        err('hodgepodge init: aborted (no adapter given)\n');
+        return 2;
       }
+      const model = await askModel(adapter, 'model');
+      if (!model) {
+        err('hodgepodge init: aborted (no model given)\n');
+        return 2;
+      }
+      const role = { adapter, model };
+      const roles = Object.fromEntries(ROLE_NAMES.map((name) => [name, { ...role }]));
       const res = initProject({ dir, roles });
       out(`${JSON.stringify(res)}\n`);
       return res.ok ? 0 : 1;

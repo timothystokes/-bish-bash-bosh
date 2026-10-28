@@ -27,7 +27,8 @@ export const MODEL_CHOICES = {
 
 // The four roles hodge and podge use, hardcoded (not a user choice): hodge needs `interview`
 // (and `reverse` for `hodge --reverse`), podge needs `build` (and `qa` when a plan calls for it).
-// `hodgepodge init` asks for all four directly; there is no "add a qa role?" gate.
+// `hodgepodge init` asks for a single adapter/model and applies it to all four; hand-edit
+// hodgepodge.yml afterward to use a different adapter/model for a specific role.
 export const ROLE_NAMES = ['interview', 'reverse', 'build', 'qa'];
 
 // `hodgepodge init`: writes <dir>/hodgepodge.yml (default dir: cwd) with every role (`interview`,
