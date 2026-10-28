@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateDiagnosis } from './podge-diagnosis.js';
+import { formatTranscript } from './adapter.js';
 
 const STATUSES = ['ok', 'failed', 'gated', 'over-budget'];
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -52,8 +53,7 @@ export function writeIterationRecord(repoDir, runId, iteration, record) {
   mkdirSync(parent, { recursive: true });
   const tmp = mkdtempSync(join(parent, '.tmp-'));
   try {
-    writeFileSync(join(tmp, 'prompt'), record.prompt);
-    writeFileSync(join(tmp, 'transcript'), record.transcript);
+    writeFileSync(join(tmp, 'transcript'), formatTranscript(record.prompt, record.transcript));
     writeFileSync(join(tmp, 'diff'), record.diff);
     writeFileSync(join(tmp, 'test.json'), JSON.stringify(record.test, null, 2));
     writeFileSync(join(tmp, 'usage.json'), JSON.stringify(record.usage, null, 2));

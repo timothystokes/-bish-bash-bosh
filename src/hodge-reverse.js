@@ -8,6 +8,7 @@ import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { lintSpecs } from './spec-lint.js';
 import { loadModePrompt } from './prompts.js';
 import { LOCK_FILE } from './run-lock.js';
+import { formatTranscript } from './adapter.js';
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 
@@ -94,8 +95,7 @@ export async function runReverse({ config, repoDir, runId, adapter, focus = unde
 
   const dir = join(repoDir, 'runs', runId, 'reverse');
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'prompt.md'), prompt);
-  writeFileSync(join(dir, 'transcript.txt'), result.transcript);
+  writeFileSync(join(dir, 'transcript.txt'), formatTranscript(prompt, result.transcript));
   writeFileSync(join(dir, 'diff.patch'), diff);
   writeFileSync(
     join(dir, 'record.json'),

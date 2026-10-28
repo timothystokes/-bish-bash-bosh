@@ -10,6 +10,7 @@ import { loadFormatSkill, loadModePrompt } from './prompts.js';
 import { FORMATS, parseFormats } from './formats.js';
 import { checkReadiness, hasObjectiveKit } from './readiness.js';
 import { consumeInbox, inboxSection, readInbox } from './inbox.js';
+import { formatTranscript } from './adapter.js';
 import { applyResponse, parseResponse, pendingAnswers, readQuestions, unanswered, writeQuestions } from './hodge-questions.js';
 import { LOCK_FILE } from './run-lock.js';
 
@@ -184,8 +185,7 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
 
   const dir = join(repoDir, 'runs', runId, round === 1 ? 'interview' : `interview-${round}`);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'prompt.md'), prompt);
-  writeFileSync(join(dir, 'transcript.txt'), result.transcript);
+  writeFileSync(join(dir, 'transcript.txt'), formatTranscript(prompt, result.transcript));
   writeFileSync(join(dir, 'diff.patch'), diff);
   writeFileSync(
     join(dir, 'record.json'),

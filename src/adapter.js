@@ -3,6 +3,13 @@ import { dirname, join } from 'node:path';
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
 
+// One record of what was sent and what came back, instead of a separate prompt file that is
+// written once and never touched again: `Prompt:` then `Response:`, so the run's artifact dir
+// holds a single readable log per call.
+export function formatTranscript(prompt, transcript) {
+  return `Prompt:\n${prompt.trimEnd()}\n\nResponse:\n${transcript.trimEnd()}\n`;
+}
+
 // Check a value has the common adapter result shape.
 export function validateAdapterResult(r) {
   const errors = [];

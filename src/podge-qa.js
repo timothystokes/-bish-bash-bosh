@@ -7,6 +7,7 @@ import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { loadQaPrompt } from './prompts.js';
 import { buildContext } from './podge-step.js';
 import { LOCK_FILE } from './run-lock.js';
+import { formatTranscript } from './adapter.js';
 
 export const CLASSIFICATIONS = ['violated-decision', 'unimplemented-requirement', 'decision-needing-replacement'];
 export const SEVERITIES = ['critical', 'high', 'medium', 'low'];
@@ -109,8 +110,7 @@ export async function runQaCycle({ config, repoDir, runId, adapter, identity }) 
   const tmp = `${dir}.tmp`;
   rmSync(tmp, { recursive: true, force: true });
   mkdirSync(tmp, { recursive: true });
-  writeFileSync(join(tmp, 'prompt.md'), prompt);
-  writeFileSync(join(tmp, 'transcript.txt'), result.transcript);
+  writeFileSync(join(tmp, 'transcript.txt'), formatTranscript(prompt, result.transcript));
   writeFileSync(join(tmp, 'findings.json'), `${JSON.stringify(res.findings ?? [], null, 2)}\n`);
   writeFileSync(join(tmp, 'record.json'), `${JSON.stringify({ status: res.status, cycle, ...(res.reason ? { reason: res.reason } : {}), usage: { seconds } }, null, 2)}\n`);
   renameSync(tmp, dir);

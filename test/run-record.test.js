@@ -39,8 +39,8 @@ test('writeIterationRecord writes the spec layout', () => {
   const repo = tmp();
   const dir = writeIterationRecord(repo, 'run1', 1, record());
   assert.equal(dir, iterationDir(repo, 'run1', 1));
-  assert.equal(readFileSync(join(dir, 'prompt'), 'utf8'), 'do it');
-  assert.equal(readFileSync(join(dir, 'transcript'), 'utf8'), 'done');
+  assert.equal(existsSync(join(dir, 'prompt')), false);
+  assert.equal(readFileSync(join(dir, 'transcript'), 'utf8'), 'Prompt:\ndo it\n\nResponse:\ndone\n');
   assert.equal(readFileSync(join(dir, 'diff'), 'utf8'), 'diff --git a b');
   assert.deepEqual(JSON.parse(readFileSync(join(dir, 'test.json'), 'utf8')), { passed: 3, failed: 0 });
   assert.deepEqual(JSON.parse(readFileSync(join(dir, 'usage.json'), 'utf8')), { seconds: 2.5 });
