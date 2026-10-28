@@ -4,11 +4,11 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runLoop, isPlanDone } from '../src/driver.js';
+import { runLoop, isPlanDone } from '../src/podge-driver.js';
 import { main } from '../src/cli.js';
 import { createFakeAdapter } from '../src/adapter.js';
 import { validateConfig } from '../src/config.js';
-import { sandboxOf } from './support/sandbox.js';
+import { writeProjectConfig, commitProjectConfig, withCwd } from './support/project.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
@@ -28,7 +28,6 @@ function makeRepo(plan) {
 }
 
 const config = (maxIterations = 5) => ({
-  targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'f', model: 'm' } },
   budgets: { maxWallClockSeconds: 60, maxIterations },
   allowedPaths: ['src/'],
@@ -135,16 +134,16 @@ test('config accepts optional requireTestPlan boolean', () => {
 
 test('podge prints loop JSON, exit 0 when done, 1 otherwise', async () => {
   const dir = makeRepo('- [ ] one\n');
-  const cfgPath = join(tmpdir(), `hodge-run-cfg-${Date.now()}.json`);
-  writeFileSync(cfgPath, JSON.stringify(config(2)));
+  commitProjectConfig(dir, config(2));
   const out = /** @type {string[]} */ ([]);
-  const code = await main(['podge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'r'], {
-    registry: { f: () => createFakeAdapter({ exitStatus: 0, transcript: 't', writes: {} }) },
-    testCommand: pass,
-    identity,
-    stdout: (s) => { out.push(s); },
-    stderr: () => {},
-  });
+  const code = await withCwd(dir, () =>
+    main(['podge', '--run-id', 'r'], {
+      registry: { f: () => createFakeAdapter({ exitStatus: 0, transcript: 't', writes: {} }) },
+      testCommand: pass,
+      identity,
+      stdout: (s) => { out.push(s); },
+      stderr: () => {},
+    }));
   assert.equal(code, 1);
   const res = JSON.parse(out.join(''));
   assert.equal(res.status, 'over-budget');
@@ -152,8 +151,9 @@ test('podge prints loop JSON, exit 0 when done, 1 otherwise', async () => {
 });
 
 test('podge reports usage errors with exit 2', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hodge-drv-cfg-'));
   const err = /** @type {string[]} */ ([]);
-  const code = await main(['podge'], { stdout: () => {}, stderr: (s) => { err.push(s); } });
+  const code = await withCwd(dir, () => main(['podge'], { stdout: () => {}, stderr: (s) => { err.push(s); } }));
   assert.equal(code, 2);
-  assert.match(err.join(''), /podge: cannot read config .*hodge\.json/);
+  assert.match(err.join(''), /podge: cannot read config .*hodgepodge\.yml/);
 });

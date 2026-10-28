@@ -1,33 +1,22 @@
-/**
- * @typedef {{rootCause: string, evidence: string, fix: string, test: string, prevention: string}} Diagnosis
- */
 
 export const DIAGNOSIS_FIELDS = ['rootCause', 'evidence', 'fix', 'test', 'prevention'];
 
-/**
- * @param {unknown} d
- * @returns {{ok: boolean, errors: string[]}}
- */
 export function validateDiagnosis(d) {
   if (typeof d !== 'object' || d === null) return { ok: false, errors: ['diagnosis must be an object'] };
-  const o = /** @type {Record<string, unknown>} */ (d);
+  const o = d;
   const errors = DIAGNOSIS_FIELDS
     .filter((k) => typeof o[k] !== 'string' || o[k].trim() === '')
     .map((k) => `diagnosis.${k} must be a non-empty string`);
   return { ok: errors.length === 0, errors };
 }
 
-/**
- * The agent reports a diagnosis as a fenced ```diagnosis block holding JSON; the last valid one wins.
- * @param {string} transcript
- * @returns {Diagnosis | null}
- */
+// The agent reports a diagnosis as a fenced ```diagnosis block holding JSON; the last valid one wins.
 export function parseDiagnosis(transcript) {
   const blocks = [...transcript.matchAll(/```diagnosis\s*\n([\s\S]*?)\n```/g)];
   for (const m of blocks.reverse()) {
     try {
       const d = JSON.parse(m[1]);
-      if (validateDiagnosis(d).ok) return /** @type {Diagnosis} */ (d);
+      if (validateDiagnosis(d).ok) return d;
     } catch {
       // malformed block: try the previous one
     }
@@ -46,18 +35,13 @@ const GATE_ADVICE = {
   'tests-only': ['Limit hardening changes to tests/.', 'Add a scope test for the offending path.', 'Say "tests only" in the prompt.'],
 };
 
-/**
- * Build a diagnosis for a non-ok step: harness-derived defaults, overridden field by field by the agent's block.
- * @param {{status: string, gates: {name: string, ok: boolean, detail?: string}[], transcript: string}} s
- * @returns {Diagnosis | null}
- */
+// Build a diagnosis for a non-ok step: harness-derived defaults, overridden field by field by the agent's block.
 export function diagnose({ status, gates, transcript }) {
   if (status === 'ok') return null;
   const bad = gates.find((g) => !g.ok);
-  /** @type {Diagnosis} */
   let base;
   if (bad) {
-    const [fix, test, prevention] = /** @type {Record<string, string[]>} */ (GATE_ADVICE)[bad.name] ?? [
+    const [fix, test, prevention] = GATE_ADVICE[bad.name] ?? [
       `Resolve the ${bad.name} gate failure.`, `Add a test covering the ${bad.name} gate.`, `Tighten the prompt, spec or gate for ${bad.name}.`,
     ];
     base = { rootCause: `gate ${bad.name} failed`, evidence: bad.detail ?? `gate ${bad.name} reported failure`, fix, test, prevention };

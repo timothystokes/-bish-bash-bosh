@@ -7,7 +7,6 @@ import { main, helpText } from '../src/cli.js';
 
 /**
  * @param {string[]} args
- * @param {import('../src/kill-switch.js').DockerRunner} [docker]
  */
 async function run(args, docker) {
   /** @type {string[]} */

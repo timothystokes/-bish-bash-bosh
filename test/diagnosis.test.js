@@ -4,9 +4,9 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { validateDiagnosis, parseDiagnosis, diagnose } from '../src/diagnosis.js';
-import { writeIterationRecord, iterationDir } from '../src/run-record.js';
-import { runStep } from '../src/step.js';
+import { validateDiagnosis, parseDiagnosis, diagnose } from '../src/podge-diagnosis.js';
+import { writeIterationRecord, iterationDir } from '../src/podge-run-record.js';
+import { runStep } from '../src/podge-step.js';
 import { createFakeAdapter } from '../src/adapter.js';
 
 const full = { rootCause: 'rc', evidence: 'ev', fix: 'fx', test: 'ts', prevention: 'pv' };
@@ -83,7 +83,6 @@ test('runStep: a gated failure records diagnosis.json and returns its root cause
   git('add', '-A'); git('commit', '-qm', 'init');
   const res = await runStep({
     config: {
-      targetRepo: 'git@example.com:o/t.git',
       roles: { build: { adapter: 'x', model: 'y' } },
       budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
       allowedPaths: ['src/'],

@@ -3,10 +3,8 @@
   "$id": "hodgepodge-config",
   "type": "object",
   "additionalProperties": false,
-  "required": ["targetRepo", "roles", "budgets", "allowedPaths"],
+  "required": ["roles", "budgets", "allowedPaths"],
   "properties": {
-    "targetRepo": { "type": "string", "minLength": 1 },
-    "hodgepodge": { "type": "string", "minLength": 1 },
     "roles": {
       "type": "object",
       "required": ["build"],

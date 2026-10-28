@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { FORMATS } from '../src/formats.js';
 import { loadFormatSkill } from '../src/prompts.js';
-import { buildInterviewPrompt } from '../src/interview.js';
+import { buildInterviewPrompt } from '../src/hodge-interview.js';
 
 /** @param {Record<string, string>} files */
 function makeRepo(files = {}) {
@@ -41,11 +41,10 @@ test('G-9: the interview prompt carries a snippet only for formats a spec declar
 
   const dir = makeRepo({
     'specs/a.md': spec('- gherkin: specs/a.feature'),
-    'specs/b.md': spec('- gherkin: specs/b.feature\n- ebnf: specs/b.ebnf\n- bogus: specs/x'),
+    'specs/b.md': spec('- gherkin: specs/b.feature\n- bogus: specs/x'),
   });
   const p = buildInterviewPrompt(dir, 'obj');
   assert.equal([...p.matchAll(/## Format skill: gherkin/g)].length, 1);
-  assert.match(p, /## Format skill: ebnf/);
   assert.doesNotMatch(p, /## Format skill: openapi/);
   assert.doesNotMatch(p, /## Format skill: bogus/);
 });

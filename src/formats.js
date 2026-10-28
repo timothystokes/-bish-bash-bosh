@@ -2,27 +2,12 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
-import Ajv from 'ajv';
-import Ajv04 from 'ajv-draft-04';
 import addFormats from 'ajv-formats';
 import { parse as parseYaml } from 'yaml';
 import { AstBuilder, GherkinClassicTokenMatcher, Parser as GherkinParser } from '@cucumber/gherkin';
 import { IdGenerator } from '@cucumber/messages';
-import { Grammars } from 'ebnf';
 import { bulletsBySection } from './spec-lint.js';
 
-/**
- * @typedef {{
- *   validate: (path: string) => string[],
- *   crossCheck: (paths: string[]) => string[],
- *   conform?: (schemaPath: string, dataPath: string, schemaPaths: string[]) => string[],
- * }} FormatTool
- */
-
-/**
- * @param {string} path
- * @returns {{value: unknown} | {error: string}}
- */
 function readJson(path) {
   try {
     return { value: JSON.parse(readFileSync(path, 'utf8')) };
@@ -31,30 +16,22 @@ function readJson(path) {
   }
 }
 
-/** @returns {import('ajv/dist/2020.js').default} */
 function newAjv() {
   const ajv = new Ajv2020.default({ strict: false, allErrors: true, logger: false });
   addFormats.default(ajv);
   return ajv;
 }
 
-/**
- * Registers each readable schema object under its path; the first of a duplicate `$id` wins.
- * @param {string[]} paths
- * @returns {{ajv: import('ajv/dist/2020.js').default, duplicates: string[], loaded: string[]}}
- */
+// Registers each readable schema object under its path; the first of a duplicate `$id` wins.
 function loadSchemas(paths) {
   const ajv = newAjv();
-  /** @type {Map<string, string>} */
   const ids = new Map();
-  /** @type {string[]} */
   const duplicates = [];
-  /** @type {string[]} */
   const loaded = [];
   for (const p of paths) {
     const r = readJson(p);
     if ('error' in r || typeof r.value !== 'object' || r.value === null || Array.isArray(r.value)) continue;
-    const schema = /** @type {{$id?: unknown}} */ (r.value);
+    const schema = (r.value);
     if (typeof schema.$id === 'string') {
       const first = ids.get(schema.$id);
       if (first !== undefined) {
@@ -64,7 +41,7 @@ function loadSchemas(paths) {
       ids.set(schema.$id, p);
     }
     try {
-      ajv.addSchema(/** @type {object} */ (r.value), p);
+      ajv.addSchema((r.value), p);
       loaded.push(p);
     } catch {
       // an invalid schema is reported by validate()
@@ -76,20 +53,15 @@ function loadSchemas(paths) {
 const require = createRequire(import.meta.url);
 const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'];
 
-/** @type {Map<string, import('ajv/dist/core.js').ValidateFunction>} */
 const oasValidators = new Map();
 
-/**
- * @param {string} version `3.0`, `3.1` or `3.2`
- * @returns {import('ajv/dist/core.js').ValidateFunction}
- */
 function oasValidator(version) {
   let v = oasValidators.get(version);
   if (!v) {
     const schema = require(`@seriousme/openapi-schema-validator/schemas/v${version}/schema.json`);
-    const Ctor = /** @type {typeof import('ajv/dist/2020.js').default} */ (
-      version === '3.0' ? /** @type {any} */ (Ajv04).default ?? Ajv04 : Ajv2020.default
-    );
+    const ajv04ModuleName = 'ajv-draft-04';
+    const ajv04Untyped = require(ajv04ModuleName);
+    const Ctor = version === '3.0' ? ajv04Untyped.default ?? ajv04Untyped : Ajv2020.default;
     const ajv = new Ctor({ strict: false, allErrors: true, logger: false });
     addFormats.default(ajv);
     v = ajv.compile(schema);
@@ -98,10 +70,6 @@ function oasValidator(version) {
   return v;
 }
 
-/**
- * @param {string} path
- * @returns {{doc: Record<string, unknown>} | {error: string}}
- */
 function readOpenApi(path) {
   let value;
   try {
@@ -110,13 +78,9 @@ function readOpenApi(path) {
     return { error: `invalid YAML/JSON: ${message(e)}` };
   }
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return { error: 'document must be an object' };
-  return { doc: /** @type {Record<string, unknown>} */ (value) };
+  return { doc: value };
 }
 
-/**
- * @param {Record<string, unknown>} doc
- * @returns {{id: string, where: string}[]}
- */
 function operationIds(doc) {
   const out = [];
   const paths = doc.paths;
@@ -124,20 +88,15 @@ function operationIds(doc) {
   for (const [route, item] of Object.entries(paths)) {
     if (typeof item !== 'object' || item === null) continue;
     for (const m of HTTP_METHODS) {
-      const op = /** @type {Record<string, unknown>} */ (item)[m];
-      const id = typeof op === 'object' && op !== null ? /** @type {{operationId?: unknown}} */ (op).operationId : undefined;
+      const op = item[m];
+      const id = typeof op === 'object' && op !== null ? op.operationId : undefined;
       if (typeof id === 'string') out.push({ id, where: `${m.toUpperCase()} ${route}` });
     }
   }
   return out;
 }
 
-/**
- * Local `$ref`s (`#/...`) that point nowhere.
- * @param {unknown} node
- * @param {unknown} root
- * @param {Set<string>} bad
- */
+// Local `$ref`s (`#/...`) that point nowhere.
 function collectBadRefs(node, root, bad) {
   if (Array.isArray(node)) {
     for (const n of node) collectBadRefs(n, root, bad);
@@ -152,11 +111,6 @@ function collectBadRefs(node, root, bad) {
   }
 }
 
-/**
- * @param {unknown} root
- * @param {string} pointer
- * @returns {boolean}
- */
 function resolvePointer(root, pointer) {
   if (pointer === '') return true;
   if (!pointer.startsWith('/')) return false;
@@ -169,18 +123,14 @@ function resolvePointer(root, pointer) {
       return false;
     }
     if (typeof cur !== 'object' || cur === null || !Object.hasOwn(cur, key)) return false;
-    cur = /** @type {Record<string, unknown>} */ (cur)[key];
+    cur = cur[key];
   }
   return true;
 }
 
-/** @param {unknown} e */
 const message = (e) => (e instanceof Error ? e.message : String(e));
 
-/**
- * Embedded format tools. Each returns problem strings (empty when fine); paths are absolute.
- * @type {Record<string, FormatTool>}
- */
+// Embedded format tools. Each returns problem strings (empty when fine); paths are absolute.
 export const FORMATS = {
   'json-schema': {
     validate(path) {
@@ -192,7 +142,7 @@ export const FORMATS = {
       }
       try {
         const ajv = newAjv();
-        if (!ajv.validateSchema(/** @type {object | boolean} */ (v))) {
+        if (!ajv.validateSchema((v))) {
           return [`invalid schema: ${ajv.errorsText(ajv.errors)}`];
         }
       } catch (e) {
@@ -207,7 +157,7 @@ export const FORMATS = {
         try {
           ajv.getSchema(p);
         } catch (e) {
-          const ref = /** @type {{missingRef?: string}} */ (e).missingRef;
+          const ref = e.missingRef;
           problems.push(ref ? `unresolved $ref "${ref}" in ${p}` : `${p}: ${message(e)}`);
         }
       }
@@ -245,7 +195,6 @@ FORMATS.openapi = {
     const bad = new Set();
     collectBadRefs(doc, doc, bad);
     for (const ref of bad) problems.push(`unresolved $ref "${ref}"`);
-    /** @type {Map<string, string>} */
     const seen = new Map();
     for (const { id, where } of operationIds(doc)) {
       const first = seen.get(id);
@@ -255,7 +204,6 @@ FORMATS.openapi = {
     return problems;
   },
   crossCheck(paths) {
-    /** @type {Map<string, string>} */
     const seen = new Map();
     const problems = [];
     for (const p of paths) {
@@ -271,102 +219,9 @@ FORMATS.openapi = {
   },
 };
 
-/** @type {Map<string, import('ajv').ValidateFunction>} */
-const asyncValidators = new Map();
-
-/**
- * @param {string} version e.g. `3.0.0`
- * @returns {import('ajv').ValidateFunction | undefined} undefined when the release is unknown
- */
-function asyncValidator(version) {
-  let v = asyncValidators.get(version);
-  if (!v) {
-    /** @type {Record<string, object>} */
-    const schemas = require('@asyncapi/specs').schemasWithoutId;
-    if (!Object.hasOwn(schemas, version)) return undefined;
-    const schema = schemas[version];
-    const ajv = new Ajv.default({ strict: false, allErrors: true, logger: false });
-    addFormats.default(ajv);
-    v = ajv.compile(schema);
-    asyncValidators.set(version, v);
-  }
-  return v;
-}
-
-/**
- * Operation ids: 2.x `operationId`s on publish/subscribe; 3.x operations are keyed by their id.
- * @param {Record<string, unknown>} doc
- * @returns {{id: string, where: string}[]}
- */
-function asyncOperationIds(doc) {
-  const out = [];
-  const ops = doc.operations;
-  if (typeof ops === 'object' && ops !== null && !Array.isArray(ops)) {
-    for (const id of Object.keys(ops)) out.push({ id, where: `operation ${id}` });
-  }
-  const channels = doc.channels;
-  if (typeof channels === 'object' && channels !== null && !Array.isArray(channels)) {
-    for (const [name, item] of Object.entries(channels)) {
-      if (typeof item !== 'object' || item === null) continue;
-      for (const k of ['publish', 'subscribe']) {
-        const op = /** @type {Record<string, unknown>} */ (item)[k];
-        const id = typeof op === 'object' && op !== null ? /** @type {{operationId?: unknown}} */ (op).operationId : undefined;
-        if (typeof id === 'string') out.push({ id, where: `${k} ${name}` });
-      }
-    }
-  }
-  return out;
-}
-
-FORMATS.asyncapi = {
-  validate(path) {
-    const r = readOpenApi(path);
-    if ('error' in r) return [r.error];
-    const doc = r.doc;
-    const version = typeof doc.asyncapi === 'string' ? doc.asyncapi : undefined;
-    const check = version === undefined ? undefined : asyncValidator(version);
-    if (!check) return [`unsupported or missing asyncapi version ${JSON.stringify(doc.asyncapi)} (want a released 2.x or 3.x version)`];
-    if (!check(doc)) {
-      const problems = (check.errors ?? []).map((e) => `invalid AsyncAPI: ${e.instancePath || '/'} ${e.message}`);
-      return [...new Set(problems)].slice(0, 20);
-    }
-    const problems = [];
-    const bad = new Set();
-    collectBadRefs(doc, doc, bad);
-    for (const ref of bad) problems.push(`unresolved $ref "${ref}"`);
-    /** @type {Map<string, string>} */
-    const seen = new Map();
-    for (const { id, where } of asyncOperationIds(doc)) {
-      const first = seen.get(id);
-      if (first !== undefined) problems.push(`duplicate operationId "${id}" in ${first} and ${where}`);
-      else seen.set(id, where);
-    }
-    return problems;
-  },
-  crossCheck(paths) {
-    /** @type {Map<string, string>} */
-    const seen = new Map();
-    const problems = [];
-    for (const p of paths) {
-      const r = readOpenApi(p);
-      if ('error' in r) continue;
-      for (const id of new Set(asyncOperationIds(r.doc).map((o) => o.id))) {
-        const first = seen.get(id);
-        if (first !== undefined) problems.push(`duplicate operationId "${id}" in ${first} and ${p}`);
-        else seen.set(id, p);
-      }
-    }
-    return problems;
-  },
-};
-
 const REQ_TAG = /^@R-[A-Za-z0-9._-]+-\d+$/;
 
-/**
- * Parses a feature file and lists its scenarios with the tags they inherit.
- * @param {string} path
- * @returns {{scenarios: {name: string, tags: string[]}[]} | {error: string}}
- */
+// Parses a feature file and lists its scenarios with the tags they inherit.
 function readGherkin(path) {
   let doc;
   try {
@@ -378,7 +233,6 @@ function readGherkin(path) {
   const feature = doc.feature;
   if (!feature) return { error: 'invalid Gherkin: no Feature found' };
   const base = feature.tags.map((t) => t.name);
-  /** @type {{name: string, tags: string[]}[]} */
   const scenarios = [];
   for (const child of feature.children) {
     const rule = child.rule;
@@ -406,7 +260,6 @@ FORMATS.gherkin = {
     return problems;
   },
   crossCheck(paths) {
-    /** @type {Map<string, string>} */
     const seen = new Map();
     const problems = [];
     for (const p of paths) {
@@ -422,55 +275,10 @@ FORMATS.gherkin = {
   },
 };
 
-const EXAMPLE_COMMENT = /\/\*\s*(accept|reject)\s*:([\s\S]*?)\*\//g;
-
-FORMATS.ebnf = {
-  validate(path) {
-    const text = readFileSync(path, 'utf8');
-    /** @type {{kind: string, input: string}[]} */
-    const examples = [];
-    const problems = [];
-    for (const m of text.matchAll(EXAMPLE_COMMENT)) {
-      try {
-        const input = JSON.parse(m[2].trim());
-        if (typeof input !== 'string') throw new Error('not a string');
-        examples.push({ kind: m[1], input });
-      } catch {
-        problems.push(`malformed example (want /* ${m[1]}: "<JSON string>" */): ${m[2].trim()}`);
-      }
-    }
-    /** @type {InstanceType<typeof Grammars.W3C.Parser>} */
-    let parser;
-    try {
-      parser = new Grammars.W3C.Parser(text);
-    } catch (e) {
-      return [...problems, `invalid EBNF: ${message(e).replace(/\s*\n\s*/g, '; ')}`];
-    }
-    if (parser.grammarRules.length === 0) return [...problems, 'invalid EBNF: no rules'];
-    if (examples.length === 0 && problems.length === 0) return ['no examples: declare /* accept: "<text>" */ and /* reject: "<text>" */ comments'];
-    if (examples.length > 0 && !examples.some((x) => x.kind === 'reject')) problems.push('needs at least one reject example');
-    if (examples.length > 0 && !examples.some((x) => x.kind === 'accept')) problems.push('needs at least one accept example');
-    for (const { kind, input } of examples) {
-      const ast = parser.getAST(input);
-      const accepted = ast !== null && ast.errors.length === 0 && ast.rest.length === 0;
-      if (kind === 'accept' && !accepted) problems.push(`example ${JSON.stringify(input)} is declared accept but the grammar rejects it`);
-      if (kind === 'reject' && accepted) problems.push(`example ${JSON.stringify(input)} is declared reject but the grammar accepts it`);
-    }
-    return problems;
-  },
-  crossCheck: () => [],
-};
-
-/**
- * Artifacts a spec declares under `## Formats` (`- <format>: <path>`, optionally `-> <output path>`
- * naming a loop output the artifact constrains).
- * @param {string} text
- * @returns {{declared: {format: string, path: string, output?: string}[], malformed: string[]}}
- */
+// Artifacts a spec declares under `## Formats` (`- <format>: <path>`, optionally `-> <output path>`
+// naming a loop output the artifact constrains).
 export function parseFormats(text) {
-  /** @type {{format: string, path: string, output?: string}[]} */
   const declared = [];
-  /** @type {string[]} */
   const malformed = [];
   for (const b of bulletsBySection(text).get('formats') ?? []) {
     const m = /^([A-Za-z0-9._-]+):\s*(\S+?)(?:\s*->\s*(\S+))?$/.exec(b);
@@ -480,19 +288,13 @@ export function parseFormats(text) {
   return { declared, malformed };
 }
 
-/**
- * Readiness gaps for declared formats: known format, artifact inside the repo, existing, valid,
- * referenced by a requirement, consistent across specs, and satisfied by any declared output that exists.
- * @param {string} repoDir
- * @returns {string[]}
- */
+// Readiness gaps for declared formats: known format, artifact inside the repo, existing, valid,
+// referenced by a requirement, consistent across specs, and satisfied by any declared output that exists.
 export function checkFormats(repoDir) {
   const specsDir = join(repoDir, 'specs');
   const files = existsSync(specsDir) ? readdirSync(specsDir).filter((f) => f.endsWith('.md')).sort() : [];
   const gaps = [];
-  /** @type {Map<string, Set<string>>} */
   const valid = new Map();
-  /** @type {{specPath: string, format: string, schema: string, output: string, abs: string}[]} */
   const outputs = [];
   for (const f of files) {
     const specPath = `specs/${f}`;
@@ -545,10 +347,6 @@ export function checkFormats(repoDir) {
   return gaps;
 }
 
-/**
- * @param {string} repoDir
- * @returns {boolean} whether any spec declares a format artifact (or a malformed bullet)
- */
 export function declaresFormats(repoDir) {
   const specsDir = join(repoDir, 'specs');
   if (!existsSync(specsDir)) return false;
@@ -558,12 +356,8 @@ export function declaresFormats(repoDir) {
   });
 }
 
-/**
- * Loop gate: declared format artifacts are valid and consistent, and every declared output that
- * exists conforms. Passes trivially when no spec declares a format.
- * @param {string} repoDir
- * @returns {import('./diff-gates.js').GateCheck}
- */
+// Loop gate: declared format artifacts are valid and consistent, and every declared output that
+// exists conforms. Passes trivially when no spec declares a format.
 export function checkFormatGate(repoDir) {
   const gaps = checkFormats(repoDir);
   return gaps.length === 0 ? { ok: true } : { ok: false, reason: gaps.join('; ') };

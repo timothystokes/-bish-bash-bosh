@@ -1,11 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-/**
- * Brownfield changes are spec deltas, so specs must already exist.
- * @param {string} repoDir
- * @returns {import('./diff-gates.js').GateCheck}
- */
+// Brownfield changes are spec deltas, so specs must already exist.
 export function checkBrownfieldGate(repoDir) {
   const dir = join(repoDir, 'specs');
   const specs = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.md')) : [];

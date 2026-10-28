@@ -3,16 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/**
- * @typedef {{root: string, remotes: string[]}} HarnessIdentity
- * @typedef {{ok: true} | {ok: false, reason: string}} GateResult
- */
-
-/**
- * Reduce a git remote URL (ssh, scp-style, https) to `host/owner/repo`.
- * @param {string} url
- * @returns {string}
- */
+// Reduce a git remote URL (ssh, scp-style, https) to `host/owner/repo`.
 export function normalizeRepoId(url) {
   let s = url.trim();
   s = s.replace(/^[a-z+]+:\/\//i, '');
@@ -23,7 +14,6 @@ export function normalizeRepoId(url) {
   return s.toLowerCase();
 }
 
-/** @param {string} p */
 function real(p) {
   const abs = resolve(p);
   try {
@@ -33,14 +23,9 @@ function real(p) {
   }
 }
 
-/**
- * Identify the hodgepodge checkout this code runs from.
- * @param {string} [rootDir] override the checkout root (tests)
- * @returns {HarnessIdentity}
- */
+// Identify the hodgepodge checkout this code runs from.
 export function harnessIdentity(rootDir) {
   const root = real(rootDir ?? join(dirname(fileURLToPath(import.meta.url)), '..'));
-  /** @type {string[]} */
   let remotes = [];
   try {
     const names = execFileSync('git', ['-C', root, 'remote'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
@@ -58,12 +43,7 @@ export function harnessIdentity(rootDir) {
   return { root, remotes };
 }
 
-/**
- * Repo gate: refuse when the target repo is hodgepodge itself.
- * @param {string} target remote URL or local path
- * @param {HarnessIdentity} [self]
- * @returns {GateResult}
- */
+// Repo gate: refuse when the target repo is hodgepodge itself.
 export function checkRepoGate(target, self = harnessIdentity()) {
   if (typeof target !== 'string' || target.trim() === '') {
     return { ok: false, reason: 'target repo is empty' };

@@ -4,8 +4,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { testResults, verifyDone, applyGaps, syncImplementation } from '../src/done.js';
-import { runLoop } from '../src/driver.js';
+import { testResults, verifyDone, applyGaps, syncImplementation } from '../src/podge-done.js';
+import { runLoop } from '../src/podge-driver.js';
 import { createFakeAdapter } from '../src/adapter.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
@@ -109,7 +109,6 @@ test('syncImplementation derives Implementation and Evidence from per-requiremen
 });
 
 const config = {
-  targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'x', model: 'y' } },
   budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/', 'plan.md', 'tests/', 'specs/'],

@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runStep, buildPrompt } from '../src/step.js';
+import { runStep, buildPrompt } from '../src/podge-step.js';
 import { createFakeAdapter } from '../src/adapter.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
@@ -24,14 +24,13 @@ function makeRepo() {
   return dir;
 }
 
-const config = (/** @type {string} */ targetRepo) => ({
-  targetRepo,
+const config = (/** @type {string} */ _targetRepo) => ({
   roles: { build: { adapter: 'x', model: 'y' } },
   budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],
 });
 
-const adapter = (/** @type {Partial<import('../src/adapter.js').FakeFixture>} */ f = {}) =>
+const adapter = (f = {}) =>
   createFakeAdapter({
     exitStatus: 0,
     transcript: 'done',
@@ -119,26 +118,17 @@ test('adapter failure gives failed status and does not run tests', async () => {
   assert.ok(!existsSync(join(dir, 'src', 'new.js')));
 });
 
-test('repo gate refuses hodgepodge as target before touching anything', async () => {
+test('repo gate refuses when repoDir is the hodgepodge checkout before touching anything', async () => {
   const dir = makeRepo();
   const res = await runStep({
-    config: config('git@github.com:ticked-com/ticked-hodgepodge.git'), repoDir: dir, runId: 'r1',
+    config: config('o/target'), repoDir: dir, runId: 'r1',
     adapter: adapter(), testCommand: pass,
-    identity: { root: '/x/hodgepodge', remotes: ['https://github.com/ticked-com/ticked-hodgepodge'] },
+    identity: { root: dir, remotes: [] },
   });
   assert.equal(res.status, 'gated');
   assert.equal(res.sha, null);
   assert.ok(!existsSync(join(dir, 'runs')));
   assert.ok(!existsSync(join(dir, 'src')));
-});
-
-test('repo gate also refuses when repoDir is the hodgepodge checkout', async () => {
-  const dir = makeRepo();
-  const res = await runStep({
-    config: config('o/target'), repoDir: dir, runId: 'r1',
-    adapter: adapter(), testCommand: pass, identity: { root: dir, remotes: [] },
-  });
-  assert.equal(res.status, 'gated');
 });
 
 test('dirty working tree is gated (idempotence: step starts from a clean tree)', async () => {

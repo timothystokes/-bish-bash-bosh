@@ -2,30 +2,40 @@ import { Readable } from 'node:stream';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { initSandbox } from '../src/init-sandbox.js';
 import { validateConfig } from '../src/config.js';
-import { runInterview, buildInterviewPrompt } from '../src/interview.js';
-import { runLoop } from '../src/driver.js';
+import { runInterview, buildInterviewPrompt } from '../src/hodge-interview.js';
+import { runLoop } from '../src/podge-driver.js';
 import { checkReadiness } from '../src/readiness.js';
 import { main } from '../src/cli.js';
+import { freshDir, seedObjectiveProject, withCwd, writeProjectConfig } from './support/project.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const fresh = () => join(mkdtempSync(join(tmpdir(), 'objseed-')), 'sb');
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
-const base = { adapter: 'agent-x', model: 'model-y', seed: 'objective' };
+const buildConfig = {
+  roles: { build: { adapter: 'agent-x', model: 'model-y' }, interview: { adapter: 'agent-x', model: 'model-y' }, reverse: { adapter: 'agent-x', model: 'model-y' } },
+  budgets: { maxWallClockSeconds: 7200, maxIterations: 20 },
+  allowedPaths: ['src/', 'bin/', 'lib/', 'package.json'],
+  requireTestPlan: true,
+};
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 
 const KIT = ['PHASES.md', 'INTERVIEW.md', 'READINESS.md', 'BRIEF.md', 'OPEN-QUESTIONS.md', 'CONVERSATION.md'];
 
+// Seeds a project fixture (objective kit + plan.md + package.json + hodgepodge.yml), committed clean.
+function sandbox() {
+  const dir = freshDir('objseed-');
+  seedObjectiveProject(dir);
+  writeProjectConfig(dir, buildConfig);
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-q', '-m', 'seed');
+  return { dir, repo: dir, config: buildConfig };
+}
+
 test('objective seed copies the general kit and a starter plan; nothing is solution-specific', () => {
-  const dir = fresh();
-  const res = initSandbox({ dir, ...base });
-  assert.equal(res.ok, true, JSON.stringify(res));
-  const repo = join(dir, 'target');
+  const { repo } = sandbox();
   for (const f of KIT) assert.ok(existsSync(join(repo, 'objective', f)), f);
   assert.match(readFileSync(join(repo, 'objective', 'BRIEF.md'), 'utf8'), /Not yet written/);
   assert.match(readFileSync(join(repo, 'plan.md'), 'utf8'), /- \[ \]/);
@@ -34,9 +44,8 @@ test('objective seed copies the general kit and a starter plan; nothing is solut
 });
 
 test('the kit documents phases, the interview protocol and the readiness thresholds', () => {
-  const dir = fresh();
-  initSandbox({ dir, ...base });
-  const read = (/** @type {string} */ f) => readFileSync(join(dir, 'target', 'objective', f), 'utf8');
+  const { repo } = sandbox();
+  const read = (/** @type {string} */ f) => readFileSync(join(repo, 'objective', f), 'utf8');
   assert.match(read('PHASES.md'), /hodge/);
   assert.match(read('PHASES.md'), /Discover[\s\S]*Specify[\s\S]*Test plan[\s\S]*Plan[\s\S]*Build/);
   assert.match(read('INTERVIEW.md'), /topic batches/i);
@@ -44,33 +53,30 @@ test('the kit documents phases, the interview protocol and the readiness thresho
   assert.match(read('READINESS.md'), /hodgepodge ready/);
 });
 
-test('config gets an interview role and requires the test plan', () => {
-  const dir = fresh();
-  initSandbox({ dir, ...base });
-  const cfg = JSON.parse(readFileSync(join(dir, 'hodge.json'), 'utf8'));
-  assert.deepEqual(validateConfig(cfg), { ok: true, errors: [] });
-  assert.deepEqual(cfg.roles.interview, { adapter: 'agent-x', model: 'model-y' });
-  assert.equal(cfg.requireTestPlan, true);
+test('config has an interview role and requires the test plan', () => {
+  const { config } = sandbox();
+  assert.deepEqual(validateConfig(config), { ok: true, errors: [] });
+  assert.deepEqual(config.roles.interview, { adapter: 'agent-x', model: 'model-y' });
+  assert.equal(config.requireTestPlan, true);
 });
 
-test('hodgepodge init has no --objective option (the objective is gathered by `hodge`)', async () => {
+test('hodge has no --objective option (the objective is gathered interactively)', async () => {
   /** @type {string[]} */
   const errs = [];
-  const code = await main(['init', '--dir', fresh(), '--adapter', 'a', '--model', 'm', '--seed', 'objective', '--objective', 'x'], { stdout: () => {}, stderr: (s) => errs.push(s) });
+  const code = await main(['hodge', '--objective', 'x'], { stdout: () => {}, stderr: (s) => errs.push(s) });
   assert.equal(code, 2);
   assert.match(errs.join(''), /unknown argument '--objective'/);
 });
 
 test('the kit is part of the interview prompt together with stage and current readiness gaps', () => {
-  const dir = fresh();
-  initSandbox({ dir, ...base });
-  const p = buildInterviewPrompt(join(dir, 'target'), 'Build a greeter CLI');
+  const { repo } = sandbox();
+  const p = buildInterviewPrompt(repo, 'Build a greeter CLI');
   assert.match(p, /INTERVIEW\.md/);
   assert.match(p, /READINESS\.md/);
   assert.doesNotMatch(p, /## Readiness gaps/, 'no readiness check until the interview is ending');
   assert.match(p, /## Stage: broad/);
   assert.match(p, /never open objective\/CONVERSATION\.md/i);
-  const closing = buildInterviewPrompt(join(dir, 'target'), 'Build a greeter CLI', true);
+  const closing = buildInterviewPrompt(repo, 'Build a greeter CLI', true);
   assert.match(closing, /## Readiness gaps/);
   assert.match(closing, /specs\/ has no \*\.md specs/);
 });
@@ -105,7 +111,6 @@ Implementation: none
 
 /** @param {Record<string, string>} writes */
 const agent = (writes) => ({
-  /** @param {import('../src/adapter.js').AdapterRequest} req */
   async run(req) {
     for (const [f, text] of Object.entries(writes)) {
       mkdirSync(dirname(join(req.cwd, f)), { recursive: true });
@@ -115,16 +120,15 @@ const agent = (writes) => ({
   },
 });
 
-const sandbox = (/** @type {string} */ objective) => {
-  const dir = fresh();
-  assert.equal(initSandbox({ dir, ...base }).ok, true);
-  writeFileSync(join(dir, 'target', 'objective', 'BRIEF.md'), `# Objective brief\n\n${objective}\n`);
-  git(join(dir, 'target'), '-c', 'user.name=t', '-c', 'user.email=t@x', 'commit', '-qam', 'brief');
-  return { dir, repo: join(dir, 'target'), config: JSON.parse(readFileSync(join(dir, 'hodge.json'), 'utf8')) };
+const briefed = (/** @type {string} */ objective) => {
+  const { repo, config } = sandbox();
+  writeFileSync(join(repo, 'objective', 'BRIEF.md'), `# Objective brief\n\n${objective}\n`);
+  git(repo, '-c', 'user.name=t', '-c', 'user.email=t@x', 'commit', '-qam', 'brief');
+  return { repo, config };
 };
 
 test('interview with a kit: lint-clean but not ready is kept as incomplete (a round), not discarded', async () => {
-  const { repo, config } = sandbox('Build a greeter');
+  const { repo, config } = briefed('Build a greeter');
   const coarse = goodSpec.replace(/- R-greet-3: .*\n/, '');
   const res = await runInterview({
     config, repoDir: repo, runId: 'r1', identity, objective: 'Build a greeter', closing: true,
@@ -138,7 +142,7 @@ test('interview with a kit: lint-clean but not ready is kept as incomplete (a ro
 });
 
 test('interview with a kit: a round that leaves a question runs no spec-lint, even with a broken spec', async () => {
-  const { repo, config } = sandbox('Build a greeter');
+  const { repo, config } = briefed('Build a greeter');
   const res = await runInterview({
     config, repoDir: repo, runId: 'r1', identity, objective: 'Build a greeter',
     adapter: agent({ 'specs/bad.md': 'no title\n', 'objective/RESPONSE.json': '{"resolved":[],"gaps":[{"topic":"T","question":"Who?","default":"devs"}]}' }),
@@ -148,7 +152,7 @@ test('interview with a kit: a round that leaves a question runs no spec-lint, ev
 });
 
 test('interview with a kit: a ready result is ok; it may write objective/', async () => {
-  const { repo, config } = sandbox('Build a greeter');
+  const { repo, config } = briefed('Build a greeter');
   const res = await runInterview({
     config, repoDir: repo, runId: 'r1', identity, objective: 'Build a greeter',
     adapter: agent({
@@ -161,7 +165,7 @@ test('interview with a kit: a ready result is ok; it may write objective/', asyn
 });
 
 test('run is gated until the objective is ready (no agent call)', async () => {
-  const { repo, config } = sandbox('Build a greeter');
+  const { repo, config } = briefed('Build a greeter');
   let called = 0;
   const adapter = { async run() { called++; return { transcript: '', exitStatus: 0, changedFiles: [] }; } };
   const res = await runLoop({ config, repoDir: repo, runId: 'r1', adapter, identity, requireTestPlan: true });
@@ -171,22 +175,20 @@ test('run is gated until the objective is ready (no agent call)', async () => {
 });
 
 test('hodgepodge ready reports gaps then ready', async () => {
-  const dir = fresh();
-  assert.equal(initSandbox({ dir, ...base }).ok, true);
+  const { repo } = sandbox();
   /** @type {string[]} */
   const outs = [];
   const run = async (/** @type {string[]} */ args) => {
     outs.length = 0;
-    const code = await main(args, { stdout: (s) => outs.push(s), stderr: (s) => outs.push(s) });
+    const code = await withCwd(repo, () => main(args, { stdout: (s) => outs.push(s), stderr: () => {} }));
     return { code, out: outs.join('') };
   };
-  const notReady = await run(['ready', '--dir', dir]);
+  const notReady = await run(['ready']);
   assert.equal(notReady.code, 1);
   assert.equal(JSON.parse(notReady.out).ready, false);
-  const repo = join(dir, 'target');
   mkdirSync(join(repo, 'specs'));
   writeFileSync(join(repo, 'specs', 'greet.md'), goodSpec);
-  const ok = await run(['ready', '--dir', dir]);
+  const ok = await run(['ready']);
   assert.equal(ok.code, 0, ok.out);
   assert.deepEqual(JSON.parse(ok.out), { ready: true, gaps: [] });
 });
@@ -195,24 +197,25 @@ test('kit files live under templates/objective (shipped in the image)', () => {
   for (const f of [...KIT, 'plan.md']) assert.ok(existsSync(join(root, 'templates', 'objective', f)), f);
 });
 
-test('hodge in an objective-kit sandbox asks for the objective and is gated without one', async () => {
-  const dir = fresh();
-  assert.equal((await main(['init', '--dir', dir, '--adapter', 'a', '--model', 'm', '--seed', 'objective'], { stdout: () => {}, stderr: () => {} })), 0);
+test('hodge in an objective-kit project asks for the objective and is gated without one', async () => {
+  const { repo } = sandbox();
   let out = '';
-  const code = await main(['hodge', '--dir', dir], {
-    registry: { a: () => ({ run: async () => { throw new Error('agent must not run without an objective'); } }) },
-    input: Readable.from(['']),
-    stdout: (s) => (out += s),
-    stderr: () => {},
-  });
+  const code = await withCwd(repo, () =>
+    main(['hodge'], {
+      registry: { 'agent-x': () => ({ run: async () => { throw new Error('agent must not run without an objective'); } }) },
+      input: Readable.from(['']),
+      stdout: (s) => (out += s),
+      stderr: () => {},
+    }),
+  );
   assert.equal(code, 1);
   assert.match(out, /Describe the objective/);
   assert.match(out, /no objective description given/);
 });
 
 test('objective seed package.json has a test script so the tests gate can run', () => {
-  const dir = fresh();
-  assert.equal(initSandbox({ dir, ...base }).ok, true);
-  const pkg = JSON.parse(readFileSync(join(dir, 'target', 'package.json'), 'utf8'));
+  const { repo } = sandbox();
+  const pkg = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'));
   assert.equal(pkg.scripts.test, 'node --test tests/*.test.js');
 });
+

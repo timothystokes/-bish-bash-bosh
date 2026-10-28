@@ -2,17 +2,10 @@ import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join, posix } from 'node:path';
 
-/** @typedef {{ok: boolean, reason?: string, detail?: string}} GateCheck */
-
 // The loop prompt tells the agent to update plan.md, so it is always in scope.
 const ALWAYS_ALLOWED = ['plan.md'];
 
-/**
- * Scope gate: every changed file must sit inside an allowed path.
- * @param {string[]} changedFiles repo-relative paths
- * @param {string[]} allowedPaths files or directory prefixes
- * @returns {GateCheck}
- */
+// Scope gate: every changed file must sit inside an allowed path.
 export function checkScopeGate(changedFiles, allowedPaths) {
   const allowed = [...allowedPaths, ...ALWAYS_ALLOWED].map((p) => posix.normalize(p).replace(/\/+$/, ''));
   const outside = changedFiles.filter((f) => {
@@ -27,25 +20,18 @@ export function checkScopeGate(changedFiles, allowedPaths) {
     : { ok: false, reason: `changes outside allowed paths: ${outside.join(', ')}` };
 }
 
-/** @type {[RegExp, string][]} */
 const STUB_MARKERS = [
-  [/\b(TODO|FIXME|XXX)\b/, 'TODO/FIXME marker'],
-  [/not\s+(yet\s+)?implemented/i, '"not implemented"'],
-  [/\bstub(bed)?\b/i, 'stub'],
-  [/\bplaceholder\b/i, 'placeholder'],
+  { re: /\b(TODO|FIXME|XXX)\b/, label: 'TODO/FIXME marker' },
+  { re: /not\s+(yet\s+)?implemented/i, label: '"not implemented"' },
+  { re: /\bstub(bed)?\b/i, label: 'stub' },
+  { re: /\bplaceholder\b/i, label: 'placeholder' },
 ];
 const EMPTY_BODY = /(\)|=>)\s*\{\s*\}/;
 
-/**
- * Anti-stub gate: scan lines the diff adds for stub markers and empty function bodies.
- * @param {string} diff unified diff
- * @returns {GateCheck}
- */
+// Anti-stub gate: scan lines the diff adds for stub markers and empty function bodies.
 export function checkAntiStubGate(diff) {
-  /** @type {string[]} */
   const problems = [];
   let file = '';
-  /** @type {string[]} */
   let block = [];
   const flush = () => {
     if (block.length > 0 && EMPTY_BODY.test(block.join('\n'))) problems.push(`${file}: empty function body`);
@@ -58,7 +44,7 @@ export function checkAntiStubGate(diff) {
     } else if (line.startsWith('+') && !file.endsWith('.md')) {
       const added = line.slice(1);
       block.push(added);
-      for (const [re, label] of STUB_MARKERS) {
+      for (const { re, label } of STUB_MARKERS) {
         if (re.test(added)) problems.push(`${file}: ${label}: ${added.trim()}`);
       }
     } else {
@@ -69,12 +55,7 @@ export function checkAntiStubGate(diff) {
   return problems.length === 0 ? { ok: true } : { ok: false, reason: problems.join('; ') };
 }
 
-/**
- * Type gate: run the type-check command when the repo has a tsconfig.json.
- * @param {string} repoDir
- * @param {string[]} [command]
- * @returns {GateCheck}
- */
+// Type gate: run the type-check command when the repo has a tsconfig.json.
 export function checkTypeGate(repoDir, command = ['npx', '--no-install', 'tsc', '-p', 'tsconfig.json', '--noEmit']) {
   if (!existsSync(join(repoDir, 'tsconfig.json'))) return { ok: true, detail: 'skipped: no tsconfig.json' };
   const [cmd, ...args] = command;

@@ -1,23 +1,12 @@
-/**
- * @typedef {{
- *   clusterArn: string, taskDefinitionArn: string, subnets: string[], securityGroups: string[],
- *   containerName: string, readPointersFunctionArn: string, stateMachineArn: string,
- *   budgets: {maxIterations: number},
- *   iterationsPerExecution: number, pollSeconds: number,
- * }} StateMachineConfig
- */
 
-/**
- * @param {StateMachineConfig} c
- */
 function validate(c) {
   for (const k of ['clusterArn', 'taskDefinitionArn', 'containerName', 'readPointersFunctionArn', 'stateMachineArn']) {
-    if (typeof c[/** @type {keyof StateMachineConfig} */ (k)] !== 'string' || c[/** @type {keyof StateMachineConfig} */ (k)] === '') throw new Error(`${k} must be a non-empty string`);
+    if (typeof c[(k)] !== 'string' || c[(k)] === '') throw new Error(`${k} must be a non-empty string`);
   }
-  for (const k of /** @type {const} */ (['subnets', 'securityGroups'])) {
+  for (const k of (['subnets', 'securityGroups'])) {
     if (!Array.isArray(c[k]) || c[k].length === 0) throw new Error(`${k} must be a non-empty array`);
   }
-  const positive = (/** @type {string} */ k, /** @type {unknown} */ v) => {
+  const positive = (k, v) => {
     if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) throw new Error(`${k} must be a positive number`);
   };
   positive('maxIterations', c.budgets?.maxIterations);
@@ -25,14 +14,10 @@ function validate(c) {
   positive('pollSeconds', c.pollSeconds);
 }
 
-/**
- * Builds the Amazon States Language definition that loops `podge step`, one Fargate Spot
- * task per iteration. The execution context holds pointers only (`$.pointers`: sha,
- * iteration, status, paused, stop), re-read from git and run records each loop.
- * Input: `{runId, executionIterations: 0}`.
- * @param {StateMachineConfig} config
- * @returns {Record<string, any>}
- */
+// Builds the Amazon States Language definition that loops `podge step`, one Fargate Spot
+// task per iteration. The execution context holds pointers only (`$.pointers`: sha,
+// iteration, status, paused, stop), re-read from git and run records each loop.
+// Input: `{runId, executionIterations: 0}`.
 export function buildStateMachine(config) {
   validate(config);
   const { budgets } = config;

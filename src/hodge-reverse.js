@@ -7,21 +7,13 @@ import { checkBudgetGate } from './budget-gate.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { lintSpecs } from './spec-lint.js';
 import { loadModePrompt } from './prompts.js';
+import { LOCK_FILE } from './run-lock.js';
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 
 /** Reverse may only write specs and the characterization tests; the source stays unchanged. */
 const ALLOWED = ['specs/', 'tests/'];
 
-/**
- * @typedef {{status: 'ok' | 'failed' | 'gated' | 'over-budget', sha: string | null, reason?: string}} ReverseResult
- */
-
-/**
- * @param {string} repoDir
- * @param {string} [focus] optional scope hint; defaults to the whole codebase
- * @returns {string}
- */
 export function buildReversePrompt(repoDir, focus) {
   const specsDir = join(repoDir, 'specs');
   const existing = existsSync(specsDir) ? readdirSync(specsDir).filter((f) => f.endsWith('.md')).sort() : [];
@@ -38,39 +30,23 @@ export function buildReversePrompt(repoDir, focus) {
   ].join('\n\n');
 }
 
-/**
- * @param {string} dir
- * @param {string[]} args
- */
 const git = (dir, ...args) =>
   execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' });
 
-/**
- * Reverse mode: one adapter call that writes specs/ and tests/ from existing code. Accepted only if
- * nothing else changed, spec-lint passes and the characterization suite is green on the unchanged source.
- * @param {{
- *   config: unknown,
- *   repoDir: string,
- *   runId: string,
- *   adapter: import('./adapter.js').Adapter,
- *   focus?: string,
- *   testCommand?: string[],
- *   identity?: import('./repo-gate.js').HarnessIdentity,
- * }} opts
- * @returns {Promise<ReverseResult>}
- */
-export async function runReverse({ config, repoDir, runId, adapter, focus, testCommand = ['npm', 'test'], identity }) {
+// Reverse mode: one adapter call that writes specs/ and tests/ from existing code. Accepted only if
+// nothing else changed, spec-lint passes and the characterization suite is green on the unchanged source.
+export async function runReverse({ config, repoDir, runId, adapter, focus = undefined, testCommand = ['npm', 'test'], identity }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
-  const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets}} */ (config);
-  const gated = (/** @type {string} */ reason) => ({ status: /** @type {const} */ ('gated'), sha: null, reason });
+  const cfg = config;
+  const gated = (reason) => ({ status: 'gated', sha: null, reason });
 
   const self = identity ?? harnessIdentity();
-  for (const target of [cfg.targetRepo, repoDir]) {
-    const g = checkRepoGate(target, self);
-    if (!g.ok) return gated(g.reason);
-  }
-  if (git(repoDir, 'status', '--porcelain').trim() !== '') return gated('working tree is not clean');
+  const g = checkRepoGate(repoDir, self);
+  if (!g.ok) return gated(g.reason);
+  // `.hodge.lock` lives in the project root now (no separate sandbox dir); exclude it from the
+  // dirty-working-tree check since it is harness-internal, never committed.
+  if (git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') return gated('working tree is not clean');
   const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
   if (!budget.ok) return { status: 'over-budget', sha: null, reason: budget.reason };
 
@@ -80,15 +56,12 @@ export async function runReverse({ config, repoDir, runId, adapter, focus, testC
   const result = await adapter.run({ prompt, cwd: repoDir, limits });
   const seconds = (Date.now() - started) / 1000;
 
-  git(repoDir, 'add', '-A');
+  git(repoDir, 'add', '-A', '--', '.', `:!${LOCK_FILE}`);
   const staged = git(repoDir, 'diff', '--cached', '--name-only').split('\n').filter(Boolean);
   const diff = git(repoDir, 'diff', '--cached');
 
-  /** @type {ReverseResult['status']} */
   let status = 'ok';
-  /** @type {string | undefined} */
   let reason;
-  /** @type {{exitStatus: number, output: string} | undefined} */
   let test;
   const outside = staged.filter((f) => !ALLOWED.some((p) => f.startsWith(p)));
   if (result.exitStatus !== 0) {
@@ -116,7 +89,7 @@ export async function runReverse({ config, repoDir, runId, adapter, focus, testC
   if (status !== 'ok') {
     // The tree was clean at start, so this discards only the agent's work (kept in diff).
     git(repoDir, 'reset', '-q', '--hard', 'HEAD');
-    git(repoDir, 'clean', '-fdq');
+    git(repoDir, 'clean', '-fdq', '-e', LOCK_FILE);
   }
 
   const dir = join(repoDir, 'runs', runId, 'reverse');
@@ -128,7 +101,7 @@ export async function runReverse({ config, repoDir, runId, adapter, focus, testC
     join(dir, 'record.json'),
     `${JSON.stringify({ status, reason, test, usage: { seconds }, changedFiles: result.changedFiles }, null, 2)}\n`,
   );
-  git(repoDir, 'add', '-A');
+  git(repoDir, 'add', '-A', '--', '.', `:!${LOCK_FILE}`);
   git(repoDir, 'commit', '-q', '-m', `hodge --reverse ${runId}: ${status}`);
 
   return { status, sha: git(repoDir, 'rev-parse', 'HEAD').trim(), ...(reason ? { reason } : {}) };

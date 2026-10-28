@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { main } from '../src/cli.js';
 import { createCopilotAdapter } from '../src/adapters/copilot.js';
-import { sandboxOf } from './support/sandbox.js';
+import { commitProjectConfig, withCwd } from './support/project.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fakeAgent = join(here, 'fixtures', 'fake-copilot.js');
@@ -24,7 +24,6 @@ const scripted = (fixture) => () =>
 
 /**
  * @param {string[]} argv
- * @param {Record<string, () => import('../src/adapter.js').Adapter>} registry
  * @param {import('node:stream').Readable} [input]
  */
 async function hodge(argv, registry, input) {
@@ -50,17 +49,12 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
   git(dir, 'add', '-A');
   git(dir, 'commit', '-qm', 'empty target');
 
-  const cfgPath = join(mkdtempSync(join(tmpdir(), 'hodge-cfg-')), 'hodge.json');
-  writeFileSync(
-    cfgPath,
-    JSON.stringify({
-      targetRepo: 'git@example.com:o/toy.git',
-      roles: { interview: { adapter: 'interviewer', model: 'm' }, build: { adapter: 'builder', model: 'm' } },
-      budgets: { maxWallClockSeconds: 60, maxIterations: 3 },
-      allowedPaths: ['src/'],
-      requireTestPlan: true,
-    }),
-  );
+  const config = {
+    roles: { interview: { adapter: 'interviewer', model: 'm' }, build: { adapter: 'builder', model: 'm' } },
+    budgets: { maxWallClockSeconds: 60, maxIterations: 3 },
+    allowedPaths: ['src/'],
+    requireTestPlan: true,
+  };
 
   const interviewFixture = {
     exitStatus: 0,
@@ -87,11 +81,12 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
   const build = scripted(buildFixture)();
   const plan = scripted({ ...buildFixture, transcript: 'planned', writes: planWrites })();
   // the first podge step is the plan step (its prompt says so); later steps build
-  const builder = { run: (/** @type {import('../src/adapter.js').AdapterRequest} */ req) => (req.prompt.startsWith('You are the plan step') ? plan : build).run(req) };
+  const builder = { run: (req) => (req.prompt.startsWith('You are the plan step') ? plan : build).run(req) };
   const registry = { interviewer: scripted(interviewFixture), builder: () => builder };
 
   // 1. interview: specs only (no tests, no test plan); structure lint passes
-  const iv = await hodge(['hodge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'p2'], registry, Readable.from(['add two numbers\n']));
+  commitProjectConfig(dir, config);
+  const iv = await withCwd(dir, () => hodge(['hodge', '--run-id', 'p2'], registry, Readable.from(['add two numbers\n'])));
   assert.equal(iv.res.status, 'ok', JSON.stringify(iv.res));
   assert.equal(iv.code, 0);
   assert.ok(existsSync(join(dir, 'specs', 'add.md')));
@@ -99,7 +94,7 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
   assert.equal(git(dir, 'status', '--porcelain'), '');
 
   // 2. podge: plan step (test plan + red tests + plan.md), then the build step turns them green
-  const run = await hodge(['podge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'p2'], registry);
+  const run = await withCwd(dir, () => hodge(['podge', '--run-id', 'p2'], registry));
   assert.equal(run.res.status, 'done', JSON.stringify(run.res));
   assert.equal(run.code, 0);
   assert.equal(run.res.steps.length, 2);

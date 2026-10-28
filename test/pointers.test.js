@@ -4,8 +4,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { writeIterationRecord } from '../src/run-record.js';
-import { rebuildPointers } from '../src/pointers.js';
+import { writeIterationRecord } from '../src/podge-run-record.js';
+import { rebuildPointers } from '../src/podge-pointers.js';
 
 /** @param {string} dir @param {string[]} args */
 const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { encoding: 'utf8' }).trim();

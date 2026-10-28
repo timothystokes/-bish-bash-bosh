@@ -26,18 +26,11 @@ export const DIMENSIONS = [
 
 const PLACEHOLDER = /\b(TBD|TODO|FIXME)\b|\?\?|<[^>\n]+>/;
 
-/**
- * @param {string} repoDir
- * @returns {boolean} true when the repo was seeded with an objective kit (`hodgepodge init --seed objective`)
- */
 export function hasObjectiveKit(repoDir) {
   return existsSync(join(repoDir, 'objective'));
 }
 
-/**
- * Text with fenced blocks and inline code removed.
- * @param {string} text
- */
+// Text with fenced blocks and inline code removed.
 function stripCode(text) {
   let fenced = false;
   const kept = [];
@@ -48,16 +41,8 @@ function stripCode(text) {
   return kept.join('\n');
 }
 
-/**
- * @param {string} s
- */
 const brief = (s) => (s.length > 60 ? `${s.slice(0, 57)}...` : s);
 
-/**
- * @param {string} path
- * @param {string[]} bullets bullets of the `## Dimensions` section (undefined section = empty)
- * @returns {string[]} gaps
- */
 function checkDimensions(path, bullets) {
   const gaps = [];
   const known = new Map(DIMENSIONS.map((d) => [d.toLowerCase(), d]));
@@ -85,14 +70,9 @@ function checkDimensions(path, bullets) {
   return gaps;
 }
 
-/**
- * Per-dimension state of a spec's `## Dimensions` bullets: `covered`, `n/a` (with a reason),
- * `gap` (recorded but not valid) or `missing` (not recorded).
- * @param {string[]} bullets
- * @returns {Record<string, 'covered' | 'n/a' | 'gap' | 'missing'>}
- */
+// Per-dimension state of a spec's `## Dimensions` bullets: `covered`, `n/a` (with a reason),
+// `gap` (recorded but not valid) or `missing` (not recorded).
 export function dimensionStates(bullets) {
-  /** @type {Record<string, 'covered' | 'n/a' | 'gap' | 'missing'>} */
   const states = Object.fromEntries(DIMENSIONS.map((d) => [d, 'missing']));
   const known = new Map(DIMENSIONS.map((d) => [d.toLowerCase(), d]));
   for (const b of bullets) {
@@ -105,12 +85,8 @@ export function dimensionStates(bullets) {
   return states;
 }
 
-/**
- * Deterministic "enough to leave the conversation" check: the requirements are captured at a fine grain.
- * Mirrors objective/READINESS.md.
- * @param {string} repoDir
- * @returns {{ready: boolean, gaps: string[]}}
- */
+// Deterministic "enough to leave the conversation" check: the requirements are captured at a fine grain.
+// Mirrors objective/READINESS.md.
 export function checkReadiness(repoDir) {
   const lint = lintSpecs(repoDir, { testPlan: false });
   const gaps = [...lint.problems];

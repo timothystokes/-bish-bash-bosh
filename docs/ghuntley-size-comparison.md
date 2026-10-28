@@ -64,7 +64,7 @@ Our orchestration is in `src/` (not instructional text, so not counted).
 
 ## 5. Context attached per iteration
 
-His scripts `@`-attach whole files on every invocation. Ours injects the prompt plus one `plan.md` item plus spec pointers (`src/next-item.js`); the agent reads `AGENTS.md` and only the specs it needs.
+His scripts `@`-attach whole files on every invocation. Ours injects the prompt plus one `plan.md` item plus spec pointers (`src/podge-next-item.js`); the agent reads `AGENTS.md` and only the specs it needs.
 
 | Iteration | Files attached | Bytes |
 |---|---|---|

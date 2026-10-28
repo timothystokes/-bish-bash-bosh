@@ -7,7 +7,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { main } from '../src/cli.js';
 import { createCopilotAdapter } from '../src/adapters/copilot.js';
-import { sandboxOf } from './support/sandbox.js';
+import { commitProjectConfig, withCwd } from './support/project.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fakeAgent = join(here, 'fixtures', 'fake-copilot.js');
@@ -40,17 +40,13 @@ function makeToyTarget() {
 
 test('toy objective: podge takes a red target to green unattended', async () => {
   const dir = makeToyTarget();
-  const cfgPath = join(mkdtempSync(join(tmpdir(), 'hodge-cfg-')), 'hodge.json');
-  writeFileSync(
-    cfgPath,
-    JSON.stringify({
-      targetRepo: 'git@example.com:o/toy.git',
-      roles: { build: { adapter: 'agent', model: 'm' } },
-      budgets: { maxWallClockSeconds: 60, maxIterations: 3 },
-      allowedPaths: ['src/'],
-      requireTestPlan: true,
-    }),
-  );
+  const config = {
+    roles: { build: { adapter: 'agent', model: 'm' } },
+    budgets: { maxWallClockSeconds: 60, maxIterations: 3 },
+    allowedPaths: ['src/'],
+    requireTestPlan: true,
+  };
+  commitProjectConfig(dir, config);
   const fixture = {
     exitStatus: 0,
     transcript: 'implemented add',
@@ -65,12 +61,13 @@ test('toy objective: podge takes a red target to green unattended', async () => 
   };
   /** @type {string[]} */
   const outs = [];
-  const code = await main(['podge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'toy'], {
-    registry,
-    identity: { root: '/nonexistent/hodgepodge', remotes: [] },
-    stdout: (s) => outs.push(s),
-    stderr: () => {},
-  });
+  const code = await withCwd(dir, () =>
+    main(['podge', '--run-id', 'toy'], {
+      registry,
+      identity: { root: '/nonexistent/hodgepodge', remotes: [] },
+      stdout: (s) => outs.push(s),
+      stderr: () => {},
+    }));
   const res = JSON.parse(outs.join(''));
   assert.equal(res.status, 'done', JSON.stringify(res));
   assert.equal(code, 0);
@@ -91,25 +88,22 @@ test('toy objective: green-from-the-start suite is gated (tests must fail first)
   writeFileSync(join(dir, 'src', 'add.js'), 'export const add = (a, b) => a + b;\n');
   git(dir, 'add', '-A');
   git(dir, 'commit', '-qm', 'already green');
-  const cfgPath = join(mkdtempSync(join(tmpdir(), 'hodge-cfg-')), 'hodge.json');
-  writeFileSync(
-    cfgPath,
-    JSON.stringify({
-      targetRepo: 'git@example.com:o/toy.git',
-      roles: { build: { adapter: 'agent', model: 'm' } },
-      budgets: { maxWallClockSeconds: 60, maxIterations: 3 },
-      allowedPaths: ['src/'],
-      requireTestPlan: true,
-    }),
-  );
+  const config = {
+    roles: { build: { adapter: 'agent', model: 'm' } },
+    budgets: { maxWallClockSeconds: 60, maxIterations: 3 },
+    allowedPaths: ['src/'],
+    requireTestPlan: true,
+  };
+  commitProjectConfig(dir, config);
   /** @type {string[]} */
   const outs = [];
-  const code = await main(['podge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'toy'], {
-    registry: { agent: () => createCopilotAdapter({ command: process.execPath, prefixArgs: [fakeAgent] }) },
-    identity: { root: '/nonexistent/hodgepodge', remotes: [] },
-    stdout: (s) => outs.push(s),
-    stderr: () => {},
-  });
+  const code = await withCwd(dir, () =>
+    main(['podge', '--run-id', 'toy'], {
+      registry: { agent: () => createCopilotAdapter({ command: process.execPath, prefixArgs: [fakeAgent] }) },
+      identity: { root: '/nonexistent/hodgepodge', remotes: [] },
+      stdout: (s) => outs.push(s),
+      stderr: () => {},
+    }));
   assert.equal(JSON.parse(outs.join('')).status, 'gated');
   assert.equal(code, 1);
 });

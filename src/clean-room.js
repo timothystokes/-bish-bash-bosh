@@ -5,18 +5,10 @@ import { join, resolve } from 'node:path';
 /** The only paths that may cross the context firewall into the builder repo. */
 const BUNDLE = ['specs', 'tests'];
 
-/**
- * @param {string} dir
- * @param {string[]} args
- */
 const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
-/**
- * Clean-room export: copy only specs/ and tests/ from the source repo into a fresh builder repo
- * (one root commit). Nothing else, so the builder never sees the source, plan or run records.
- * @param {{sourceDir: string, builderDir: string}} opts
- * @returns {{ok: boolean, sha?: string, files?: string[], reason?: string}}
- */
+// Clean-room export: copy only specs/ and tests/ from the source repo into a fresh builder repo
+// (one root commit). Nothing else, so the builder never sees the source, plan or run records.
 export function exportBundle({ sourceDir, builderDir }) {
   const src = resolve(sourceDir);
   const dest = resolve(builderDir);
@@ -38,16 +30,10 @@ export function exportBundle({ sourceDir, builderDir }) {
   return { ok: true, sha: git(dest, 'rev-parse', 'HEAD').trim(), files: git(dest, 'ls-files').split('\n').filter(Boolean) };
 }
 
-/**
- * Firewall gate for clean-room mode: the builder repo must hold a spec bundle, its root commit may
- * contain only specs/ and tests/, and it must not point at the source repo.
- * @param {string} repoDir
- * @param {{sourceRemotes?: string[]}} [opts] remote URLs of the source repo the builder must not have
- * @returns {import('./diff-gates.js').GateCheck}
- */
+// Firewall gate for clean-room mode: the builder repo must hold a spec bundle, its root commit may
+// contain only specs/ and tests/, and it must not point at the source repo.
 export function checkCleanRoomGate(repoDir, opts = {}) {
-  const fail = (/** @type {string} */ reason) => ({ ok: false, reason: `clean-room firewall: ${reason}` });
-  /** @type {string[]} */
+  const fail = (reason) => ({ ok: false, reason: `clean-room firewall: ${reason}` });
   let roots;
   try {
     roots = git(repoDir, 'rev-list', '--max-parents=0', 'HEAD').split('\n').filter(Boolean);

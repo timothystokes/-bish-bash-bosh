@@ -1,15 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
-/**
- * @typedef {{
- *   model?: string,
- *   baseUrl?: string,
- *   apiKeyEnv?: string,
- *   env?: Record<string, string | undefined>,
- * }} OpenAiHttpOptions
- */
-
 const FILE_RE = /^<<<FILE (.+)>>>\n([\s\S]*?)\n?^<<<END>>>[ \t]*$/gm;
 
 export const FILE_PROTOCOL = [
@@ -20,13 +11,8 @@ export const FILE_PROTOCOL = [
   'Paths must be relative to the repo root. Any text outside blocks is your commentary.',
 ].join('\n');
 
-/**
- * Extract file blocks from a model reply; the remainder is the transcript.
- * @param {string} content
- * @returns {{transcript: string, files: Record<string, string>}}
- */
+// Extract file blocks from a model reply; the remainder is the transcript.
 export function parseFileBlocks(content) {
-  /** @type {Record<string, string>} */
   const files = {};
   const transcript = content
     .replace(FILE_RE, (_m, path, body) => {
@@ -37,23 +23,19 @@ export function parseFileBlocks(content) {
   return { transcript, files };
 }
 
-/**
- * Adapter for any OpenAI-compatible `/chat/completions` endpoint. The model has
- * no tools, so it returns whole files in the file-block protocol and the adapter
- * writes them. Paths outside cwd are rejected. HTTP error => exit 2, no response
- * => 127, wall-clock timeout => 124 (same convention as process adapters).
- * @param {OpenAiHttpOptions} [opts]
- * @returns {import('../adapter.js').Adapter}
- */
+// Adapter for any OpenAI-compatible `/chat/completions` endpoint. The model has
+// no tools, so it returns whole files in the file-block protocol and the adapter
+// writes them. Paths outside cwd are rejected. HTTP error => exit 2, no response
+// => 127, wall-clock timeout => 124 (same convention as process adapters).
 export function createOpenAiHttpAdapter(opts = {}) {
   const baseUrl = (opts.baseUrl ?? 'https://api.openai.com/v1').replace(/\/+$/, '');
   const env = opts.env ?? process.env;
   return {
     async run({ prompt, cwd, limits }) {
-      const fail = (/** @type {number} */ exitStatus, /** @type {string} */ transcript) => ({
+      const fail = (exitStatus, transcript) => ({
         exitStatus,
         transcript,
-        changedFiles: /** @type {string[]} */ ([]),
+        changedFiles: ([]),
       });
       const headers = { 'content-type': 'application/json', ...(opts.apiKeyEnv && env[opts.apiKeyEnv] ? { authorization: `Bearer ${env[opts.apiKeyEnv]}` } : {}) };
       const body = JSON.stringify({
@@ -68,7 +50,7 @@ export function createOpenAiHttpAdapter(opts = {}) {
       try {
         res = await fetch(`${baseUrl}/chat/completions`, { method: 'POST', headers, body, signal });
       } catch (err) {
-        const e = /** @type {Error} */ (err);
+        const e = (err);
         return e.name === 'TimeoutError' || e.name === 'AbortError' ? fail(124, 'wall-clock limit exceeded') : fail(127, `request failed: ${e.message}`);
       }
       let json;

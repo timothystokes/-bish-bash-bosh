@@ -9,7 +9,6 @@ import { validateAdapterResult } from '../../src/adapter.js';
  * Contract suite every adapter must pass. No network: `makeAdapter` receives a
  * fixture describing the scripted fake agent behaviour and returns an Adapter.
  * @param {string} name
- * @param {(fixture: import('../../src/adapter.js').FakeFixture) => import('../../src/adapter.js').Adapter} makeAdapter
  */
 export function adapterContract(name, makeAdapter) {
   const limits = { maxWallClockSeconds: 60 };

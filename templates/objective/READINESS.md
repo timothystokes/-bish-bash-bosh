@@ -1,6 +1,6 @@
 # Readiness
 
-`hodgepodge ready --dir <sandbox>` prints `{ready, gaps}`; `src/readiness.js` is the authority, not the agent's claim. `podge` refuses to start until it passes.
+`hodgepodge ready` prints `{ready, gaps}`; `src/readiness.js` is the authority, not the agent's claim. `podge` refuses to start until it passes.
 
 Per spec in `specs/*.md`:
 - Structure: titled, one decision, `Implementation: none|partial|implemented` (evidence when not `none`). The test mapping is checked later by the plan step.
@@ -10,7 +10,7 @@ Per spec in `specs/*.md`:
 - At least one failure or negative-path statement; Out of scope has at least one bullet.
 - No TBD, TODO, FIXME, `??` or `<angle>` placeholders outside code spans.
 - Each `## Formats` bullet (`- <format>: <path>`) names an existing artifact that validates and is referenced by a requirement; artifacts agree across specs.
-- Known formats: `asyncapi`, `ebnf`, `gherkin`, `json-schema`, `openapi`
+- Known formats: `gherkin`, `json-schema`, `openapi`
 
 Across the objective: `objective/OPEN-QUESTIONS.md` has no unchecked `- [ ]` item.
 

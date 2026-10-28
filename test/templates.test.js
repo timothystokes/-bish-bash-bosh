@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { lintSpecs } from '../src/spec-lint.js';
-import { parseTestPlan } from '../src/test-plan-gate.js';
+import { parseTestPlan } from '../src/podge-test-plan-gate.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (/** @type {string} */ p) => readFileSync(join(root, 'templates', p), 'utf8');

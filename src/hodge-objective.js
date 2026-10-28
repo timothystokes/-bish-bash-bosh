@@ -2,58 +2,34 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { hasObjectiveKit } from './readiness.js';
-import { runInterview } from './interview.js';
-import { BATCH_HINT, formatBatchLog, nextBatch, readQuestions, recordAnswers, renderBatch, resolveAnswer, unanswered, writeQuestions } from './questions.js';
-
-/**
- * @typedef {{
- *   status: 'ok' | 'paused' | 'stalled' | 'max-rounds' | 'failed' | 'gated' | 'over-budget',
- *   rounds: number,
- *   reason?: string,
- * }} ObjectiveResult
- */
+import { runInterview } from './hodge-interview.js';
+import { BATCH_HINT, formatBatchLog, nextBatch, readQuestions, recordAnswers, renderBatch, resolveAnswer, unanswered, writeQuestions } from './hodge-questions.js';
+import { LOCK_FILE } from './run-lock.js';
 
 const PLACEHOLDER = /^Not yet written/m;
 const ENDED = 'Ended the interview: the owner said done.';
-const isDone = (/** @type {string} */ a) => /^(done|finished)$/i.test(a);
+const isDone = (a) => /^(done|finished)$/i.test(a);
 
-/**
- * @param {string} dir
- * @param {string[]} args
- */
 const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' });
 
-/**
- * Requirements gathering: ask for a description of the objective, then alternate agent rounds
- * (which update specs and write one next question) with the owner's answers, broad first and fine-grained
- * later, until `hodgepodge ready` passes. Everything lives in the target repo, so a paused conversation resumes.
- * @param {{
- *   config: unknown,
- *   repoDir: string,
- *   runId: string,
- *   adapter: import('./adapter.js').Adapter,
- *   ask: (prompt: string) => Promise<string | null>,
- *   say: (text: string) => void,
- *   maxRounds?: number,
- *   inboxDir?: string,
- *   identity?: import('./repo-gate.js').HarnessIdentity,
- * }} opts
- * @returns {Promise<ObjectiveResult>}
- */
-export async function runObjective({ config, repoDir, runId, adapter, ask, say, maxRounds = 30, inboxDir, identity }) {
-  /** @param {string} reason @returns {ObjectiveResult} */
+// Requirements gathering: ask for a description of the objective, then alternate agent rounds
+// (which update specs and write one next question) with the owner's answers, broad first and fine-grained
+// later, until `hodgepodge ready` passes. Everything lives in the target repo, so a paused conversation resumes.
+export async function runObjective({ config, repoDir, runId, adapter, ask, say, maxRounds = 30, inboxDir = undefined, identity = undefined }) {
   const gated = (reason) => ({ status: 'gated', rounds: 0, reason });
-  if (!hasObjectiveKit(repoDir)) return gated('no objective kit in the target (create the sandbox with `hodgepodge init --seed objective`)');
-  if (git(repoDir, 'status', '--porcelain').trim() !== '') return gated('working tree is not clean');
+  if (!hasObjectiveKit(repoDir)) return gated('no objective kit in the project (run `hodge` once; it adds objective/ automatically)');
+  // `.hodge.lock` lives in the project root now (no separate sandbox dir); exclude it from the
+  // dirty-working-tree check since it is harness-internal, never committed.
+  if (git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') return gated('working tree is not clean');
 
   const briefPath = join(repoDir, 'objective', 'BRIEF.md');
   let brief = existsSync(briefPath) ? readFileSync(briefPath, 'utf8') : '';
   if (brief.trim() === '' || PLACEHOLDER.test(brief)) {
-    const description = ((await ask('Describe the objective in a sentence or two: what should exist when this is done, and why?\n> ')) ?? '').trim();
+    const description = (await ask('Describe the objective in a sentence or two: what should exist when this is done, and why?\n> ') ?? '').trim();
     if (description === '') return gated('no objective description given');
     brief = `# Objective brief\n\n${description}\n`;
     writeFileSync(briefPath, brief);
-    git(repoDir, 'add', '-A');
+    git(repoDir, 'add', '-A', '--', '.', `:!${LOCK_FILE}`);
     git(repoDir, 'commit', '-q', '-m', 'hodge: brief');
   }
 
@@ -66,21 +42,19 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
   // Once the owner ends the interview (or no question is left), rounds check readiness and close the gaps.
   let closing = existsSync(conversationPath) && readFileSync(conversationPath, 'utf8').includes(ENDED);
 
-  /** @returns {Promise<boolean>} false when the owner stopped answering */
   const askBatch = async () => {
     const qs = readQuestions(repoDir);
     const batch = nextBatch(qs);
     if (batch.length === 0) return true;
     say(`\n${renderBatch(batch)}\n(${BATCH_HINT})\n`);
-    /** @type {import('./questions.js').BatchAnswer[]} */
     let answers;
     for (;;) {
-      const reply = ((await ask('> ')) ?? '').trim();
+      const reply = (await ask('> ') ?? '').trim();
       if (reply === '') return false;
       if (isDone(reply)) {
         closing = true;
         const rest = unanswered(qs).map((q) => ({ n: q.id, topic: q.topic, text: q.text, default: q.default }));
-        answers = rest.map((q) => ({ n: q.n, answer: q.default, source: /** @type {const} */ ('default') }));
+        answers = rest.map((q) => ({ n: q.n, answer: q.default, source: ('default') }));
         appendFileSync(conversationPath, `\n## Round ${round - 1}\n\n${ENDED}\n${formatBatchLog(rest, answers)}\n`);
         break;
       }
@@ -94,7 +68,7 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
       break;
     }
     writeQuestions(repoDir, recordAnswers(qs, answers));
-    git(repoDir, 'add', '-A');
+    git(repoDir, 'add', '-A', '--', '.', `:!${LOCK_FILE}`);
     git(repoDir, 'commit', '-q', '-m', `hodge ${runId}: answers to round ${round - 1}`);
     return true;
   };

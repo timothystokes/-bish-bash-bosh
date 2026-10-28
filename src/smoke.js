@@ -11,19 +11,13 @@ export const SMOKE_PROMPT = [
   'Create no other files. Do not use git.',
 ].join('\n');
 
-/** @returns {string} the exact stdout a correct fizzbuzz.js prints */
 export function expectedSmokeOutput() {
   let s = '';
   for (let i = 1; i <= 15; i++) s += `${i % 15 === 0 ? 'FizzBuzz' : i % 3 === 0 ? 'Fizz' : i % 5 === 0 ? 'Buzz' : i}\n`;
   return s;
 }
 
-/**
- * Tiny adapter smoke check for live use: the agent writes and runs fizzbuzz; the harness re-runs the file and compares.
- * @param {import('./adapter.js').Adapter} adapter
- * @param {{cwd: string, limits: import('./adapter.js').Limits}} opts cwd should be an empty scratch directory
- * @returns {Promise<{ok: boolean, errors: string[], changedFiles: string[], result: import('./adapter.js').AdapterResult}>}
- */
+// Tiny adapter smoke check for live use: the agent writes and runs fizzbuzz; the harness re-runs the file and compares.
 export async function runSmoke(adapter, { cwd, limits }) {
   const target = join(cwd, SMOKE_FILE);
   rmSync(target, { force: true });

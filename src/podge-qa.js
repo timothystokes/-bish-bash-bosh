@@ -1,34 +1,24 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { validateDiagnosis } from './diagnosis.js';
+import { validateDiagnosis } from './podge-diagnosis.js';
 import { checkBudgetGate } from './budget-gate.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { loadQaPrompt } from './prompts.js';
-import { buildContext } from './step.js';
-
-/**
- * @typedef {import('./diagnosis.js').Diagnosis} Diagnosis
- * @typedef {{classification: string, severity: string, spec: string, consequence: string, diagnosis: Diagnosis}} Finding
- * @typedef {{status: 'clean' | 'findings' | 'failed' | 'over-budget' | 'gated', cycle: number, findings?: Finding[], reason?: string}} QaResult
- */
+import { buildContext } from './podge-step.js';
+import { LOCK_FILE } from './run-lock.js';
 
 export const CLASSIFICATIONS = ['violated-decision', 'unimplemented-requirement', 'decision-needing-replacement'];
 export const SEVERITIES = ['critical', 'high', 'medium', 'low'];
 export const DEFAULT_MAX_QA_CYCLES = 5;
 const HEADING = '## QA findings';
 
-/**
- * @param {unknown} f
- * @returns {{ok: boolean, errors: string[]}}
- */
 export function validateFinding(f) {
   if (typeof f !== 'object' || f === null) return { ok: false, errors: ['finding must be an object'] };
-  const o = /** @type {Record<string, unknown>} */ (f);
-  /** @type {string[]} */
+  const o = f;
   const errors = [];
-  if (!CLASSIFICATIONS.includes(/** @type {string} */ (o['classification']))) errors.push(`finding.classification must be one of ${CLASSIFICATIONS.join(', ')}`);
-  if (!SEVERITIES.includes(/** @type {string} */ (o['severity']))) errors.push(`finding.severity must be one of ${SEVERITIES.join(', ')}`);
+  if (!CLASSIFICATIONS.includes((o['classification']))) errors.push(`finding.classification must be one of ${CLASSIFICATIONS.join(', ')}`);
+  if (!SEVERITIES.includes((o['severity']))) errors.push(`finding.severity must be one of ${SEVERITIES.join(', ')}`);
   for (const k of ['spec', 'consequence']) {
     if (typeof o[k] !== 'string' || o[k].trim() === '') errors.push(`finding.${k} must be a non-empty string`);
   }
@@ -36,17 +26,12 @@ export function validateFinding(f) {
   return { ok: errors.length === 0, errors };
 }
 
-/**
- * The evaluator reports in its last fenced ```findings block (a JSON array; `[]` means clean).
- * A missing, malformed or invalid report is an error: silence is never a pass.
- * @param {string} transcript
- * @returns {{ok: true, findings: Finding[]} | {ok: false, error: string}}
- */
+// The evaluator reports in its last fenced ```findings block (a JSON array; `[]` means clean).
+// A missing, malformed or invalid report is an error: silence is never a pass.
 export function parseFindings(transcript) {
   const blocks = [...transcript.matchAll(/```findings\s*\n([\s\S]*?)\n```/g)];
   const last = blocks.at(-1);
   if (!last) return { ok: false, error: 'qa reply has no fenced `findings` block' };
-  /** @type {unknown} */
   let parsed;
   try {
     parsed = JSON.parse(last[1]);
@@ -56,19 +41,12 @@ export function parseFindings(transcript) {
   if (!Array.isArray(parsed)) return { ok: false, error: 'qa `findings` block must be a JSON array' };
   const errors = parsed.flatMap((f, i) => validateFinding(f).errors.map((e) => `#${i + 1}: ${e}`));
   if (errors.length > 0) return { ok: false, error: `invalid qa findings: ${errors.join('; ')}` };
-  return { ok: true, findings: /** @type {Finding[]} */ (parsed) };
+  return { ok: true, findings: (parsed) };
 }
 
-/** @param {string} s */
 const oneLine = (s) => s.replace(/\s+/g, ' ').trim();
 
-/**
- * Hand findings back to `podge` as unchecked plan items under `## QA findings`.
- * @param {string} plan
- * @param {number} cycle
- * @param {Finding[]} findings
- * @returns {string}
- */
+// Hand findings back to `podge` as unchecked plan items under `## QA findings`.
 export function findingsToPlanItems(plan, cycle, findings) {
   const items = findings.map((f, i) =>
     `- [ ] QA-${cycle}-${i + 1} [${f.severity}] ${f.classification} (${oneLine(f.spec)}): ${oneLine(f.diagnosis.fix)} | evidence: ${oneLine(f.diagnosis.evidence)} | consequence: ${oneLine(f.consequence)}`);
@@ -77,12 +55,7 @@ export function findingsToPlanItems(plan, cycle, findings) {
   return `${base}${heading}${items.join('\n')}\n`;
 }
 
-/**
- * Number of QA cycles already recorded for a run (`runs/<runId>/qa-N/`).
- * @param {string} repoDir
- * @param {string} runId
- * @returns {number}
- */
+// Number of QA cycles already recorded for a run (`runs/<runId>/qa-N/`).
 export function qaCycles(repoDir, runId) {
   const dir = join(repoDir, 'runs', runId);
   if (!existsSync(dir)) return 0;
@@ -90,27 +63,19 @@ export function qaCycles(repoDir, runId) {
   return nums.length === 0 ? 0 : Math.max(...nums);
 }
 
-/**
- * @param {string} dir
- * @param {string[]} args
- */
 const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' });
 
-/**
- * One QA cycle: an independent evaluator (the `qa` role's adapter) checks the build against the specs. Read-only:
- * any change it makes is discarded and fails the cycle. Findings become unchecked plan items, committed.
- * @param {{config: unknown, repoDir: string, runId: string, adapter: import('./adapter.js').Adapter, identity?: import('./repo-gate.js').HarnessIdentity}} o
- * @returns {Promise<QaResult>}
- */
+// One QA cycle: an independent evaluator (the `qa` role's adapter) checks the build against the specs. Read-only:
+// any change it makes is discarded and fails the cycle. Findings become unchecked plan items, committed.
 export async function runQaCycle({ config, repoDir, runId, adapter, identity }) {
-  const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets}} */ (config);
+  const cfg = config;
   const cycle = qaCycles(repoDir, runId) + 1;
   const self = identity ?? harnessIdentity();
-  for (const target of [cfg.targetRepo, repoDir]) {
-    const g = checkRepoGate(target, self);
-    if (!g.ok) return { status: 'gated', cycle, reason: g.reason };
-  }
-  if (git(repoDir, 'status', '--porcelain').trim() !== '') return { status: 'gated', cycle, reason: 'working tree is not clean' };
+  const g = checkRepoGate(repoDir, self);
+  if (!g.ok) return { status: 'gated', cycle, reason: g.reason };
+  // `.hodge.lock` lives in the project root now (no separate sandbox dir); exclude it from the
+  // dirty-working-tree check since it is harness-internal, never committed.
+  if (git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') return { status: 'gated', cycle, reason: 'working tree is not clean' };
   const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
   if (!budget.ok) return { status: 'over-budget', cycle, reason: budget.reason };
 
@@ -123,12 +88,11 @@ export async function runQaCycle({ config, repoDir, runId, adapter, identity }) 
   });
   const seconds = (Date.now() - started) / 1000;
 
-  /** @type {QaResult} */
   let res;
-  const touched = git(repoDir, 'status', '--porcelain').trim() !== '';
+  const touched = git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '';
   if (touched) {
     git(repoDir, 'reset', '-q', '--hard', 'HEAD');
-    git(repoDir, 'clean', '-fdq');
+    git(repoDir, 'clean', '-fdq', '-e', LOCK_FILE);
   }
   const parsed = parseFindings(result.transcript);
   if (result.exitStatus !== 0) {
@@ -154,7 +118,7 @@ export async function runQaCycle({ config, repoDir, runId, adapter, identity }) 
     const planPath = join(repoDir, 'plan.md');
     writeFileSync(planPath, findingsToPlanItems(existsSync(planPath) ? readFileSync(planPath, 'utf8') : '', cycle, res.findings));
   }
-  git(repoDir, 'add', '-A');
+  git(repoDir, 'add', '-A', '--', '.', `:!${LOCK_FILE}`);
   git(repoDir, 'commit', '-q', '--allow-empty', '-m', `qa ${runId}/${cycle}: ${res.status}`);
   return res;
 }

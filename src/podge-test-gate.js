@@ -1,23 +1,13 @@
 import { spawnSync } from 'node:child_process';
 
-/** @typedef {{ok: boolean, exitStatus: number, output: string, detail?: string}} TestGateResult */
-
 // Steps that only touch these paths change no behaviour, so there is nothing to regress.
 const PLANNING_PATHS = ['plan.md', 'tests/PLAN.md', 'specs/'];
 
-/**
- * @param {string[]} changed repo-relative paths staged by the step
- * @returns {boolean}
- */
 export function isPlanningOnly(changed) {
   return changed.length > 0 && changed.every((f) => PLANNING_PATHS.some((p) => (p.endsWith('/') ? f.startsWith(p) : f === p)));
 }
 
-/**
- * Names of failing tests in spec-reporter (`✖ name (1ms)`) or TAP (`not ok 1 - name`) output.
- * @param {string} output
- * @returns {Set<string>}
- */
+// Names of failing tests in spec-reporter (`✖ name (1ms)`) or TAP (`not ok 1 - name`) output.
 export function failingTests(output) {
   const names = new Set();
   for (const line of output.split('\n')) {
@@ -27,10 +17,6 @@ export function failingTests(output) {
   return names;
 }
 
-/**
- * @param {string[]} command
- * @param {string} cwd
- */
 export function runTests(command, cwd) {
   const [cmd, ...args] = command;
   const t = spawnSync(cmd, args, { cwd, encoding: 'utf8' });
@@ -38,12 +24,7 @@ export function runTests(command, cwd) {
   return { exitStatus: t.status ?? 1, output };
 }
 
-/**
- * Regression gate: green, or red only with failures that were already failing before the step.
- * @param {{exitStatus: number, output: string}} after
- * @param {{exitStatus: number, output: string}} before suite run at HEAD before the agent ran
- * @returns {TestGateResult}
- */
+// Regression gate: green, or red only with failures that were already failing before the step.
 export function checkTestsNoRegression(after, before) {
   if (after.exitStatus === 0) return { ok: true, exitStatus: 0, output: after.output };
   const failing = failingTests(after.output);

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { exportBundle, checkCleanRoomGate } from '../src/clean-room.js';
 import { loadModePrompt } from '../src/prompts.js';
-import { runStep } from '../src/step.js';
+import { runStep } from '../src/podge-step.js';
 import { createFakeAdapter } from '../src/adapter.js';
 import { main } from '../src/cli.js';
 
@@ -107,7 +107,6 @@ test('clean-room prompt tells the builder it only has specs and tests', () => {
 
 const config = () => ({
   mode: 'clean-room',
-  targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'f', model: 'm' } },
   budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],

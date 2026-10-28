@@ -2,15 +2,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
-/** @typedef {import('./diff-gates.js').GateCheck} GateCheck */
-
-/**
- * Parse `tests/PLAN.md` text into spec path or requirement ID (`R-<spec>-<n>`) -> mapped test paths.
- * @param {string} text
- * @returns {Map<string, string[]>}
- */
+// Parse `tests/PLAN.md` text into spec path or requirement ID (`R-<spec>-<n>`) -> mapped test paths.
 export function parseTestPlan(text) {
-  /** @type {Map<string, string[]>} */
   const mapped = new Map();
   for (const line of text.split('\n')) {
     const specs = line.match(/specs\/[\w./-]+\.md|\bR-[\w-]+-\d+\b/g) ?? [];
@@ -20,14 +13,9 @@ export function parseTestPlan(text) {
   return mapped;
 }
 
-/**
- * Test-plan gate: the target needs `tests/PLAN.md` mapping every spec to existing tests,
- * and (before the first build iteration) the suite must be red.
- * A mapping is any line of PLAN.md naming a `specs/*.md` path and a `tests/*` path.
- * @param {string} repoDir
- * @param {{testCommand: string[], requireRed: boolean}} opts
- * @returns {GateCheck}
- */
+// Test-plan gate: the target needs `tests/PLAN.md` mapping every spec to existing tests,
+// and (before the first build iteration) the suite must be red.
+// A mapping is any line of PLAN.md naming a `specs/*.md` path and a `tests/*` path.
 export function checkTestPlanGate(repoDir, { testCommand, requireRed }) {
   const planPath = join(repoDir, 'tests', 'PLAN.md');
   if (!existsSync(planPath)) return { ok: false, reason: 'tests/PLAN.md is missing' };

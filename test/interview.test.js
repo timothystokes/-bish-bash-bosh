@@ -5,11 +5,11 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runInterview, buildInterviewPrompt } from '../src/interview.js';
+import { runInterview, buildInterviewPrompt } from '../src/hodge-interview.js';
 import { loadModePrompt } from '../src/prompts.js';
 import { main } from '../src/cli.js';
 import { lintSpecs } from '../src/spec-lint.js';
-import { sandboxOf } from './support/sandbox.js';
+import { writeProjectConfig, commitProjectConfig, withCwd } from './support/project.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
@@ -26,7 +26,6 @@ function makeRepo() {
 }
 
 const config = (/** @type {Record<string, {adapter: string, model: string}>} */ roles = { interview: { adapter: 'f', model: 'm' } }) => ({
-  targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'f', model: 'm' }, ...roles },
   budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],
@@ -45,7 +44,6 @@ const agent = (writes, exitStatus = 0) => {
   return {
     prompts,
     adapter: {
-      /** @param {import('../src/adapter.js').AdapterRequest} req */
       async run(req) {
         prompts.push(req.prompt);
         const { createFakeAdapter } = await import('../src/adapter.js');
@@ -152,8 +150,7 @@ const gaps = (/** @type {number[]} */ resolved, /** @type {string} */ question) 
 
 test('hodge on a repo without a kit scaffolds objective/ and keeps asking until ready', async () => {
   const dir = makeRepo();
-  const cfgPath = join(tmpdir(), `hodge-int-cfg-${Date.now()}.json`);
-  writeFileSync(cfgPath, JSON.stringify(config({ interview: { adapter: 'iv', model: 'm' } })));
+  commitProjectConfig(dir, config({ interview: { adapter: 'iv', model: 'm' } }));
   const out = /** @type {string[]} */ ([]);
   /** @type {Record<string, string>[]} */
   const rounds = [
@@ -164,42 +161,43 @@ test('hodge on a repo without a kit scaffolds objective/ and keeps asking until 
   const prompts = /** @type {string[]} */ ([]);
   let n = 0;
   const adapter = {
-    /** @param {import('../src/adapter.js').AdapterRequest} req */
     async run(req) {
       prompts.push(req.prompt);
       const { createFakeAdapter } = await import('../src/adapter.js');
       return createFakeAdapter({ exitStatus: 0, transcript: 't', writes: rounds[n++] ?? {} }).run(req);
     },
   };
-  const code = await main(['hodge', '--dir', sandboxOf(cfgPath, dir)], {
-    registry: { iv: () => adapter, f: () => { throw new Error('build role must not be used'); } },
-    identity,
-    input: Readable.from(['Build a greeter\n', 'y\n', 'y\n', '']),
-    stdout: (s) => { out.push(s); }, stderr: () => {},
-  });
+  const code = await withCwd(dir, () =>
+    main(['hodge'], {
+      registry: { iv: () => adapter, f: () => { throw new Error('build role must not be used'); } },
+      identity,
+      input: Readable.from(['Build a greeter\n', 'y\n', 'y\n', '']),
+      stdout: (s) => { out.push(s); }, stderr: () => {},
+    }));
   assert.ok(existsSync(join(dir, 'objective', 'INTERVIEW.md')), 'kit scaffolded');
   assert.equal(code, 1, 'paused at EOF, not ok');
   assert.ok(n >= 3, `agent ran once per answer, ran ${n} times`);
   assert.match(out.join(''), /Who uses the greeter\?[\s\S]*Should names be trimmed\?[\s\S]*Anything out of scope\?/);
   assert.match(prompts[1], /Q1 \[Greeter\] Who uses the greeter\?: Yes/);
-  assert.equal(git(dir, 'status', '--porcelain'), '');
+  assert.equal(git(dir, 'status', '--porcelain', '--', '.', ':!.hodge.lock'), '');
   assert.equal(readFileSync(join(dir, 'README.md'), 'utf8'), '# target\n');
 });
 
 test('hodge usage errors exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
   const e = (/** @type {string} */ s) => { err.push(s); };
-  assert.equal(await main(['hodge', '--dir', '/nonexistent/sandbox'], { stdout: () => {}, stderr: e }), 2);
-  assert.match(err.join(''), /hodge\.json/);
+  const missing = mkdtempSync(join(tmpdir(), 'hodge-int-missing-'));
+  assert.equal(await withCwd(missing, () => main(['hodge'], { stdout: () => {}, stderr: e })), 2);
+  assert.match(err.join(''), /hodgepodge\.yml/);
 
-  const cfgPath = join(tmpdir(), `hodge-int-norole-${Date.now()}.json`);
-  writeFileSync(cfgPath, JSON.stringify(config({})));
+  const norole = mkdtempSync(join(tmpdir(), 'hodge-int-norole-'));
+  writeProjectConfig(norole, config({}));
   err.length = 0;
-  assert.equal(await main(['hodge', '--dir', sandboxOf(cfgPath)], { registry: { f: () => agent({}).adapter }, stdout: () => {}, stderr: e }), 2);
+  assert.equal(await withCwd(norole, () => main(['hodge'], { registry: { f: () => agent({}).adapter }, stdout: () => {}, stderr: e })), 2);
   assert.match(err.join(''), /no role 'interview'/);
 
   err.length = 0;
-  assert.equal(await main(['podge', 'step', '--dir', sandboxOf(cfgPath), '--objective', 'x'], { stdout: () => {}, stderr: e }), 2);
+  assert.equal(await withCwd(norole, () => main(['podge', 'step', '--objective', 'x'], { stdout: () => {}, stderr: e })), 2);
 });
 
 test('readlineOptions: a TTY input gets terminal mode so Enter submits; piped input stays plain', async () => {

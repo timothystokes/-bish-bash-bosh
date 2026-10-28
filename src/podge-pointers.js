@@ -2,17 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readControl } from './control.js';
-import { isPlanDone } from './driver.js';
+import { isPlanDone } from './podge-driver.js';
 import { createLocalStatusSource } from './status.js';
 
-/**
- * @typedef {{sha: string | null, iteration: number, status: string, paused: boolean, stop: boolean}} Pointers
- */
-
-/**
- * @param {string} repoDir
- * @returns {string | null} HEAD sha, or null when there are no commits
- */
 function headSha(repoDir) {
   try {
     return execFileSync('git', ['-C', repoDir, 'rev-parse', '--verify', '-q', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -21,15 +13,9 @@ function headSha(repoDir) {
   }
 }
 
-/**
- * Rebuilds the execution-context pointers from git and run records only (the payload of the
- * state machine's `ReadPointers` lambda). Status is `done` when the plan is fully ticked,
- * else the last iteration's status, else `new`. A malformed control file fails closed as stop.
- * @param {string} repoDir
- * @param {string} runId
- * @param {string} controlFile
- * @returns {Pointers}
- */
+// Rebuilds the execution-context pointers from git and run records only (the payload of the
+// state machine's `ReadPointers` lambda). Status is `done` when the plan is fully ticked,
+// else the last iteration's status, else `new`. A malformed control file fails closed as stop.
 export function rebuildPointers(repoDir, runId, controlFile) {
   const source = createLocalStatusSource(repoDir);
   const totals = source.totals(runId);

@@ -1,41 +1,28 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { runStep } from './step.js';
-import { verifyDone, applyGaps, syncImplementation, requirementsOf, writeDoneReport } from './done.js';
+import { runStep } from './podge-step.js';
+import { verifyDone, applyGaps, syncImplementation, requirementsOf, writeDoneReport } from './podge-done.js';
 import { lintSpecs } from './spec-lint.js';
 import { checkReadiness, hasObjectiveKit } from './readiness.js';
-import { runQaCycle, qaCycles, DEFAULT_MAX_QA_CYCLES } from './qa.js';
+import { runQaCycle, qaCycles, DEFAULT_MAX_QA_CYCLES } from './podge-qa.js';
 import { readControl, consumeSteer } from './control.js';
+import { LOCK_FILE } from './run-lock.js';
 
-/**
- * @typedef {import('./step.js').StepResult} StepResult
- * @typedef {import('./qa.js').QaResult} QaResult
- * @typedef {{status: 'done' | 'over-budget' | 'failed' | 'gated' | 'stopped', steps: StepResult[], reason?: string, qa?: QaResult[]}} LoopResult
- */
-
-/**
- * A plan is done when it has at least one checkbox item and none are unchecked.
- * @param {string} plan
- * @returns {boolean}
- */
+// A plan is done when it has at least one checkbox item and none are unchecked.
 export function isPlanDone(plan) {
   const items = plan.match(/^\s*[-*] \[[ xX]\]/gm) ?? [];
   return items.length > 0 && !/^\s*[-*] \[ \]/m.test(plan);
 }
 
-/**
- * Local driver: loops `runStep` until the plan is done or a step is not ok.
- * Failures stop the loop (tune prompts/specs/gates; no blind retries).
- * With `controlFile`, `control.json` is read before every iteration: stop ends the loop,
- * paused waits (polling), a steer note goes into the next prompt only.
- * With `qaAdapter` (the `qa` role), a verified plan is done only after an independent QA cycle reports no findings; findings
- * become plan items for the build agent and QA re-checks, up to config `maxQaCycles` (default 5).
- * @param {Parameters<typeof runStep>[0] & {controlFile?: string, qaAdapter?: import('./adapter.js').Adapter, sleep?: (ms: number) => Promise<void>, pollMs?: number}} opts
- * @returns {Promise<LoopResult>}
- */
+// Local driver: loops `runStep` until the plan is done or a step is not ok.
+// Failures stop the loop (tune prompts/specs/gates; no blind retries).
+// With `controlFile`, `control.json` is read before every iteration: stop ends the loop,
+// paused waits (polling), a steer note goes into the next prompt only.
+// With `qaAdapter` (the `qa` role), a verified plan is done only after an independent QA cycle reports no findings; findings
+// become plan items for the build agent and QA re-checks, up to config `maxQaCycles` (default 5).
 export async function runLoop(opts) {
-  const { controlFile, qaAdapter, pollMs = 1000, sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)), ...stepOpts } = opts;
+  const { controlFile, qaAdapter, pollMs = 1000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), ...stepOpts } = opts;
   if (hasObjectiveKit(stepOpts.repoDir)) {
     const ready = checkReadiness(stepOpts.repoDir);
     if (!ready.ready) return { status: 'gated', steps: [], reason: `objective not ready (run \`hodgepodge ready\`): ${ready.gaps.join('; ')}` };
@@ -45,16 +32,13 @@ export async function runLoop(opts) {
     const lint = lintSpecs(stepOpts.repoDir, { testPlan: existsSync(join(stepOpts.repoDir, 'tests', 'PLAN.md')) });
     if (!lint.ok) return { status: 'gated', steps: [], reason: `spec-lint failed: ${lint.problems.join('; ')}` };
   }
-  /** @type {StepResult[]} */
   const steps = [];
-  /** @type {QaResult[]} */
   const qa = [];
-  const withQa = (/** @type {LoopResult} */ r) => (qa.length > 0 ? { ...r, qa } : r);
+  const withQa = (r) => (qa.length > 0 ? { ...r, qa } : r);
   const startPlan = join(stepOpts.repoDir, 'plan.md');
   const startConflict = existsSync(startPlan) ? findConflict(readFileSync(startPlan, 'utf8')) : undefined;
   if (startConflict) return { status: 'gated', steps, reason: `unresolved ${startConflict}: fix the spec or tests (\`hodge\`), then resolve it in plan.md` };
   for (;;) {
-    /** @type {string | undefined} */
     let steer;
     if (controlFile) {
       let ctl = readControl(controlFile);
@@ -78,7 +62,7 @@ export async function runLoop(opts) {
       const unproven = verifyPlanDone(stepOpts, plan);
       if (!unproven) {
         if (!qaAdapter) return { status: 'done', steps };
-        const max = /** @type {{maxQaCycles?: number}} */ (stepOpts.config).maxQaCycles ?? DEFAULT_MAX_QA_CYCLES;
+        const max = stepOpts.config.maxQaCycles ?? DEFAULT_MAX_QA_CYCLES;
         if (qaCycles(stepOpts.repoDir, stepOpts.runId) >= max) {
           return withQa({ status: 'failed', steps, reason: `qa cycle limit (${max}) reached: the last findings were not re-verified` });
         }
@@ -91,30 +75,23 @@ export async function runLoop(opts) {
   }
 }
 
-/**
- * When specs declare requirement IDs, a ticked plan is only done if `verifyDone` agrees; otherwise
- * the plan gets unchecked verification items (committed) and the loop continues.
- * @param {{repoDir: string, runId: string, testCommand?: string[], typeCommand?: string[]}} o
- * @param {string} plan
- * @returns {boolean} true when verification disproved the plan
- */
+// When specs declare requirement IDs, a ticked plan is only done if `verifyDone` agrees; otherwise
+// the plan gets unchecked verification items (committed) and the loop continues.
 function verifyPlanDone({ repoDir, runId, testCommand = ['npm', 'test'], typeCommand }, plan) {
   if (requirementsOf(repoDir).length === 0) return false;
   const v = verifyDone(repoDir, { testCommand, typeCommand });
   syncImplementation(repoDir, v.report.requirements);
   writeDoneReport(repoDir, runId, v.report);
   if (!v.ok) writeFileSync(join(repoDir, 'plan.md'), applyGaps(plan, v.gaps));
-  const git = (/** @type {string[]} */ ...a) => execFileSync('git', ['-C', repoDir, ...a], { encoding: 'utf8' });
-  git('add', '-A');
-  if (git('status', '--porcelain').trim() !== '') git('commit', '-q', '-m', `podge verify ${runId}: ${v.ok ? 'done' : 'gaps'}`);
+  const git = (...a) => execFileSync('git', ['-C', repoDir, ...a], { encoding: 'utf8' });
+  // `.hodge.lock` lives in the project root now (no separate sandbox dir); exclude it from
+  // staging/commit since it is harness-internal, never committed.
+  git('add', '-A', '--', '.', `:!${LOCK_FILE}`);
+  if (git('status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') git('commit', '-q', '-m', `podge verify ${runId}: ${v.ok ? 'done' : 'gaps'}`);
   return !v.ok;
 }
 
-/**
- * First unchecked plan item the agent marked as a spec/test conflict.
- * @param {string} plan
- * @returns {string | undefined}
- */
+// First unchecked plan item the agent marked as a spec/test conflict.
 export function findConflict(plan) {
   return plan.match(/^\s*[-*] \[ \] (CONFLICT:.*)$/m)?.[1]?.slice(0, 200);
 }

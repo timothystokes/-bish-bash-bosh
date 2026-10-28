@@ -4,8 +4,8 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Ajv from 'ajv';
-import { writeIterationRecord } from '../src/run-record.js';
-import { writeDoneReport } from '../src/done.js';
+import { writeIterationRecord } from '../src/podge-run-record.js';
+import { writeDoneReport } from '../src/podge-done.js';
 
 const SCHEMAS = ['config', 'record', 'usage', 'diagnosis', 'done'];
 
@@ -30,7 +30,6 @@ test('every artifact schema compiles in strict mode and has an $id', () => {
 
 test('config schema accepts the qa role and maxQaCycles', () => {
   const cfg = {
-    targetRepo: '/r',
     roles: { build: { adapter: 'a', model: 'm' }, qa: { adapter: 'b', model: 'n' } },
     budgets: { maxWallClockSeconds: 1, maxIterations: 1 },
     allowedPaths: ['src/**'],
@@ -88,7 +87,6 @@ test('diagnosis schema requires all five non-blank fields', () => {
 test('done.json written by writeDoneReport conforms; bad shapes do not', () => {
   const repo = mkdtempSync(join(tmpdir(), 'hodge-schema-'));
   try {
-    /** @type {import('../src/done.js').DoneReport} */
     const report = {
       ok: false,
       suite: { ok: true },

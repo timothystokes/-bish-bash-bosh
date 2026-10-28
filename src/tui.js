@@ -1,23 +1,11 @@
 import { readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
 
-/**
- * @typedef {import('./status.js').RunStatus} RunStatus
- * @typedef {import('./status.js').StatusSource} StatusSource
- * @typedef {import('./control.js').ControlState} ControlState
- * @typedef {import('./budget-gate.js').Budgets} Budgets
- */
-
 const KEYS = '[p]ause  [r]esume  [s]teer  [x] stop  [q]uit';
 
-/** @param {string} label @param {string} text */
 const row = (label, text) => `${label.padEnd(12)}${text}`;
 
-/**
- * Declared formats, readiness by dimension, QA findings and done evidence.
- * @param {import('./run-details.js').RunDetails} d
- * @returns {string[]}
- */
+// Declared formats, readiness by dimension, QA findings and done evidence.
 export function renderDetails(d) {
   const lines = [
     d.formats.length === 0
@@ -44,12 +32,8 @@ export function renderDetails(d) {
   return lines.join('\n').split('\n');
 }
 
-/**
- * Pure renderer for one TUI frame.
- * @param {{status: RunStatus, control: ControlState, tail: string[], prompt: string | null, message?: string}} f
- * @returns {string}
- */
-export function renderFrame({ status, control, tail, prompt, message }) {
+// Pure renderer for one TUI frame.
+export function renderFrame({ status, control, tail, prompt, message = undefined }) {
   const { totals: t, budgets: b } = status;
   const over = Object.values(status.remaining).some((v) => v < 0);
   const state = !control.ok ? `STOPPED (${control.reason})` : control.stop ? 'STOPPED' : control.paused ? 'PAUSED' : 'RUNNING';
@@ -67,12 +51,8 @@ export function renderFrame({ status, control, tail, prompt, message }) {
   ].join('\n');
 }
 
-/**
- * Key-driven TUI state machine; no timers or terminal I/O so it is testable.
- * @param {{source: StatusSource, runId: string, budgets: Budgets, controlFile: string, tailLines?: number}} o
- */
+// Key-driven TUI state machine; no timers or terminal I/O so it is testable.
 export function createTui({ source, runId, budgets, controlFile, tailLines = 15 }) {
-  /** @type {'normal' | 'steer' | 'confirm'} */
   let mode = 'normal';
   let note = '';
   let message = '';
@@ -88,12 +68,7 @@ export function createTui({ source, runId, budgets, controlFile, tailLines = 15 
         message,
       });
     },
-    /**
-     * @param {string} k one keypress
-     * @returns {'quit' | undefined}
-     */
     key(k) {
-      /** @param {{paused?: boolean, stop?: boolean, steer?: string}} u */
       const write = (u) => {
         const r = writeControl(controlFile, u);
         message = r.ok ? '' : r.reason;
@@ -132,24 +107,14 @@ export function createTui({ source, runId, budgets, controlFile, tailLines = 15 
   return self;
 }
 
-/**
- * Runs the TUI until the user quits. `input` may be a TTY (raw mode is enabled and restored).
- * @param {{
- *   source: StatusSource, runId: string, budgets: Budgets, controlFile: string, tailLines?: number,
- *   input: NodeJS.ReadableStream & {setRawMode?: (b: boolean) => unknown},
- *   output: {write(s: string): unknown},
- *   intervalMs?: number,
- * }} o
- * @returns {Promise<void>}
- */
-export function runTui({ input, output, intervalMs = 1000, ...rest }) {
-  const tui = createTui(rest);
+// Runs the TUI until the user quits. `input` may be a TTY (raw mode is enabled and restored).
+export function runTui({ input, output, intervalMs = 1000, source, runId, budgets, controlFile, tailLines = undefined }) {
+  const tui = createTui({ source, runId, budgets, controlFile, tailLines });
   return new Promise((resolve) => {
     const draw = () => output.write(`\x1b[2J\x1b[H${tui.frame().replace(/\n/g, '\r\n')}\r\n`);
     input.setRawMode?.(true);
     input.setEncoding?.('utf8');
     const timer = setInterval(draw, intervalMs);
-    /** @param {string | Buffer} chunk */
     const onData = (chunk) => {
       for (const k of String(chunk)) tui.key(k);
       if (tui.done) {

@@ -7,14 +7,14 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { addEntry, readInbox, consumeInbox, inboxSection, INBOX_FILE } from '../src/inbox.js';
 import { main } from '../src/cli.js';
-import { buildPrompt, buildPlanPrompt, runStep } from '../src/step.js';
-import { buildInterviewPrompt, runInterview } from '../src/interview.js';
+import { buildPrompt, buildPlanPrompt, runStep } from '../src/podge-step.js';
+import { buildInterviewPrompt, runInterview } from '../src/hodge-interview.js';
 import { createFakeAdapter } from '../src/adapter.js';
-import { sandboxOf } from './support/sandbox.js';
+import { writeProjectConfig, withCwd } from './support/project.js';
 
 const tmp = () => mkdtempSync(join(tmpdir(), 'hodge-inbox-'));
 
-test('O-3: entries go to more-questions.md (hodge) and more-todos.md (podge) in the sandbox, one bullet each', () => {
+test('O-3: entries go to more-questions.md (hodge) and more-todos.md (podge) in the project, one bullet each', () => {
   const dir = tmp();
   assert.deepEqual(INBOX_FILE, { hodge: 'more-questions.md', podge: 'more-todos.md' });
   addEntry(dir, 'hodge', 'What about SSO?');
@@ -67,12 +67,14 @@ test('O-3: prompts carry the entries only when given', () => {
 });
 
 test('O-3: `hodgepodge console <kind>` writes each stdin line and stops at /quit; no model, no lock', async () => {
-  const dir = sandboxOf({ targetRepo: 'x' });
+  const dir = tmp();
+  writeProjectConfig(dir, { roles: { build: { adapter: 'fake', model: 'm' } }, budgets: { maxWallClockSeconds: 60, maxIterations: 5 }, allowedPaths: ['src/'] });
   const out = /** @type {string[]} */ ([]);
-  const code = await main(['console', 'hodge', '--dir', dir], {
-    input: Readable.from(['one\n\ntwo\n/quit\nignored\n']),
-    stdout: (s) => { out.push(s); },
-  });
+  const code = await withCwd(dir, () =>
+    main(['console', 'hodge'], {
+      input: Readable.from(['one\n\ntwo\n/quit\nignored\n']),
+      stdout: (s) => { out.push(s); },
+    }));
   assert.equal(code, 0);
   assert.equal(readFileSync(join(dir, 'more-questions.md'), 'utf8'), '- one\n- two\n');
   assert.equal(existsSync(join(dir, '.hodge.lock')), false);
@@ -102,16 +104,15 @@ function makeRepo() {
 }
 
 const cfg = {
-  targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'fake', model: 'm' }, interview: { adapter: 'fake', model: 'm' } },
   budgets: { maxWallClockSeconds: 600, maxIterations: 5 },
   allowedPaths: ['src/'],
 };
 
-test('O-3: runStep sends the sandbox todos in its prompt and consumes them after an ok step', async () => {
+test('O-3: runStep sends the project todos in its prompt and consumes them after an ok step', async () => {
   const repo = makeRepo();
-  const sb = sandboxOf(cfg, repo);
-  addEntry(sb, 'podge', 'cover the empty case');
+  const inboxDir = tmp();
+  addEntry(inboxDir, 'podge', 'cover the empty case');
   /** @type {string[]} */
   const prompts = [];
   const adapter = {
@@ -121,26 +122,26 @@ test('O-3: runStep sends the sandbox todos in its prompt and consumes them after
       return { exitStatus: 0, transcript: '', changedFiles: [] };
     },
   };
-  const res = await runStep({ config: cfg, repoDir: repo, runId: 'r', adapter: /** @type {any} */ (adapter), testCommand: ['true'], inboxDir: sb });
+  const res = await runStep({ config: cfg, repoDir: repo, runId: 'r', adapter: /** @type {any} */ (adapter), testCommand: ['true'], inboxDir });
   assert.match(prompts[0], /## More todos[\s\S]*cover the empty case/);
-  if (res.status === 'ok') assert.equal(readInbox(sb, 'podge'), '');
-  else assert.match(readInbox(sb, 'podge'), /cover the empty case/);
+  if (res.status === 'ok') assert.equal(readInbox(inboxDir, 'podge'), '');
+  else assert.match(readInbox(inboxDir, 'podge'), /cover the empty case/);
 });
 
 test('O-3: a gated or failed step keeps the todos for the next one', async () => {
   const repo = makeRepo();
   writeFileSync(join(repo, 'dirty'), 'x');
-  const sb = sandboxOf(cfg, repo);
-  addEntry(sb, 'podge', 'keep me');
-  const res = await runStep({ config: cfg, repoDir: repo, runId: 'r', adapter: createFakeAdapter({ exitStatus: 0, transcript: '', writes: {} }), testCommand: ['true'], inboxDir: sb });
+  const inboxDir = tmp();
+  addEntry(inboxDir, 'podge', 'keep me');
+  const res = await runStep({ config: cfg, repoDir: repo, runId: 'r', adapter: createFakeAdapter({ exitStatus: 0, transcript: '', writes: {} }), testCommand: ['true'], inboxDir });
   assert.equal(res.status, 'gated');
-  assert.equal(readInbox(sb, 'podge'), '- keep me\n');
+  assert.equal(readInbox(inboxDir, 'podge'), '- keep me\n');
 });
 
-test('O-3: runInterview sends the sandbox questions and consumes them unless the round failed', async () => {
+test('O-3: runInterview sends the project questions and consumes them unless the round failed', async () => {
   const repo = makeRepo();
-  const sb = sandboxOf(cfg, repo);
-  addEntry(sb, 'hodge', 'what about offline mode?');
+  const inboxDir = tmp();
+  addEntry(inboxDir, 'hodge', 'what about offline mode?');
   /** @type {string[]} */
   const prompts = [];
   const adapter = {
@@ -149,10 +150,10 @@ test('O-3: runInterview sends the sandbox questions and consumes them unless the
       return { exitStatus: 1, transcript: '', changedFiles: [] };
     },
   };
-  const res = await runInterview({ config: cfg, repoDir: repo, runId: 'r', adapter: /** @type {any} */ (adapter), objective: 'obj', inboxDir: sb });
+  const res = await runInterview({ config: cfg, repoDir: repo, runId: 'r', adapter: /** @type {any} */ (adapter), objective: 'obj', inboxDir });
   assert.equal(res.status, 'failed');
   assert.match(prompts[0], /## More questions[\s\S]*offline mode/);
-  assert.match(readInbox(sb, 'hodge'), /offline mode/);
+  assert.match(readInbox(inboxDir, 'hodge'), /offline mode/);
 
   const ok = {
     run: async () => {
@@ -160,6 +161,6 @@ test('O-3: runInterview sends the sandbox questions and consumes them unless the
       return { exitStatus: 0, transcript: '', changedFiles: [] };
     },
   };
-  await runInterview({ config: cfg, repoDir: repo, runId: 'r', adapter: /** @type {any} */ (ok), objective: 'obj', round: 2, inboxDir: sb });
-  assert.equal(readInbox(sb, 'hodge'), '');
+  await runInterview({ config: cfg, repoDir: repo, runId: 'r', adapter: /** @type {any} */ (ok), objective: 'obj', round: 2, inboxDir });
+  assert.equal(readInbox(inboxDir, 'hodge'), '');
 });

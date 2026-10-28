@@ -4,7 +4,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sumRunUsage, checkBudgetGate } from '../src/budget-gate.js';
-import { writeIterationRecord } from '../src/run-record.js';
+import { writeIterationRecord } from '../src/podge-run-record.js';
 
 const budgets = { maxWallClockSeconds: 60, maxIterations: 3 };
 

@@ -5,15 +5,9 @@ import { join, relative } from 'node:path';
 
 const SKIP_DIRS = new Set(['.git', 'node_modules']);
 
-/**
- * Hash every file under dir so changes can be detected without requiring git.
- * @param {string} dir
- * @returns {Map<string, string>}
- */
+// Hash every file under dir so changes can be detected without requiring git.
 function snapshot(dir) {
-  /** @type {Map<string, string>} */
   const out = new Map();
-  /** @param {string} d */
   const walk = (d) => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
       const full = join(d, e.name);
@@ -28,11 +22,7 @@ function snapshot(dir) {
   return out;
 }
 
-/**
- * Run a CLI agent process under limits and report which files it changed.
- * @param {{command: string, args: string[], cwd: string, env?: Record<string, string>, maxWallClockSeconds?: number, onOutput?: (stream: 'stdout' | 'stderr', chunk: string) => void}} p
- * @returns {Promise<{code: number, stdout: string, stderr: string, timedOut: boolean, changedFiles: string[]}>}
- */
+// Run a CLI agent process under limits and report which files it changed.
 export async function runProcessAgent({ command, args, cwd, env, maxWallClockSeconds, onOutput }) {
   const before = snapshot(cwd);
   const res = await new Promise((resolve) => {

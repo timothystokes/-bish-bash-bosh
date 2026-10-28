@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkScopeGate, checkAntiStubGate, checkTypeGate } from '../src/diff-gates.js';
-import { runStep } from '../src/step.js';
+import { runStep } from '../src/podge-step.js';
 import { createFakeAdapter } from '../src/adapter.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
@@ -84,7 +84,6 @@ function makeRepo() {
 }
 
 const config = {
-  targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'x', model: 'y' } },
   budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],

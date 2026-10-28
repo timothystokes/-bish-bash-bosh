@@ -1,13 +1,8 @@
 import { spawn } from 'node:child_process';
 
-/**
- * @typedef {(cmd: string, args: string[], opts?: {cwd?: string}) => Promise<{code: number, stdout: string, stderr: string}>} Run
- */
-
-/** @type {Run} */
-export function defaultRun(cmd, args, opts = {}) {
+export function defaultRun(cmd, args, { cwd } = { cwd: undefined }) {
   return new Promise((res, rej) => {
-    const p = spawn(cmd, args, { cwd: opts.cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     p.stdout.on('data', (d) => (stdout += d));
@@ -17,11 +12,7 @@ export function defaultRun(cmd, args, opts = {}) {
   });
 }
 
-/**
- * S3 client backed by the `aws` CLI (no SDK dependency). The sha256 lives in object metadata.
- * @param {{run?: Run}} [opts]
- * @returns {import('./artifacts.js').S3Client}
- */
+// S3 client backed by the `aws` CLI (no SDK dependency). The sha256 lives in object metadata.
 export function createAwsCliS3Client({ run = defaultRun } = {}) {
   return {
     async headObject({ bucket, key }) {
@@ -47,12 +38,8 @@ export function createAwsCliS3Client({ run = defaultRun } = {}) {
   };
 }
 
-/**
- * Promotion PR opener backed by `gh pr create`. Never merges.
- * @param {{run?: Run, cwd?: string}} [opts]
- * @returns {import('./artifacts.js').PrOpener}
- */
-export function createGhPrOpener({ run = defaultRun, cwd } = {}) {
+// Promotion PR opener backed by `gh pr create`. Never merges.
+export function createGhPrOpener({ run = defaultRun, cwd = undefined } = {}) {
   return {
     async openPullRequest({ title, body, head, base }) {
       const r = await run('gh', ['pr', 'create', '--title', title, '--body', body, '--head', head, '--base', base], { cwd });

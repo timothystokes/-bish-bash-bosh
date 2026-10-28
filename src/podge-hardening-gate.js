@@ -1,12 +1,7 @@
 import { spawnSync } from 'node:child_process';
 
-/**
- * Coverage/mutation gate for test-hardening: the injectable command must exit 0
- * (it encodes the coverage or mutation-score threshold).
- * @param {string} repoDir
- * @param {string[] | undefined} hardenCommand
- * @returns {import('./diff-gates.js').GateCheck}
- */
+// Coverage/mutation gate for test-hardening: the injectable command must exit 0
+// (it encodes the coverage or mutation-score threshold).
 export function checkHardeningGate(repoDir, hardenCommand) {
   if (!hardenCommand || hardenCommand.length === 0) {
     return { ok: false, reason: 'test-hardening mode needs config hardenCommand (coverage/mutation command that exits non-zero below threshold)' };

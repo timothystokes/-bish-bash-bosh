@@ -1,26 +1,14 @@
 import { runProcessAgent } from './process.js';
 
-/**
- * @typedef {{model?: string, command?: string, prefixArgs?: string[], env?: Record<string, string>}} ClaudeCodeOptions
- */
-
-/**
- * Arguments for a non-interactive Claude Code run.
- * @param {{prompt: string, model?: string}} p
- * @returns {string[]}
- */
+// Arguments for a non-interactive Claude Code run.
 export function buildClaudeArgs({ prompt, model }) {
   const args = ['-p', prompt, '--output-format', 'json', '--dangerously-skip-permissions'];
   if (model) args.push('--model', model);
   return args;
 }
 
-/**
- * Parse `--output-format json` output: a result object (or an array containing one).
- * Unparseable output becomes the transcript.
- * @param {string} stdout
- * @returns {{transcript: string}}
- */
+// Parse `--output-format json` output: a result object (or an array containing one).
+// Unparseable output becomes the transcript.
 export function parseClaudeOutput(stdout) {
   let parsed;
   try {
@@ -28,21 +16,17 @@ export function parseClaudeOutput(stdout) {
   } catch {
     return { transcript: stdout.trim() };
   }
-  const ev = Array.isArray(parsed) ? [...parsed].reverse().find((/** @type {any} */ e) => e?.type === 'result') : parsed;
+  const ev = Array.isArray(parsed) ? [...parsed].reverse().find((e) => e?.type === 'result') : parsed;
   if (!ev || typeof ev !== 'object') return { transcript: stdout.trim() };
   return { transcript: typeof ev.result === 'string' ? ev.result : '' };
 }
 
-/**
- * Adapter driving Claude Code in non-interactive mode.
- * @param {ClaudeCodeOptions} [opts]
- * @returns {import('../adapter.js').Adapter}
- */
+// Adapter driving Claude Code in non-interactive mode.
 export function createClaudeCodeAdapter(opts = {}) {
   const command = opts.command ?? 'claude';
   const prefix = opts.prefixArgs ?? [];
   return {
-    async run({ prompt, cwd, limits, onOutput }) {
+    async run({ prompt, cwd, limits, onOutput = undefined }) {
       const { code, stdout, stderr, timedOut, changedFiles } = await runProcessAgent({
         command,
         args: [...prefix, ...buildClaudeArgs({ prompt, model: opts.model })],

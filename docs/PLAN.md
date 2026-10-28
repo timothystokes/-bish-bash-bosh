@@ -13,7 +13,7 @@ Approach: Ralph-style loops (one task per loop, fresh context, fixed stack), str
 | Autonomy | Unattended or on-the-loop (visibility + controls). No per-step human gate |
 | Gate | Per-step commits to a **sandbox repo/branch**; human reviews completed work before promotion out of sandbox |
 | Tests | Test plan required per objective; must exist and be red before build loops start |
-| Reverse specs | Specs constrained by standards: OpenAPI, JSON Schema, EBNF grammars, example-based conformance cases |
+| Reverse specs | Specs constrained by standards: OpenAPI, JSON Schema, example-based conformance cases |
 | Sandbox | Docker locally; Fargate task in cloud |
 | Secrets | Small Node preflight-style proxy (regex rules, redact, audit) |
 | UI | Terminal TUI first (log tail, pause/resume/steer, kill, cost meter vs budget). No Slack |
@@ -118,7 +118,7 @@ Run record per objective: `runs/<id>/{plan.md, iterations/NNN/{prompt,transcript
 
 ## Reverse engineering and standards
 
-- Specs are markdown plus machine-readable contracts: JSON Schema for data, OpenAPI for HTTP surfaces, and, for language-like targets, an EBNF grammar plus example-based conformance cases (input, expected output) as JSON.
+- Specs are markdown plus machine-readable contracts: JSON Schema for data, OpenAPI for HTTP surfaces, and, for language-like targets, example-based conformance cases (input, expected output) as JSON.
 - Characterization tests are generated from the running system, so specs are verified rather than just written.
 
 ## Risks and mitigations

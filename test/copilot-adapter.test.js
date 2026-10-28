@@ -9,7 +9,6 @@ import { adapterContract } from './helpers/adapter-contract.js';
 
 const fake = fileURLToPath(new URL('./fixtures/fake-copilot.js', import.meta.url));
 
-/** @param {import('../src/adapter.js').FakeFixture} fixture */
 const make = (fixture) =>
   createCopilotAdapter({
     model: 'm',

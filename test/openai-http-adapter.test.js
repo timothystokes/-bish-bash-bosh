@@ -40,13 +40,12 @@ const completion = (content) => ({ choices: [{ message: { role: 'assistant', con
 const closers = [];
 test.after(() => closers.forEach((c) => c()));
 
-/** @param {import('../src/adapter.js').FakeFixture} f */
 const make = (f) => {
   // Contract adapters are built synchronously, so the server starts lazily on first run.
   /** @type {Promise<{baseUrl: string, close: () => void}> | undefined} */
   let started;
   return {
-    async run(/** @type {import('../src/adapter.js').AdapterRequest} */ req) {
+    async run(req) {
       started ??= startServer(() =>
         f.exitStatus !== 0
           ? { status: 500, json: { error: { message: f.transcript } } }

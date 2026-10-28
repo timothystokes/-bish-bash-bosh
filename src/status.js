@@ -3,32 +3,6 @@ import { join } from 'node:path';
 import { sumRunUsage } from './budget-gate.js';
 import { readRunDetails } from './run-details.js';
 
-/**
- * @typedef {import('./budget-gate.js').RunTotals} RunTotals
- * @typedef {import('./budget-gate.js').Budgets} Budgets
- * @typedef {import('./run-details.js').RunDetails} RunDetails
- * @typedef {{
- *   totals(runId: string): RunTotals,
- *   lastStatus(runId: string): string | null,
- *   tail(runId: string, lines: number): string[],
- *   details(runId: string): RunDetails,
- * }} StatusSource
- * @typedef {{
- *   runId: string,
- *   iterations: number,
- *   lastStatus: string | null,
- *   totals: RunTotals,
- *   budgets: Budgets,
- *   remaining: RunTotals,
- *   details: RunDetails,
- * }} RunStatus
- */
-
-/**
- * @param {string} repoDir
- * @param {string} runId
- * @returns {string | null} directory of the newest complete iteration record
- */
 function lastIteration(repoDir, runId) {
   const base = join(repoDir, 'runs', runId, 'iterations');
   if (!existsSync(base)) return null;
@@ -39,12 +13,8 @@ function lastIteration(repoDir, runId) {
   return last ? join(base, last) : null;
 }
 
-/**
- * Status source backed by local run files (`runs/<id>/iterations/NNN`).
- * Other sources (e.g. cloud execution history) implement the same interface.
- * @param {string} repoDir
- * @returns {StatusSource}
- */
+// Status source backed by local run files (`runs/<id>/iterations/NNN`).
+// Other sources (e.g. cloud execution history) implement the same interface.
 export function createLocalStatusSource(repoDir) {
   return {
     totals: (runId) => sumRunUsage(repoDir, runId),
@@ -61,12 +31,6 @@ export function createLocalStatusSource(repoDir) {
   };
 }
 
-/**
- * @param {StatusSource} source
- * @param {string} runId
- * @param {Budgets} budgets
- * @returns {RunStatus}
- */
 export function readRunStatus(source, runId, budgets) {
   const totals = source.totals(runId);
   return {

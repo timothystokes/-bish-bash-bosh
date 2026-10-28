@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
-import { writeIterationRecord } from '../src/run-record.js';
+import { writeIterationRecord } from '../src/podge-run-record.js';
 import { readRunDetails } from '../src/run-details.js';
 import { createLocalStatusSource } from '../src/status.js';
 import { renderFrame, createTui, runTui } from '../src/tui.js';

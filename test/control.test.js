@@ -5,8 +5,8 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, existsSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readControl, consumeSteer } from '../src/control.js';
-import { runLoop } from '../src/driver.js';
-import { buildPrompt } from '../src/step.js';
+import { runLoop } from '../src/podge-driver.js';
+import { buildPrompt } from '../src/podge-step.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
@@ -25,7 +25,6 @@ function makeRepo() {
 }
 
 const config = {
-  targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'f', model: 'm' } },
   budgets: { maxWallClockSeconds: 60, maxIterations: 10 },
   allowedPaths: ['src/'],

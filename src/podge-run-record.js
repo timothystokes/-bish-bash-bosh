@@ -1,36 +1,16 @@
 import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { validateDiagnosis } from './diagnosis.js';
-
-/**
- * @typedef {{name: string, ok: boolean, detail?: string}} GateResult
- * @typedef {{
- *   status: 'ok' | 'failed' | 'gated' | 'over-budget',
- *   usage: {seconds: number},
- *   changedFiles: string[],
- *   gates: GateResult[],
- *   prompt: string,
- *   transcript: string,
- *   diff: string,
- *   test: unknown,
- *   diagnosis?: import('./diagnosis.js').Diagnosis,
- * }} RunRecord
- */
+import { validateDiagnosis } from './podge-diagnosis.js';
 
 const STATUSES = ['ok', 'failed', 'gated', 'over-budget'];
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
-/** @param {unknown} v */
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
 
-/**
- * @param {unknown} r
- * @returns {{ok: boolean, errors: string[]}}
- */
 export function validateRunRecord(r) {
   const errors = [];
   if (typeof r !== 'object' || r === null) return { ok: false, errors: ['record must be an object'] };
-  const o = /** @type {Record<string, any>} */ (r);
+  const o = r;
   if (!STATUSES.includes(o.status)) errors.push(`status must be one of ${STATUSES.join(', ')}`);
   if (typeof o.usage !== 'object' || o.usage === null || !isNum(o.usage.seconds)) {
     errors.push('usage.seconds must be a non-negative number');
@@ -52,33 +32,17 @@ export function validateRunRecord(r) {
   return { ok: errors.length === 0, errors };
 }
 
-/**
- * @param {string} runId
- * @param {number} iteration
- */
 function checkIds(runId, iteration) {
   if (typeof runId !== 'string' || !SAFE_ID.test(runId)) throw new Error(`invalid runId: ${runId}`);
   if (!Number.isInteger(iteration) || iteration < 1) throw new Error(`invalid iteration: ${iteration}`);
 }
 
-/**
- * @param {string} repoDir target repo root
- * @param {string} runId
- * @param {number} iteration 1-based
- */
 export function iterationDir(repoDir, runId, iteration) {
   checkIds(runId, iteration);
   return join(repoDir, 'runs', runId, 'iterations', String(iteration).padStart(3, '0'));
 }
 
-/**
- * Write one iteration record atomically (temp dir then rename); never overwrites.
- * @param {string} repoDir
- * @param {string} runId
- * @param {number} iteration
- * @param {RunRecord} record
- * @returns {string} the iteration directory
- */
+// Write one iteration record atomically (temp dir then rename); never overwrites.
 export function writeIterationRecord(repoDir, runId, iteration, record) {
   const v = validateRunRecord(record);
   if (!v.ok) throw new Error(`invalid run record: ${v.errors.join('; ')}`);

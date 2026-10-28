@@ -1,17 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseTestPlan } from './test-plan-gate.js';
+import { parseTestPlan } from './podge-test-plan-gate.js';
 
-/** @typedef {{ok: boolean, problems: string[]}} LintResult */
-
-/**
- * Titles are the `# ` lines outside code fences.
- * @param {string} text
- * @returns {string[]}
- */
+// Titles are the `# ` lines outside code fences.
 function titles(text) {
   let fenced = false;
-  /** @type {string[]} */
   const out = [];
   for (const line of text.split('\n')) {
     if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
@@ -20,16 +13,10 @@ function titles(text) {
   return out;
 }
 
-/**
- * Bullets under each `## Heading` (outside code fences), keyed by lower-cased heading.
- * @param {string} text
- * @returns {Map<string, string[]>}
- */
+// Bullets under each `## Heading` (outside code fences), keyed by lower-cased heading.
 export function bulletsBySection(text) {
-  /** @type {Map<string, string[]>} */
   const out = new Map();
   let fenced = false;
-  /** @type {string | null} */
   let current = null;
   for (const line of text.split('\n')) {
     if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
@@ -43,12 +30,7 @@ export function bulletsBySection(text) {
   return out;
 }
 
-/**
- * Value of the first `Name: value` line outside code fences.
- * @param {string} text
- * @param {string} name
- * @returns {string | null}
- */
+// Value of the first `Name: value` line outside code fences.
 export function field(text, name) {
   let fenced = false;
   for (const line of text.split('\n')) {
@@ -58,26 +40,18 @@ export function field(text, name) {
   return null;
 }
 
-/**
- * Deterministic structure check of `specs/*.md`: non-empty, one `# Spec: ...` title
- * (one decision per file), unique titles, an `Implementation: none|partial|implemented` field (with existing
- * `Evidence:` paths unless `none`), requirement IDs `R-<spec>-<n>` that are unique, and every spec and
- * requirement mapped to a test in `tests/PLAN.md`. The mapping is the plan stage's output, so the interview
- * checks with `testPlan: false` (structure only).
- * @param {string} repoDir
- * @param {{testPlan?: boolean}} [opts] `testPlan` defaults to true
- * @returns {LintResult}
- */
+// Deterministic structure check of `specs/*.md`: non-empty, one `# Spec: ...` title
+// (one decision per file), unique titles, an `Implementation: none|partial|implemented` field (with existing
+// `Evidence:` paths unless `none`), requirement IDs `R-<spec>-<n>` that are unique, and every spec and
+// requirement mapped to a test in `tests/PLAN.md`. The mapping is the plan stage's output, so the interview
+// checks with `testPlan: false` (structure only).
 export function lintSpecs(repoDir, { testPlan = true } = {}) {
-  /** @type {string[]} */
   const problems = [];
   const specsDir = join(repoDir, 'specs');
   const files = existsSync(specsDir) ? readdirSync(specsDir).filter((f) => f.endsWith('.md')).sort() : [];
   if (files.length === 0) return { ok: false, problems: ['specs/ has no *.md specs'] };
 
-  /** @type {Map<string, string[]>} */
   const byTitle = new Map();
-  /** @type {Set<string>} */
   const ids = new Set();
   for (const f of files) {
     const path = `specs/${f}`;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { handler } from '../src/read-pointers-handler.js';
+import { handler } from '../src/podge-read-pointers-handler.js';
 
 test('handler rebuilds JSON-safe pointers from the mounted repo and its control.json', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'hodge-lambda-'));

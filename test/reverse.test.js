@@ -4,11 +4,11 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runReverse, buildReversePrompt } from '../src/reverse.js';
+import { runReverse, buildReversePrompt } from '../src/hodge-reverse.js';
 import { loadModePrompt } from '../src/prompts.js';
 import { main } from '../src/cli.js';
 import { lintSpecs } from '../src/spec-lint.js';
-import { sandboxOf } from './support/sandbox.js';
+import { writeProjectConfig, commitProjectConfig, withCwd } from './support/project.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
@@ -26,7 +26,6 @@ function makeRepo() {
 }
 
 const config = (/** @type {Record<string, {adapter: string, model: string}>} */ roles = { reverse: { adapter: 'f', model: 'm' } }) => ({
-  targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'f', model: 'm' }, ...roles },
   budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],
@@ -47,7 +46,6 @@ const agent = (writes, exitStatus = 0) => {
   return {
     prompts,
     adapter: {
-      /** @param {import('../src/adapter.js').AdapterRequest} req */
       async run(req) {
         prompts.push(req.prompt);
         const { createFakeAdapter } = await import('../src/adapter.js');
@@ -134,25 +132,27 @@ test('gates: dirty tree and harness repo make no agent call', async () => {
 
 test('hodge --reverse uses the reverse role; usage errors exit 2', async () => {
   const dir = makeRepo();
-  const cfgPath = join(tmpdir(), `hodge-rev-cfg-${Date.now()}.json`);
-  writeFileSync(cfgPath, JSON.stringify(config({ reverse: { adapter: 'rv', model: 'm' } })));
+  commitProjectConfig(dir, config({ reverse: { adapter: 'rv', model: 'm' } }));
   const out = /** @type {string[]} */ ([]);
   const registry = { rv: () => agent(goodWrites).adapter, f: () => { throw new Error('build role must not be used'); } };
-  const code = await main(['hodge', '--reverse', '--dir', sandboxOf(cfgPath, dir)], {
-    registry, identity, testCommand: pass, stdout: (s) => { out.push(s); }, stderr: () => {},
-  });
+  const code = await withCwd(dir, () =>
+    main(['hodge', '--reverse'], {
+      registry, identity, testCommand: pass, stdout: (s) => { out.push(s); }, stderr: () => {},
+    }));
   assert.equal(code, 0);
   assert.equal(JSON.parse(out.join('')).status, 'ok');
 
   const dir2 = makeRepo();
-  const bad = await main(['hodge', '--reverse', '--dir', sandboxOf(cfgPath, dir2)], {
-    registry, identity, testCommand: fail, stdout: () => {}, stderr: () => {},
-  });
+  commitProjectConfig(dir2, config({ reverse: { adapter: 'rv', model: 'm' } }));
+  const bad = await withCwd(dir2, () =>
+    main(['hodge', '--reverse'], {
+      registry, identity, testCommand: fail, stdout: () => {}, stderr: () => {},
+    }));
   assert.equal(bad, 1);
 
   const err = /** @type {string[]} */ ([]);
-  const noRole = join(tmpdir(), `hodge-rev-norole-${Date.now()}.json`);
-  writeFileSync(noRole, JSON.stringify(config({})));
-  assert.equal(await main(['hodge', '--reverse', '--dir', sandboxOf(noRole)], { registry, stdout: () => {}, stderr: (s) => { err.push(s); } }), 2);
+  const noRoleDir = mkdtempSync(join(tmpdir(), 'hodge-rev-norole-'));
+  writeProjectConfig(noRoleDir, config({}));
+  assert.equal(await withCwd(noRoleDir, () => main(['hodge', '--reverse'], { registry, stdout: () => {}, stderr: (s) => { err.push(s); } })), 2);
   assert.match(err.join(''), /no role 'reverse'/);
 });

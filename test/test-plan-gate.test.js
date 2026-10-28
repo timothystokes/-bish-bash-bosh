@@ -4,8 +4,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkTestPlanGate } from '../src/test-plan-gate.js';
-import { runStep } from '../src/step.js';
+import { checkTestPlanGate } from '../src/podge-test-plan-gate.js';
+import { runStep } from '../src/podge-step.js';
 import { createFakeAdapter } from '../src/adapter.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
@@ -73,8 +73,7 @@ test('red check is skipped once build iterations exist (green allowed)', () => {
   assert.equal(checkTestPlanGate(d, { testCommand: GREEN, requireRed: false }).ok, true);
 });
 
-const config = (/** @type {string} */ dir) => ({
-  targetRepo: dir,
+const config = (/** @type {string} */ _dir) => ({
   roles: { build: { adapter: 'fake', model: 'm' } },
   budgets: { maxWallClockSeconds: 600, maxIterations: 10 },
   allowedPaths: ['src/'],
@@ -104,7 +103,6 @@ function planAdapter(writes) {
   /** @type {string[]} */
   const prompts = [];
   const inner = createFakeAdapter({ exitStatus: 0, transcript: '', writes });
-  /** @type {import('../src/adapter.js').Adapter} */
   const adapter = { run: async (req) => (prompts.push(req.prompt), inner.run(req)) };
   return { prompts, adapter };
 }

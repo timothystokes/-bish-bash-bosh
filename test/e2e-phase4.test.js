@@ -7,7 +7,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { main } from '../src/cli.js';
 import { createCopilotAdapter } from '../src/adapters/copilot.js';
-import { sandboxOf } from './support/sandbox.js';
+import { commitProjectConfig, withCwd } from './support/project.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fakeAgent = join(here, 'fixtures', 'fake-copilot.js');
@@ -23,7 +23,6 @@ const scripted = (fixture) => () =>
 
 /**
  * @param {string[]} argv
- * @param {Record<string, () => import('../src/adapter.js').Adapter>} registry
  */
 async function hodge(argv, registry) {
   /** @type {string[]} */
@@ -39,11 +38,7 @@ async function hodge(argv, registry) {
 
 const budgets = { maxWallClockSeconds: 60, maxIterations: 3 };
 /** @param {Record<string, unknown>} extra */
-const writeConfig = (extra) => {
-  const p = join(mkdtempSync(join(tmpdir(), 'hodge-cfg-')), 'hodge.json');
-  writeFileSync(p, JSON.stringify({ targetRepo: 'git@example.com:o/toy.git', budgets, allowedPaths: ['src/', 'package.json'], ...extra }));
-  return p;
-};
+const makeConfig = (extra) => ({ budgets, allowedPaths: ['src/', 'package.json'], ...extra });
 const pkg = JSON.stringify({ name: 'toy', type: 'module', scripts: { test: 'node --test tests/*.test.js' } });
 
 test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite passes', async () => {
@@ -69,8 +64,9 @@ test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite pas
         "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { greet } from '../src/greet.js';\ntest('R-greet-1 greeting', () => assert.equal(greet('bob'), 'hello bob'));\n",
     },
   };
-  const srcCfg = writeConfig({ roles: { build: { adapter: 'reverser', model: 'm' }, reverse: { adapter: 'reverser', model: 'm' } } });
-  const rev = await hodge(['hodge', '--reverse', '--dir', sandboxOf(srcCfg, source), '--run-id', 'p4r'], { reverser: scripted(reverseFixture) });
+  const srcCfg = makeConfig({ roles: { build: { adapter: 'reverser', model: 'm' }, reverse: { adapter: 'reverser', model: 'm' } } });
+  commitProjectConfig(source, srcCfg);
+  const rev = await withCwd(source, () => hodge(['hodge', '--reverse', '--run-id', 'p4r'], { reverser: scripted(reverseFixture) }));
   assert.equal(rev.res.status, 'ok', JSON.stringify(rev.res));
   assert.equal(rev.code, 0);
   assert.equal(git(source, 'status', '--porcelain'), '');
@@ -91,8 +87,9 @@ test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite pas
     transcript: 'implemented greet from the spec',
     writes: { 'plan.md': '- [x] implement greet\n', 'package.json': pkg, 'src/greet.js': 'export const greet = (name) => "hello " + name;\n' },
   };
-  const bCfg = writeConfig({ mode: 'clean-room', roles: { build: { adapter: 'builder', model: 'm' } } });
-  const run = await hodge(['podge', '--dir', sandboxOf(bCfg, builder), '--run-id', 'p4b'], { builder: scripted(buildFixture) });
+  const bCfg = makeConfig({ mode: 'clean-room', roles: { build: { adapter: 'builder', model: 'm' } } });
+  commitProjectConfig(builder, bCfg);
+  const run = await withCwd(builder, () => hodge(['podge', '--run-id', 'p4b'], { builder: scripted(buildFixture) }));
   assert.equal(run.res.status, 'done', JSON.stringify(run.res));
   assert.equal(run.code, 0);
 

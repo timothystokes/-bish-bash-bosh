@@ -4,14 +4,14 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { validateFinding, parseFindings, findingsToPlanItems, runQaCycle, qaCycles } from '../src/qa.js';
-import { runLoop } from '../src/driver.js';
+import { validateFinding, parseFindings, findingsToPlanItems, runQaCycle, qaCycles } from '../src/podge-qa.js';
+import { runLoop } from '../src/podge-driver.js';
 import { sumRunUsage } from '../src/budget-gate.js';
-import { writeIterationRecord } from '../src/run-record.js';
+import { writeIterationRecord } from '../src/podge-run-record.js';
 import { validateConfig } from '../src/config.js';
 import { loadQaPrompt } from '../src/prompts.js';
 import { main } from '../src/cli.js';
-import { sandboxOf } from './support/sandbox.js';
+import { writeProjectConfig, commitProjectConfig, withCwd } from './support/project.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
@@ -41,7 +41,6 @@ function makeRepo(plan = '- [x] one\n') {
 }
 
 const config = (extra = {}) => ({
-  targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'b', model: 'm' }, qa: { adapter: 'q', model: 'm2' } },
   budgets: { maxWallClockSeconds: 60, maxIterations: 20 },
   allowedPaths: ['src/'],
@@ -201,9 +200,9 @@ test('podge uses the configured qa role adapter, distinct from build', async () 
     b: () => ({ async run() { used.push('build'); return { exitStatus: 0, transcript: '', changedFiles: [] }; } }),
     q: () => ({ async run() { used.push('qa'); return { exitStatus: 0, transcript: block([]), changedFiles: [] }; } }),
   };
-  const sb = sandboxOf(config(), dir);
+  commitProjectConfig(dir, config());
   let out = '';
-  const code = await main(['podge', '--dir', sb], { registry, testCommand: pass, identity, stdout: (s) => { out += s; }, stderr: () => {} });
+  const code = await withCwd(dir, () => main(['podge'], { registry, testCommand: pass, identity, stdout: (s) => { out += s; }, stderr: () => {} }));
   assert.equal(code, 0, out);
   assert.deepEqual(used, ['build', 'qa']);
   assert.equal(JSON.parse(out).status, 'done');

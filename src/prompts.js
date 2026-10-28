@@ -7,10 +7,6 @@ export const MODES = ['interview', 'plan', 'forward', 'reverse', 'brownfield', '
 
 const promptsDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'prompts');
 
-/**
- * @param {string} mode
- * @returns {string}
- */
 export function loadModePrompt(mode) {
   if (!MODES.includes(mode)) throw new Error(`unknown mode: ${mode}`);
   const file = join(promptsDir, `${mode}.md`);
@@ -23,11 +19,7 @@ export function loadQaPrompt() {
   return readFileSync(join(promptsDir, 'qa.md'), 'utf8').trimEnd();
 }
 
-/**
- * Guidance for one declared spec format (`prompts/formats/<format>.md`).
- * @param {string} format
- * @returns {string}
- */
+// Guidance for one declared spec format (`prompts/formats/<format>.md`).
 export function loadFormatSkill(format) {
   const file = join(promptsDir, 'formats', `${format}.md`);
   if (!/^[A-Za-z0-9-]+$/.test(format) || !existsSync(file)) throw new Error(`no skill snippet for format: ${format}`);

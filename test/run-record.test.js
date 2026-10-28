@@ -3,9 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { validateRunRecord, writeIterationRecord, iterationDir } from '../src/run-record.js';
+import { validateRunRecord, writeIterationRecord, iterationDir } from '../src/podge-run-record.js';
 
-/** @returns {import('../src/run-record.js').RunRecord} */
 const record = () => ({
   status: 'ok',
   usage: { seconds: 2.5 },

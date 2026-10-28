@@ -3,12 +3,6 @@ import { createCodexAdapter } from './codex.js';
 import { createCopilotAdapter } from './copilot.js';
 import { createOpenAiHttpAdapter } from './openai-http.js';
 
-/**
- * @typedef {(opts: {model: string}) => import('../adapter.js').Adapter} AdapterFactory
- * @typedef {Record<string, AdapterFactory>} AdapterRegistry
- */
-
-/** @type {AdapterRegistry} */
 export const defaultRegistry = {
   copilot: ({ model }) => createCopilotAdapter({ model }),
   'claude-code': ({ model }) => createClaudeCodeAdapter({ model }),
@@ -21,17 +15,12 @@ export const defaultRegistry = {
     }),
 };
 
-/**
- * Resolve a role's adapter id (opaque string from config) to an adapter instance.
- * @param {unknown} config validated config
- * @param {string} role
- * @param {AdapterRegistry} [registry]
- * @returns {import('../adapter.js').Adapter}
- */
-export function resolveAdapter(config, role, registry = defaultRegistry) {
-  const roles = /** @type {{roles: Record<string, {adapter: string, model: string}>}} */ (config).roles;
+// Resolve a role's adapter id (opaque string from config) to an adapter instance.
+export function resolveAdapter(config, role, registry = undefined) {
+  const reg = registry ?? defaultRegistry;
+  const roles = config.roles;
   const spec = roles[role];
   if (!spec) throw new Error(`no role '${role}' in config`);
-  if (!Object.hasOwn(registry, spec.adapter)) throw new Error(`unknown adapter '${spec.adapter}'`);
-  return registry[spec.adapter]({ model: spec.model });
+  if (!Object.hasOwn(reg, spec.adapter)) throw new Error(`unknown adapter '${spec.adapter}'`);
+  return reg[spec.adapter]({ model: spec.model });
 }

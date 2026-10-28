@@ -7,12 +7,8 @@ const schema = JSON.parse(
 const ajv = new Ajv.default({ allErrors: true });
 const validate = ajv.compile(schema);
 
-/**
- * Validate a harness config object against the config schema.
- * Adapter and model ids are opaque strings; the harness never names vendors.
- * @param {unknown} config
- * @returns {{ok: boolean, errors: string[]}}
- */
+// Validate a harness config object against the config schema.
+// Adapter and model ids are opaque strings; the harness never names vendors.
 export function validateConfig(config) {
   const ok = validate(config);
   const errors = (validate.errors ?? []).map((e) => {

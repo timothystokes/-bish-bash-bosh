@@ -1,14 +1,6 @@
 import { runProcessAgent } from './process.js';
 
-/**
- * @typedef {{model?: string, command?: string, prefixArgs?: string[], env?: Record<string, string>}} CodexOptions
- */
-
-/**
- * Arguments for a non-interactive Codex run (`codex exec`, JSONL events on stdout).
- * @param {{prompt: string, model?: string}} p
- * @returns {string[]}
- */
+// Arguments for a non-interactive Codex run (`codex exec`, JSONL events on stdout).
 export function buildCodexArgs({ prompt, model }) {
   const args = ['exec', '--json', '--dangerously-bypass-approvals-and-sandbox'];
   if (model) args.push('--model', model);
@@ -16,12 +8,8 @@ export function buildCodexArgs({ prompt, model }) {
   return args;
 }
 
-/**
- * Parse `codex exec --json` JSONL: agent_message items form the transcript.
- * Non-JSON lines are ignored; output with no events becomes the transcript.
- * @param {string} stdout
- * @returns {{transcript: string}}
- */
+// Parse `codex exec --json` JSONL: agent_message items form the transcript.
+// Non-JSON lines are ignored; output with no events becomes the transcript.
 export function parseCodexOutput(stdout) {
   const messages = [];
   let events = 0;
@@ -40,16 +28,12 @@ export function parseCodexOutput(stdout) {
   return { transcript: messages.join('\n') };
 }
 
-/**
- * Adapter driving Codex in non-interactive mode.
- * @param {CodexOptions} [opts]
- * @returns {import('../adapter.js').Adapter}
- */
+// Adapter driving Codex in non-interactive mode.
 export function createCodexAdapter(opts = {}) {
   const command = opts.command ?? 'codex';
   const prefix = opts.prefixArgs ?? [];
   return {
-    async run({ prompt, cwd, limits, onOutput }) {
+    async run({ prompt, cwd, limits, onOutput = undefined }) {
       const { code, stdout, stderr, timedOut, changedFiles } = await runProcessAgent({
         command,
         args: [...prefix, ...buildCodexArgs({ prompt, model: opts.model })],

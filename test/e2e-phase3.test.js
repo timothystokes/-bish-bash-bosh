@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { main } from '../src/cli.js';
-import { sandboxOf } from './support/sandbox.js';
+import { commitProjectConfig, withCwd } from './support/project.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const bin = join(here, '..', 'bin', 'hodgepodge');
@@ -19,7 +19,6 @@ const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
 
 /**
  * @param {string[]} argv
- * @param {Record<string, () => import('../src/adapter.js').Adapter>} [registry]
  */
 async function hodge(argv, registry) {
   /** @type {string[]} */
@@ -44,21 +43,15 @@ test('phase 3 exit: pause, steer and stop via hodgepodge control drive podge', a
   git(dir, 'commit', '-qm', 'target');
 
   const tmp = mkdtempSync(join(tmpdir(), 'hodge-cfg-'));
-  const cfgPath = join(tmp, 'hodge.json');
   const ctl = join(tmp, 'control.json');
-  writeFileSync(
-    cfgPath,
-    JSON.stringify({
-      targetRepo: 'git@example.com:o/toy.git',
-      roles: { build: { adapter: 'scripted', model: 'm' } },
-      budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
-      allowedPaths: ['src/'],
-    }),
-  );
+  const config = {
+    roles: { build: { adapter: 'scripted', model: 'm' } },
+    budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
+    allowedPaths: ['src/'],
+  };
 
   /** @type {string[]} */
   const prompts = [];
-  /** @type {import('../src/adapter.js').Adapter} */
   const adapter = {
     async run(req) {
       prompts.push(req.prompt);
@@ -75,7 +68,8 @@ test('phase 3 exit: pause, steer and stop via hodgepodge control drive podge', a
   // pause first, then steer: the run must not start an iteration while paused
   assert.equal((await hodge(['control', '--file', ctl, 'pause'])).res.ok, true);
   assert.equal((await hodge(['control', '--file', ctl, 'steer', 'prefer small functions'])).res.ok, true);
-  const running = hodge(['podge', '--dir', sandboxOf(cfgPath, dir), '--run-id', 'p3', '--control', ctl], { scripted: () => adapter });
+  commitProjectConfig(dir, config);
+  const running = withCwd(dir, () => hodge(['podge', '--run-id', 'p3', '--control', ctl], { scripted: () => adapter }));
   await sleep(300);
   assert.equal(prompts.length, 0, 'no iteration while paused');
   assert.equal(existsSync(join(dir, 'runs', 'p3')), false);

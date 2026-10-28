@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { writeIterationRecord } from '../src/run-record.js';
+import { writeIterationRecord } from '../src/podge-run-record.js';
 import { createLocalStatusSource, readRunStatus } from '../src/status.js';
 import { main } from '../src/cli.js';
-import { sandboxOf } from './support/sandbox.js';
+import { writeProjectConfig, withCwd } from './support/project.js';
 
 const budgets = { maxWallClockSeconds: 100, maxIterations: 5 };
 
@@ -46,21 +46,22 @@ test('readRunStatus on an unknown run is empty, not an error', () => {
 
 test('hodgepodge status prints JSON and includes control state', async () => {
   const dir = makeRun();
-  const cfg = join(dir, 'cfg.json');
-  writeFileSync(cfg, JSON.stringify({ targetRepo: 'git@example.com:o/t.git', roles: { build: { adapter: 'f', model: 'm' } }, budgets, allowedPaths: ['src/'] }));
+  writeProjectConfig(dir, { roles: { build: { adapter: 'f', model: 'm' } }, budgets, allowedPaths: ['src/'] });
   const ctl = join(dir, 'control.json');
   writeFileSync(ctl, JSON.stringify({ paused: true }));
   let out = '';
-  const code = await main(['status', '--dir', sandboxOf(cfg, dir), '--run-id', 'r1', '--control', ctl], { stdout: (/** @type {string} */ s) => (out += s), stderr: () => {} });
+  const code = await withCwd(dir, () =>
+    main(['status', '--run-id', 'r1', '--control', ctl], { stdout: (/** @type {string} */ s) => (out += s), stderr: () => {} }));
   assert.equal(code, 0);
   const j = JSON.parse(out);
   assert.equal(j.iterations, 2);
   assert.equal(j.control.paused, true);
 });
 
-test('hodgepodge status needs a sandbox (hodge.json)', async () => {
+test('hodgepodge status needs a project config (hodgepodge.yml)', async () => {
   let e = '';
-  const code = await main(['status', '--dir', '/nonexistent/sandbox'], { stdout: () => {}, stderr: (/** @type {string} */ s) => (e += s) });
+  const missing = mkdtempSync(join(tmpdir(), 'hodge-status-missing-'));
+  const code = await withCwd(missing, () => main(['status'], { stdout: () => {}, stderr: (/** @type {string} */ s) => (e += s) }));
   assert.equal(code, 2);
-  assert.match(e, /hodge\.json/);
+  assert.match(e, /hodgepodge\.yml/);
 });

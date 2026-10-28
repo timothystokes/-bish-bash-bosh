@@ -5,12 +5,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { loadModePrompt } from '../src/prompts.js';
-import { buildPrompt, runStep } from '../src/step.js';
+import { buildPrompt, runStep } from '../src/podge-step.js';
 import { validateConfig } from '../src/config.js';
 import { createFakeAdapter } from '../src/adapter.js';
 
 const baseConfig = () => ({
-  targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'a', model: 'm' } },
   budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/**'],

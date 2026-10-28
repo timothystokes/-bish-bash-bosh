@@ -1,16 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   parseQuestions, formatQuestions, nextBatch, renderBatch, resolveAnswer, formatBatchLog, recordAnswers,
   parseResponse, applyResponse, pendingAnswers, unanswered, STORE_HEADER,
-} from '../src/questions.js';
-import { initSandbox } from '../src/init-sandbox.js';
-import { runObjective } from '../src/objective.js';
+} from '../src/hodge-questions.js';
+import { runObjective } from '../src/hodge-objective.js';
+import { freshDir, seedObjectiveProject, writeProjectConfig } from './support/project.js';
 
-/** @param {number} id @param {string} topic @param {Partial<import('../src/questions.js').Question>} [more] */
+const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
+
+/** @param {number} id @param {string} topic @param {object} [more] */
 const q = (id, topic, more = {}) => ({ id, topic, text: `Question ${id}?`, default: `d${id}`, done: false, ...more });
 
 test('Q-1: the store round-trips through code-owned lines with ids, defaults, answers and specs', () => {
@@ -86,15 +88,16 @@ test('Q-6: code updates status from the response: resolved are done with their s
 });
 
 test('Q-7: a round is driven by code: the agent gets only the answers by id, never the conversation or the store', async () => {
-  const dir = join(mkdtempSync(join(tmpdir(), 'q-')), 'sb');
-  initSandbox({ dir, adapter: 'a', model: 'm', seed: 'objective' });
-  const repo = join(dir, 'target');
-  const config = JSON.parse(readFileSync(join(dir, 'hodge.json'), 'utf8'));
+  const repo = freshDir('q-');
+  seedObjectiveProject(repo);
+  const config = { roles: { build: { adapter: 'a', model: 'm' } }, budgets: { maxWallClockSeconds: 60, maxIterations: 5 }, allowedPaths: ['src/'] };
+  writeProjectConfig(repo, config);
+  git(repo, 'add', '-A');
+  git(repo, 'commit', '-q', '-m', 'seed');
   const batch = { resolved: [], gaps: [{ topic: 'Greeting', question: 'Print to stdout?', default: 'yes' }, { topic: 'Errors', question: 'Exit code on bad input?', default: '2' }] };
   /** @type {string[]} */
   const prompts = [];
   const adapter = {
-    /** @param {import('../src/adapter.js').AdapterRequest} req */
     async run(req) {
       prompts.push(req.prompt);
       if (prompts.length === 1) writeFileSync(join(req.cwd, 'objective', 'RESPONSE.json'), JSON.stringify(batch));

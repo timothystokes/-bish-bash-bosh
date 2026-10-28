@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../src/cli.js';
 import { readRunDetails } from '../src/run-details.js';
-import { sandboxOf } from './support/sandbox.js';
+import { commitProjectConfig, withCwd } from './support/project.js';
 
 // A nested `node --test` inherits the outer runner's context and reports green; the target must run standalone.
 delete process.env.NODE_TEST_CONTEXT;
@@ -71,7 +71,6 @@ function makeTarget({ tests = TESTS, planMd = PLAN_MD } = {}) {
 }
 
 const cfg = (extra = {}) => ({
-  targetRepo: 'git@example.com:o/toy.git',
   roles: { build: { adapter: 'builder', model: 'm' }, qa: { adapter: 'checker', model: 'm2' } },
   budgets: { maxWallClockSeconds: 120, maxIterations: 4 },
   allowedPaths: ['src/', 'out/'],
@@ -125,14 +124,15 @@ const tickAll = (/** @type {string} */ cwd) => put(cwd, { 'plan.md': readFileSyn
 async function run(cmd, dir, config, registry) {
   /** @type {string[]} */
   const outs = [];
-  const sandbox = sandboxOf(config, dir);
-  const code = await main([cmd, '--dir', sandbox, '--run-id', 'p6'], {
-    registry,
-    identity: { root: '/nonexistent/hodgepodge', remotes: [] },
-    stdout: (s) => outs.push(s),
-    stderr: () => {},
-  });
-  return { code, sandbox, res: JSON.parse(outs.join('')) };
+  commitProjectConfig(dir, config);
+  const code = await withCwd(dir, () =>
+    main([cmd, '--run-id', 'p6'], {
+      registry,
+      identity: { root: '/nonexistent/hodgepodge', remotes: [] },
+      stdout: (s) => outs.push(s),
+      stderr: () => {},
+    }));
+  return { code, res: JSON.parse(outs.join('')) };
 }
 
 test('phase 6 regression: lint, formats, scripted build, derived done, QA cycle, evidence, lock', async () => {
@@ -150,7 +150,7 @@ test('phase 6 regression: lint, formats, scripted build, derived done, QA cycle,
     },
   ]);
   const qa = scripted([() => findingsBlock([FINDING]), () => findingsBlock([])]);
-  const { code, sandbox, res } = await run('podge', dir, cfg(), { builder: () => build.adapter, checker: () => qa.adapter });
+  const { code, res } = await run('podge', dir, cfg(), { builder: () => build.adapter, checker: () => qa.adapter });
 
   assert.equal(res.status, 'done', JSON.stringify(res));
   assert.equal(code, 0);
@@ -179,7 +179,7 @@ test('phase 6 regression: lint, formats, scripted build, derived done, QA cycle,
   assert.deepEqual(details.formats?.map((/** @type {any} */ d) => d.format), ['json-schema']);
   assert.equal(details.qa?.length, 2);
   assert.equal(details.done?.ok, true);
-  assert.equal(existsSync(join(sandbox, '.hodge.lock')), false, 'the run lock is released');
+  assert.equal(existsSync(join(dir, '.hodge.lock')), false, 'the run lock is released');
 });
 
 test('phase 6 regression: an output that does not conform to the declared schema is stopped by the formats gate with a diagnosis', async () => {
@@ -245,16 +245,17 @@ test('phase 6 regression: spec-lint stops podge before any agent call when a req
 
 test('phase 6 regression: a second run in the same sandbox is refused while the first holds the lock', async () => {
   const dir = makeTarget();
-  const sandbox = sandboxOf(cfg(), dir);
-  writeFileSync(join(sandbox, '.hodge.lock'), `${process.pid}\n`);
+  commitProjectConfig(dir, cfg());
+  writeFileSync(join(dir, '.hodge.lock'), `${process.pid}\n`);
   /** @type {string[]} */
   const errs = [];
-  const code = await main(['podge', '--dir', sandbox, '--run-id', 'p6'], {
-    registry: { builder: () => scripted([() => 'x']).adapter, checker: () => scripted([() => findingsBlock([])]).adapter },
-    identity: { root: '/nonexistent/hodgepodge', remotes: [] },
-    stdout: () => {},
-    stderr: (s) => errs.push(s),
-  });
+  const code = await withCwd(dir, () =>
+    main(['podge', '--run-id', 'p6'], {
+      registry: { builder: () => scripted([() => 'x']).adapter, checker: () => scripted([() => findingsBlock([])]).adapter },
+      identity: { root: '/nonexistent/hodgepodge', remotes: [] },
+      stdout: () => {},
+      stderr: (s) => errs.push(s),
+    }));
   assert.notEqual(code, 0);
   assert.match(errs.join(''), /lock|already running/i);
   assert.equal(readdirSync(join(dir)).includes('runs'), false);

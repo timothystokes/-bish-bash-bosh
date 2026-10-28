@@ -4,10 +4,10 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkBrownfieldGate } from '../src/brownfield-gate.js';
+import { checkBrownfieldGate } from '../src/podge-brownfield-gate.js';
 import { loadModePrompt } from '../src/prompts.js';
-import { runStep } from '../src/step.js';
-import { runLoop } from '../src/driver.js';
+import { runStep } from '../src/podge-step.js';
+import { runLoop } from '../src/podge-driver.js';
 import { createFakeAdapter } from '../src/adapter.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
@@ -29,7 +29,6 @@ function makeRepo(withSpecs) {
 
 const config = () => ({
   mode: 'brownfield',
-  targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'f', model: 'm' } },
   budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],

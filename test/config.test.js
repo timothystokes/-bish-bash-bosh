@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { validateConfig } from '../src/config.js';
 
 const valid = () => ({
-  targetRepo: 'git@example.com:org/delivery.git',
   roles: {
     build: { adapter: 'cli-agent', model: 'model-a' },
     review: { adapter: 'http-agent', model: 'model-b' },
@@ -18,8 +17,8 @@ test('accepts a valid config', () => {
   assert.deepEqual(r.errors, []);
 });
 
-test('requires targetRepo, roles, budgets, allowedPaths', () => {
-  for (const key of ['targetRepo', 'roles', 'budgets', 'allowedPaths']) {
+test('requires roles, budgets, allowedPaths', () => {
+  for (const key of ['roles', 'budgets', 'allowedPaths']) {
     const c = /** @type {Record<string, unknown>} */ (valid());
     delete c[key];
     const r = validateConfig(c);

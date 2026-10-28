@@ -4,9 +4,9 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkHardeningGate } from '../src/hardening-gate.js';
+import { checkHardeningGate } from '../src/podge-hardening-gate.js';
 import { loadModePrompt } from '../src/prompts.js';
-import { runStep } from '../src/step.js';
+import { runStep } from '../src/podge-step.js';
 import { validateConfig } from '../src/config.js';
 import { createFakeAdapter } from '../src/adapter.js';
 
@@ -28,7 +28,6 @@ function makeRepo() {
 
 const config = (/** @type {object} */ extra = {}) => ({
   mode: 'test-hardening',
-  targetRepo: 'git@example.com:o/target.git',
   roles: { build: { adapter: 'f', model: 'm' } },
   budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/', 'tests/'],

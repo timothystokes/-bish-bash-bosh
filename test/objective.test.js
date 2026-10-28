@@ -1,17 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { Readable } from 'node:stream';
-import { initSandbox } from '../src/init-sandbox.js';
-import { runObjective } from '../src/objective.js';
+import { runObjective } from '../src/hodge-objective.js';
 import { sumRunUsage } from '../src/budget-gate.js';
 import { main } from '../src/cli.js';
+import { freshDir, initGitRepo, seedObjectiveProject, withCwd, writeProjectConfig } from './support/project.js';
 
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
+const buildConfig = { roles: { build: { adapter: 'a', model: 'm' } }, budgets: { maxWallClockSeconds: 7200, maxIterations: 20 }, allowedPaths: ['src/', 'bin/', 'lib/', 'package.json'], requireTestPlan: true };
 
 const goodSpec = `# Spec: Greeter
 Implementation: none
@@ -60,7 +60,6 @@ function scripted(/** @type {Record<string, string | null>[]} */ rounds) {
   return {
     prompts,
     adapter: {
-      /** @param {import('../src/adapter.js').AdapterRequest} req */
       async run(req) {
         prompts.push(req.prompt);
         const writes = rounds[prompts.length - 1] ?? {};
@@ -72,9 +71,12 @@ function scripted(/** @type {Record<string, string | null>[]} */ rounds) {
 }
 
 const sandbox = () => {
-  const dir = join(mkdtempSync(join(tmpdir(), 'obj-')), 'sb');
-  assert.equal(initSandbox({ dir, adapter: 'a', model: 'm', seed: 'objective' }).ok, true);
-  return { dir, repo: join(dir, 'target'), config: JSON.parse(readFileSync(join(dir, 'hodge.json'), 'utf8')) };
+  const dir = freshDir('obj-');
+  seedObjectiveProject(dir);
+  writeProjectConfig(dir, buildConfig);
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-q', '-m', 'seed');
+  return { dir, repo: dir, config: buildConfig };
 };
 
 /** @param {(string | null)[]} answers */
@@ -174,12 +176,15 @@ test('no description given is gated and calls no agent', async () => {
 });
 
 test('a target without the kit is gated', async () => {
-  const dir = join(mkdtempSync(join(tmpdir(), 'obj-')), 'sb');
-  initSandbox({ dir, adapter: 'a', model: 'm', seed: 'empty' });
-  const config = { ...JSON.parse(readFileSync(join(dir, 'hodge.json'), 'utf8')) };
-  const res = await runObjective({ config, repoDir: join(dir, 'target'), runId: 'r1', adapter: scripted([]).adapter, ...owner(['x']), identity });
+  const dir = freshDir('obj-');
+  initGitRepo(dir);
+  writeFileSync(join(dir, 'README.md'), 'x\n');
+  writeProjectConfig(dir, buildConfig);
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-q', '-m', 'seed');
+  const res = await runObjective({ config: buildConfig, repoDir: dir, runId: 'r1', adapter: scripted([]).adapter, ...owner(['x']), identity });
   assert.equal(res.status, 'gated');
-  assert.match(res.reason ?? '', /--seed objective/);
+  assert.match(res.reason ?? '', /no objective kit/);
 });
 
 test('gaps but no question is stalled, not an endless loop', async () => {
@@ -258,18 +263,24 @@ test('"done" is remembered: a resumed conversation keeps closing', async () => {
   assert.match(a.prompts[2], /## Readiness gaps/);
 });
 
-test('hodge --dir drives the conversation from stdin', async () => {
-  const { dir } = sandbox();
+test('hodge drives the conversation from stdin, operating on cwd', async () => {
+  const dir = freshDir('obj-');
+  seedObjectiveProject(dir);
+  writeProjectConfig(dir, { ...buildConfig, roles: { build: buildConfig.roles.build, interview: { adapter: 'a', model: 'm' } } });
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-q', '-m', 'seed');
   const a = scripted(fullRounds);
   /** @type {string[]} */
   const outs = [];
-  const code = await main(['hodge', '--dir', dir], {
-    stdout: (s) => outs.push(s),
-    stderr: (s) => outs.push(s),
-    input: Readable.from(['A greeter\n1: Developers\n2: Yes\n']),
-    registry: { a: () => a.adapter },
-    identity,
-  });
+  const code = await withCwd(dir, () =>
+    main(['hodge'], {
+      stdout: (s) => outs.push(s),
+      stderr: (s) => outs.push(s),
+      input: Readable.from(['A greeter\n1: Developers\n2: Yes\n']),
+      registry: { a: () => a.adapter },
+      identity,
+    }),
+  );
   const text = outs.join('');
   assert.equal(code, 0, text);
   assert.match(text, /Describe the objective/);

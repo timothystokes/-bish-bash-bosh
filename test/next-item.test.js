@@ -5,8 +5,8 @@ import { mkdtempSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileS
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nextItem } from '../src/next-item.js';
-import { buildPrompt, buildPlanPrompt } from '../src/step.js';
+import { nextItem } from '../src/podge-next-item.js';
+import { buildPrompt, buildPlanPrompt } from '../src/podge-step.js';
 import { MODES, loadModePrompt, loadQaPrompt } from '../src/prompts.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');

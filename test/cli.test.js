@@ -1,11 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { helpText } from '../src/cli.js';
 
 test('helpText mentions hodge and usage', () => {
-  assert.match(helpText(), /^hodgepodge/);
+  assert.match(helpText(), /hodgepodge: model-agnostic harness/);
   assert.match(helpText(), /Usage:/);
+});
+
+test('helpText no longer documents a --dir flag; every command operates on cwd', () => {
+  assert.doesNotMatch(helpText(), /--dir <sandbox>/);
+  assert.match(helpText(), /no `--dir` flag/);
+  assert.match(helpText(), /hodgepodge\.yml/);
 });
 
 test('bin/hodgepodge --help prints help and exits 0', () => {
@@ -26,11 +35,28 @@ test('bin/hodge and bin/podge --help print the shared help', () => {
 
 test('podge step runs one iteration', async () => {
   const { main } = await import('../src/cli.js');
+  const prev = process.cwd();
+  process.chdir(mkdtempSync(join(tmpdir(), 'cli-nocfg-')));
+  try {
+    /** @type {string[]} */
+    const errs = [];
+    const code = await main(['podge', 'step'], { stdout: () => {}, stderr: (s) => { errs.push(s); } });
+    assert.equal(code, 2);
+    assert.match(errs.join(''), /podge step: /);
+  } finally {
+    process.chdir(prev);
+  }
+});
+
+test('the logo is printed to stderr (not stdout) for every command', async () => {
+  const { main, LOGO } = await import('../src/cli.js');
+  /** @type {string[]} */
+  const outs = [];
   /** @type {string[]} */
   const errs = [];
-  const code = await main(['podge', 'step', '--dir', '/nonexistent/sandbox'], { stdout: () => {}, stderr: (s) => { errs.push(s); } });
-  assert.equal(code, 2);
-  assert.match(errs.join(''), /^podge step: /);
+  await main(['status'], { stdout: (s) => outs.push(s), stderr: (s) => errs.push(s) });
+  assert.match(errs.join(''), new RegExp(LOGO.split('\n').map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\n')));
+  assert.doesNotMatch(outs.join(''), /╷ ╷╭─╮/);
 });
 
 test('removed commands are rejected', async () => {

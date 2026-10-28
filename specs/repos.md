@@ -1,6 +1,8 @@
-# Spec: Repo separation
-- Hodgepodge holds the harness only.
-- Every delivery objective names a **target repo** in config. Specs, plan, tests, run records and code for that objective live in the target repo.
-- Repo gate: the harness must refuse to run if the target repo is hodgepodge itself.
-- Per-step commits go to a sandbox branch/repo of the target; humans review completed work before it leaves the sandbox.
-- Promotion out of the sandbox is deferred (likely a traditional CD pipeline).
+# Spec: Repo model
+- Hodgepodge holds the harness only. It never holds delivered work.
+- Every command operates directly on the current working directory: the project being built. There is no separate sandbox dir and no `--dir` flag; `hodgepodge.yml` (config: roles, budgets, allowedPaths) lives at the project root, alongside the project's own files.
+- Repo gate: the harness must refuse to run if the project directory is hodgepodge's own checkout (the harness never builds itself by accident).
+- Per-step commits go to the project's own branch; humans review completed work (`hodgepodge promote` opens a PR, never merges) before it is promoted further.
+- Promotion beyond that PR review is deferred (likely a traditional CD pipeline).
+- Local driver: one run is one Docker container, with the project directory bind-mounted as the container's working directory (`specs/loop.md`). The cloud driver (`specs/cloud-driver.md`) is a future goal with the same container image and `podge step` contract.
+

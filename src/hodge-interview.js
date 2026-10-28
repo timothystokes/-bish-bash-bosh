@@ -10,7 +10,8 @@ import { loadFormatSkill, loadModePrompt } from './prompts.js';
 import { FORMATS, parseFormats } from './formats.js';
 import { checkReadiness, hasObjectiveKit } from './readiness.js';
 import { consumeInbox, inboxSection, readInbox } from './inbox.js';
-import { applyResponse, parseResponse, pendingAnswers, readQuestions, unanswered, writeQuestions } from './questions.js';
+import { applyResponse, parseResponse, pendingAnswers, readQuestions, unanswered, writeQuestions } from './hodge-questions.js';
+import { LOCK_FILE } from './run-lock.js';
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 
@@ -21,18 +22,6 @@ const ALLOWED = ['specs/', 'objective/'];
 const CODE_OWNED = ['objective/BRIEF.md', 'objective/CONVERSATION.md', 'objective/OPEN-QUESTIONS.md'];
 const RESPONSE_FILE = 'objective/RESPONSE.json';
 
-/**
- * @typedef {{status: 'ok' | 'incomplete' | 'failed' | 'gated' | 'over-budget', sha: string | null, reason?: string}} InterviewResult
- */
-
-/**
- * @param {string} repoDir
- * @param {string} objective
- * @param {boolean} [closing] the interview is expected to end this round: list the readiness gaps to close
- * @param {string} [moreQuestions] pending outer-console entries
- * @param {string} [note] what was wrong with the previous round's response
- * @returns {string}
- */
 export function buildInterviewPrompt(repoDir, objective, closing = false, moreQuestions = '', note = '') {
   const specsDir = join(repoDir, 'specs');
   const existing = existsSync(specsDir) ? readdirSync(specsDir).filter((f) => f.endsWith('.md')).sort() : [];
@@ -50,11 +39,7 @@ export function buildInterviewPrompt(repoDir, objective, closing = false, moreQu
   ].join('\n\n');
 }
 
-/**
- * One skill snippet per known format that any spec declares.
- * @param {string} repoDir
- * @returns {string[]}
- */
+// One skill snippet per known format that any spec declares.
 function formatSkillSections(repoDir) {
   const specsDir = join(repoDir, 'specs');
   if (!existsSync(specsDir)) return [];
@@ -67,26 +52,16 @@ function formatSkillSections(repoDir) {
   return [...names].sort().flatMap((n) => [`## Format skill: ${n}`, loadFormatSkill(n)]);
 }
 
-/**
- * Broad until the first spec exists, then fine-grained.
- * @param {string} repoDir
- * @returns {'broad' | 'fine'}
- */
+// Broad until the first spec exists, then fine-grained.
 export function stageOf(repoDir) {
   const specsDir = join(repoDir, 'specs');
   return existsSync(specsDir) && readdirSync(specsDir).some((f) => f.endsWith('.md')) ? 'fine' : 'broad';
 }
 
-/**
- * With an objective kit, the interview prompt carries pointers to the protocol files plus only what changes per
- * round: the brief, this round's answers keyed by question id and the stage. The question store and the conversation
- * log are code-owned and never shown. The readiness gaps are listed only once the interview is closing (the owner
- * said done, or no question was left).
- * @param {string} repoDir
- * @param {boolean} closing
- * @param {string} note
- * @returns {string[]}
- */
+// With an objective kit, the interview prompt carries pointers to the protocol files plus only what changes per
+// round: the brief, this round's answers keyed by question id and the stage. The question store and the conversation
+// log are code-owned and never shown. The readiness gaps are listed only once the interview is closing (the owner
+// said done, or no question was left).
 function kitSections(repoDir, closing, note) {
   if (!hasObjectiveKit(repoDir)) return [];
   const briefPath = join(repoDir, 'objective', 'BRIEF.md');
@@ -116,44 +91,25 @@ function kitSections(repoDir, closing, note) {
   ];
 }
 
-/**
- * @param {string} dir
- * @param {string[]} args
- */
 const git = (dir, ...args) =>
   execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' });
 
-/**
- * Interview mode: one adapter call that writes specs/ and objective notes. spec-lint (structure only) and the
- * readiness check run only when the interview is expected to be over: `closing` (the owner said done) or the agent
- * left no question. Problems then keep the round `incomplete` and come back as the next round's gaps, never discarded.
- * @param {{
- *   config: unknown,
- *   repoDir: string,
- *   runId: string,
- *   adapter: import('./adapter.js').Adapter,
- *   objective: string,
- *   round?: number,
- *   closing?: boolean,
- *   inboxDir?: string,
- *   note?: string,
- *   identity?: import('./repo-gate.js').HarnessIdentity,
- * }} opts
- * @returns {Promise<InterviewResult>}
- */
-export async function runInterview({ config, repoDir, runId, adapter, objective, round = 1, closing = false, inboxDir, note = '', identity }) {
+// Interview mode: one adapter call that writes specs/ and objective notes. spec-lint (structure only) and the
+// readiness check run only when the interview is expected to be over: `closing` (the owner said done) or the agent
+// left no question. Problems then keep the round `incomplete` and come back as the next round's gaps, never discarded.
+export async function runInterview({ config, repoDir, runId, adapter, objective, round = 1, closing = false, inboxDir = undefined, note = '', identity = undefined }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
-  const cfg = /** @type {{targetRepo: string, budgets: import('./budget-gate.js').Budgets}} */ (config);
-  const gated = (/** @type {string} */ reason) => ({ status: /** @type {const} */ ('gated'), sha: null, reason });
+  const cfg = config;
+  const gated = (reason) => ({ status: 'gated', sha: null, reason });
 
   if (objective.trim() === '') return gated('objective is empty');
   const self = identity ?? harnessIdentity();
-  for (const target of [cfg.targetRepo, repoDir]) {
-    const g = checkRepoGate(target, self);
-    if (!g.ok) return gated(g.reason);
-  }
-  if (git(repoDir, 'status', '--porcelain').trim() !== '') return gated('working tree is not clean');
+  const g = checkRepoGate(repoDir, self);
+  if (!g.ok) return gated(g.reason);
+  // `.hodge.lock` lives in the project root now (no separate sandbox dir); exclude it from the
+  // dirty-working-tree check since it is harness-internal, never committed.
+  if (git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') return gated('working tree is not clean');
   const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
   if (!budget.ok) return { status: 'over-budget', sha: null, reason: budget.reason };
 
@@ -165,7 +121,6 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
   const seconds = (Date.now() - started) / 1000;
 
   const kit = hasObjectiveKit(repoDir);
-  /** @type {string | null} */
   let responseText = null;
   if (kit) {
     for (const f of CODE_OWNED) git(repoDir, 'checkout', 'HEAD', '--', f);
@@ -176,15 +131,12 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
     }
   }
 
-  git(repoDir, 'add', '-A');
+  git(repoDir, 'add', '-A', '--', '.', `:!${LOCK_FILE}`);
   let staged = git(repoDir, 'diff', '--cached', '--name-only').split('\n').filter(Boolean);
 
-  /** @type {InterviewResult['status']} */
   let status = 'ok';
-  /** @type {string | undefined} */
   let reason;
   const outside = staged.filter((f) => !ALLOWED.some((p) => f.startsWith(p)));
-  /** @type {string | undefined} */
   let badResponse;
   if (kit && result.exitStatus === 0 && outside.length === 0) {
     // Code, not the agent, updates question status; a missing response is an empty one.
@@ -192,14 +144,13 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
     const parsed = parseResponse(responseText ?? '{"resolved":[],"gaps":[]}', pendingAnswers(qs).map((q) => q.id));
     if (parsed.ok) {
       writeQuestions(repoDir, applyResponse(qs, parsed.response));
-      git(repoDir, 'add', '-A');
+      git(repoDir, 'add', '-A', '--', '.', `:!${LOCK_FILE}`);
       staged = git(repoDir, 'diff', '--cached', '--name-only').split('\n').filter(Boolean);
     } else badResponse = `invalid ${RESPONSE_FILE}: ${parsed.reason}`;
   }
   const diff = git(repoDir, 'diff', '--cached');
   // No question left to ask the owner means the agent claims the specs are ready.
   const checking = closing || (kit ? unanswered(readQuestions(repoDir)).length === 0 : true);
-  /** @returns {string | undefined} the gaps that keep the interview open */
   const openGaps = () => {
     const gaps = hasObjectiveKit(repoDir) ? checkReadiness(repoDir).gaps : lintSpecs(repoDir, { testPlan: false }).problems;
     return gaps.length > 0 ? `not ready: ${gaps.join('; ')}` : undefined;
@@ -231,7 +182,7 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
   if (status === 'failed') {
     // The tree was clean at start, so this discards only the agent's work (kept in diff).
     git(repoDir, 'reset', '-q', '--hard', 'HEAD');
-    git(repoDir, 'clean', '-fdq');
+    git(repoDir, 'clean', '-fdq', '-e', LOCK_FILE);
   }
 
   const dir = join(repoDir, 'runs', runId, round === 1 ? 'interview' : `interview-${round}`);
@@ -244,7 +195,7 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
     `${JSON.stringify({ status, reason, usage: { seconds }, changedFiles: result.changedFiles }, null, 2)}\n`,
   );
   if (inboxDir && (status === 'ok' || status === 'incomplete')) consumeInbox(inboxDir, 'hodge', moreQuestions);
-  git(repoDir, 'add', '-A');
+  git(repoDir, 'add', '-A', '--', '.', `:!${LOCK_FILE}`);
   git(repoDir, 'commit', '-q', '--allow-empty', '-m', `hodge ${runId}: ${status}`);
 
   return { status, sha: git(repoDir, 'rev-parse', 'HEAD').trim(), ...(reason ? { reason } : {}) };

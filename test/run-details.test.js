@@ -6,9 +6,9 @@ import { join } from 'node:path';
 import { readRunDetails } from '../src/run-details.js';
 import { createLocalStatusSource, readRunStatus } from '../src/status.js';
 import { renderFrame } from '../src/tui.js';
-import { writeDoneReport } from '../src/done.js';
+import { writeDoneReport } from '../src/podge-done.js';
 import { main } from '../src/cli.js';
-import { sandboxOf } from './support/sandbox.js';
+import { writeProjectConfig, withCwd } from './support/project.js';
 
 const budgets = { maxWallClockSeconds: 100, maxIterations: 5 };
 const control = /** @type {const} */ ({ ok: true, paused: false, stop: false });
@@ -138,9 +138,10 @@ test('renderFrame says so when nothing is declared, no QA ran and there is no do
 
 test('hodgepodge status prints formats, readiness, qa and done in the JSON', async () => {
   const repo = makeRepo();
-  const cfg = { targetRepo: 'git@example.com:o/t.git', roles: { build: { adapter: 'f', model: 'm' } }, budgets, allowedPaths: ['src/'] };
+  const cfg = { roles: { build: { adapter: 'f', model: 'm' } }, budgets, allowedPaths: ['src/'] };
+  writeProjectConfig(repo, cfg);
   let out = '';
-  const code = await main(['status', '--dir', sandboxOf(cfg, repo), '--run-id', 'r1'], { stdout: (/** @type {string} */ s) => (out += s), stderr: () => {} });
+  const code = await withCwd(repo, () => main(['status', '--run-id', 'r1'], { stdout: (/** @type {string} */ s) => (out += s), stderr: () => {} }));
   assert.equal(code, 0);
   const j = JSON.parse(out);
   assert.equal(j.details.formats.length, 2);

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { acquireRunLock, LOCK_FILE } from '../src/run-lock.js';
 import { main } from '../src/cli.js';
+import { commitProjectConfig, initGitRepo, withCwd } from './support/project.js';
 
 const tmp = () => mkdtempSync(join(tmpdir(), 'run-lock-'));
 
@@ -47,17 +48,20 @@ async function run(args) {
   return { code, err: errs.join('') };
 }
 
-test('hodge, podge and podge step refuse a sandbox held by a live process, and release the lock when done', async () => {
-  const dir = join(tmp(), 'sb');
-  assert.equal((await run(['init', '--dir', dir, '--adapter', 'copilot', '--model', 'm1'])).code, 0);
-  writeFileSync(join(dir, LOCK_FILE), `${process.ppid}\n`);
-  for (const args of [['hodge'], ['hodge', '--reverse'], ['podge'], ['podge', 'step']]) {
-    const r = await run([...args, '--dir', dir]);
-    assert.equal(r.code, 2, args.join(' '));
-    assert.match(r.err, /another run holds this sandbox/);
-  }
-  writeFileSync(join(dir, LOCK_FILE), '2147483646\n');
-  const r = await main(['podge', 'step', '--dir', dir], { stdout: () => {}, stderr: () => {}, registry: {} });
-  assert.notEqual(r, undefined);
-  assert.equal(existsSync(join(dir, LOCK_FILE)), false);
+test('hodge, podge and podge step refuse a project held by a live process, and release the lock when done', async () => {
+  const dir = tmp();
+  initGitRepo(dir);
+  await withCwd(dir, async () => {
+    commitProjectConfig(dir, { roles: { build: { adapter: 'f', model: 'm' } }, budgets: { maxWallClockSeconds: 60, maxIterations: 5 }, allowedPaths: ['src/'] });
+    writeFileSync(join(dir, LOCK_FILE), `${process.ppid}\n`);
+    for (const args of [['hodge'], ['hodge', '--reverse'], ['podge'], ['podge', 'step']]) {
+      const r = await run(args);
+      assert.equal(r.code, 2, args.join(' '));
+      assert.match(r.err, /another run holds this project/);
+    }
+    writeFileSync(join(dir, LOCK_FILE), '2147483646\n');
+    const r = await main(['podge', 'step'], { stdout: () => {}, stderr: () => {}, registry: {} });
+    assert.notEqual(r, undefined);
+    assert.equal(existsSync(join(dir, LOCK_FILE)), false);
+  });
 });
