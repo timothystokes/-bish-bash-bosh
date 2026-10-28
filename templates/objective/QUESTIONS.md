@@ -1,4 +1,4 @@
-# Open questions
+# Questions
 
 Managed by `hodge`; don't edit. One line per question with two checkboxes: `Answered` ticks once the owner has
 answered (or accepted the default), `Specified` ticks once a spec records the decision. Q1 is the objective

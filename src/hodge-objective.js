@@ -1,12 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { hasObjectiveKit } from './readiness.js';
 import { runInterview } from './hodge-interview.js';
-import { BATCH_HINT, formatBatchLog, nextBatch, readQuestions, recordAnswers, renderBatch, resolveAnswer, unanswered, writeQuestions } from './hodge-questions.js';
+import { BATCH_HINT, nextBatch, readQuestions, recordAnswers, renderBatch, resolveAnswer, unanswered, writeQuestions } from './hodge-questions.js';
 import { LOCK_FILE } from './run-lock.js';
 
-const ENDED = 'Ended the interview: the owner said done.';
 const isDone = (a) => /^(done|finished)$/i.test(a);
 
 // Q1 is the objective description, bootstrapped once and never re-asked: it is already "specified" (nothing to
@@ -42,9 +41,10 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
   let ran = 0;
   let lastStall = '';
   let note = '';
-  const conversationPath = join(repoDir, 'objective', 'CONVERSATION.md');
-  // Once the owner ends the interview (or no question is left), rounds check readiness and close the gaps.
-  let closing = existsSync(conversationPath) && readFileSync(conversationPath, 'utf8').includes(ENDED);
+  // Closing only ever turns on, never off, and controls whether the prompt shows readiness gaps; it is not
+  // persisted across a paused/resumed session, so a resumed conversation starts assuming it is not yet closing
+  // (it flips back on again within a round or two, as soon as no question is left to ask).
+  let closing = false;
 
   const askBatch = async () => {
     const qs = readQuestions(repoDir);
@@ -59,7 +59,6 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
         closing = true;
         const rest = unanswered(qs).map((q) => ({ n: q.id, topic: q.topic, text: q.text, default: q.default }));
         answers = rest.map((q) => ({ n: q.n, answer: q.default, source: ('default') }));
-        appendFileSync(conversationPath, `\n## Round ${round - 1}\n\n${ENDED}\n${formatBatchLog(rest, answers)}\n`);
         break;
       }
       const r = resolveAnswer(batch, reply);
@@ -68,7 +67,6 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
         continue;
       }
       answers = r.answers;
-      appendFileSync(conversationPath, `\n## Round ${round - 1}\n\n${formatBatchLog(batch, answers)}\n`);
       break;
     }
     writeQuestions(repoDir, recordAnswers(qs, answers));

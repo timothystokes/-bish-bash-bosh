@@ -120,7 +120,7 @@ export function checkReadiness(repoDir) {
 
   gaps.push(...checkFormats(repoDir));
 
-  const oq = join(repoDir, 'objective', 'OPEN-QUESTIONS.md');
+  const oq = join(repoDir, 'objective', 'QUESTIONS.md');
   if (existsSync(oq)) {
     for (const line of readFileSync(oq, 'utf8').split('\n')) {
       const m = /^\d+ - Answered: \[[ x]\]; Specified: \[ \]; (.+)$/.exec(line);

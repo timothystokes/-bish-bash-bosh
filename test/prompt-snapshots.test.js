@@ -55,7 +55,7 @@ test('interview drafts specs from each answer and reports resolved ids and gaps 
     assert.match(text, /draft[^.\n]*spec[^.\n]*(each|every) answer/i);
     assert.match(text, /RESPONSE\.json/);
     assert.match(text, /"default"/);
-    assert.match(text, /never open objective\/CONVERSATION\.md/i);
+    assert.match(text, /never open objective\/QUESTIONS\.md/i);
   }
 });
 

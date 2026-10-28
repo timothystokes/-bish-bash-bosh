@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  parseQuestions, formatQuestions, nextBatch, renderBatch, resolveAnswer, formatBatchLog, recordAnswers,
+  parseQuestions, formatQuestions, nextBatch, renderBatch, resolveAnswer, recordAnswers,
   parseResponse, applyResponse, pendingAnswers, unanswered, STORE_HEADER,
 } from '../src/hodge-questions.js';
 import { runObjective } from '../src/hodge-objective.js';
@@ -55,7 +55,6 @@ test('Q-4: "y" accepts every default; index answers override only the named ques
     assert.equal(r.ok, false, bad);
     assert.match(/** @type {{reason: string}} */ (r).reason, /N: answer|index/i);
   }
-  assert.match(formatBatchLog(b, some.answers), /Q3 \[B\] Question 3\?\n {2}A3 \(owner\): 64/);
   assert.deepEqual(recordAnswers([q(1, 'A'), q(3, 'B')], some.answers).map((x) => x.answer), ['d1', '64']);
 });
 
@@ -114,9 +113,9 @@ test('Q-7: a round is driven by code: the agent gets only the answers by id, nev
   });
   assert.match(said[0], /## Greeting\n2\. Print to stdout\? Default: yes[\s\S]*## Errors\n3\. Exit code on bad input\? Default: 2/);
   assert.match(said[0], /y to accept all defaults/i);
-  assert.match(readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8'), /A3 \(owner\): 64[\s\S]*A2 \(default\): yes|A2 \(default\): yes[\s\S]*A3 \(owner\): 64/);
+  assert.match(readFileSync(join(repo, 'objective', 'QUESTIONS.md'), 'utf8'), /Default: yes[\s\S]*Default: 64|Default: 64[\s\S]*Default: yes/, 'answered-but-unresolved questions keep the owner\'s answer as their new default');
   assert.match(prompts[1], /Q2 \[Greeting\] Print to stdout\?: yes/);
   assert.match(prompts[1], /Q3 \[Errors\] Exit code on bad input\?: 64/);
-  for (const p of prompts) assert.doesNotMatch(p, /A3 \(owner\)|## objective\/CONVERSATION/, 'the conversation log is never shown');
-  assert.match(prompts[1], /never open objective\/CONVERSATION\.md/i);
+  for (const p of prompts) assert.doesNotMatch(p, /## objective\/QUESTIONS/, 'the question store is never shown');
+  assert.match(prompts[1], /never open objective\/QUESTIONS\.md/i);
 });

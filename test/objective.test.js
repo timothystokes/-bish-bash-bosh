@@ -112,12 +112,9 @@ test('asks for the description first, then alternates rounds and answers broad t
   assert.match(o.asked[0], /Describe the objective/);
   assert.match(o.said[0], /2\. Who uses the greeter\?/);
   assert.match(o.said[1], /3\. Should names be trimmed\?/);
-  const store0 = readFileSync(join(repo, 'objective', 'OPEN-QUESTIONS.md'), 'utf8');
+  const store0 = readFileSync(join(repo, 'objective', 'QUESTIONS.md'), 'utf8');
   assert.match(store0, /1 - Answered: \[x\]; Specified: \[x\]; Topic: objective; Q: Describe the objective.*; A: A greeter library for Ann/);
-  const convo = readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8');
-  assert.match(convo, /Who uses the greeter\?[\s\S]*Developers/);
-  assert.match(convo, /Should names be trimmed\?[\s\S]*Yes, trim/);
-  const store = readFileSync(join(repo, 'objective', 'OPEN-QUESTIONS.md'), 'utf8');
+  const store = readFileSync(join(repo, 'objective', 'QUESTIONS.md'), 'utf8');
   assert.match(store, /2 - Answered: \[x\]; Specified: \[x\]; Topic: Greeter; Q: Who uses the greeter\?; A: Developers; Spec: specs\/greet\.md/);
   assert.match(store, /3 - Answered: \[x\]; Specified: \[x\];.*A: Yes, trim/, 'statuses are updated by code from the response');
   assert.equal(git(repo, 'status', '--porcelain'), '');
@@ -139,7 +136,7 @@ test('"y" accepts the proposed defaults; the log and the agent see the default a
   const o = owner(['desc', 'Y', 'Yes']);
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ask: o.ask, say: o.say, identity });
   assert.equal(res.status, 'ok');
-  assert.match(readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8'), /A2 \(default\): Yes/);
+  assert.match(readFileSync(join(repo, 'objective', 'QUESTIONS.md'), 'utf8'), /A: Yes/);
   assert.match(a.prompts[1], /Q2 \[Greeter\] Who uses the greeter\?: Yes/);
   assert.match(o.said[0], /y to accept all defaults/i);
 });
@@ -158,7 +155,7 @@ test('an empty answer pauses; rerunning re-asks the pending question and resumes
   const a = scripted(fullRounds);
   const first = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc', '']), identity });
   assert.equal(first.status, 'paused');
-  assert.match(readFileSync(join(repo, 'objective', 'OPEN-QUESTIONS.md'), 'utf8'), /2 - Answered: \[ \]; Specified: \[ \];.*Who uses the greeter\?/, 'question kept for resume');
+  assert.match(readFileSync(join(repo, 'objective', 'QUESTIONS.md'), 'utf8'), /2 - Answered: \[ \]; Specified: \[ \];.*Who uses the greeter\?/, 'question kept for resume');
   assert.equal(git(repo, 'status', '--porcelain'), '');
   const o = owner(['2: Developers', '3: Yes']);
   const second = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ask: o.ask, say: o.say, identity });
@@ -248,20 +245,23 @@ test('rounds with a question never run readiness; "done" ends the interview and 
   const rec = JSON.parse(readFileSync(join(repo, 'runs', 'r1', 'interview', 'record.json'), 'utf8'));
   assert.equal(rec.status, 'incomplete');
   assert.match(rec.reason, /waiting for the owner/);
-  assert.match(readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8'), /Ended the interview/);
 });
 
-test('"done" is remembered: a resumed conversation keeps closing', async () => {
+test('a resumed conversation reaches ready without saying "done" again, once no question is left', async () => {
+  // Closing is not persisted across a pause (only remembered for the current `hodge` invocation): a resumed
+  // conversation starts assuming it is not yet closing, but still reaches `ok` as soon as the round leaves no
+  // question, so a stray resume never needs the owner to repeat "done".
   const { repo, config } = sandbox();
   const a = scripted([
     { 'specs/greet.md': coarse, 'objective/RESPONSE.json': resp([], ['Should names be trimmed?']) },
     { 'specs/greet.md': coarse, 'objective/RESPONSE.json': resp([2], ['Trim names?']) },
     { 'specs/greet.md': goodSpec, 'objective/RESPONSE.json': resp([3]) },
   ]);
-  await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc', 'done', '']), identity });
+  const first = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc', 'done', '']), identity });
+  assert.equal(first.status, 'paused');
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['y']), identity });
   assert.equal(res.status, 'ok');
-  assert.match(a.prompts[2], /## Readiness gaps/);
+  assert.doesNotMatch(a.prompts[2], /## Readiness gaps/, 'closing is not remembered across the resume, only re-derived once no question is left');
 });
 
 test('hodge drives the conversation from stdin, operating on cwd', async () => {
@@ -289,18 +289,17 @@ test('hodge drives the conversation from stdin, operating on cwd', async () => {
   assert.match(text, /"status":"ok"/);
 });
 
-test('code owns the store: agent edits to OPEN-QUESTIONS.md, CONVERSATION.md and QUESTION.md are discarded', async () => {
+test('code owns the store: agent edits to QUESTIONS.md and QUESTION.md are discarded', async () => {
   const { repo, config } = sandbox();
   const a = scripted([
-    { 'objective/RESPONSE.json': resp([], ['Who uses the greeter?']), 'objective/OPEN-QUESTIONS.md': '# hacked\n', 'objective/CONVERSATION.md': 'x\n', 'objective/QUESTION.md': 'Free?\n' },
+    { 'objective/RESPONSE.json': resp([], ['Who uses the greeter?']), 'objective/QUESTIONS.md': '# hacked\n', 'objective/QUESTION.md': 'Free?\n' },
     { 'specs/greet.md': goodSpec, 'objective/RESPONSE.json': resp([2]) },
   ]);
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc', 'y']), identity });
   assert.equal(res.status, 'ok');
   assert.ok(!existsSync(join(repo, 'objective', 'QUESTION.md')));
   assert.ok(!existsSync(join(repo, 'objective', 'RESPONSE.json')), 'the response is consumed, not committed');
-  assert.doesNotMatch(readFileSync(join(repo, 'objective', 'OPEN-QUESTIONS.md'), 'utf8'), /hacked/);
-  assert.doesNotMatch(readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8'), /^x$/m);
+  assert.doesNotMatch(readFileSync(join(repo, 'objective', 'QUESTIONS.md'), 'utf8'), /hacked/);
 });
 
 test('an invalid response keeps the round, leaves the answers pending and is reported to the next round', async () => {

@@ -12,7 +12,7 @@ Per spec in `specs/*.md`:
 - Each `## Formats` bullet (`- <format>: <path>`) names an existing artifact that validates and is referenced by a requirement; artifacts agree across specs.
 - Known formats: `gherkin`, `json-schema`, `openapi`
 
-Across the objective: `objective/OPEN-QUESTIONS.md` has every question's Specified box ticked.
+Across the objective: `objective/QUESTIONS.md` has every question's Specified box ticked.
 
 Judged by the interviewer, reviewed by the owner: a `covered` dimension is really answered, an `n/a` reason is true, and every requirement traces to the brief.
 

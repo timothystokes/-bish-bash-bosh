@@ -1,11 +1,11 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// The question store (`objective/OPEN-QUESTIONS.md`) is owned by code: the agent never reads or edits it. Code picks
+// The question store (`objective/QUESTIONS.md`) is owned by code: the agent never reads or edits it. Code picks
 // the batch to ask, records the owner's answers, hands only those answers to the agent, and updates each question's
 // status from the agent's `objective/RESPONSE.json`.
 
-export const STORE_HEADER = `# Open questions
+export const STORE_HEADER = `# Questions
 
 Managed by \`hodge\`; don't edit. One line per question with two checkboxes: \`Answered\` ticks once the owner has
 answered (or accepted the default), \`Specified\` ticks once a spec records the decision.
@@ -93,15 +93,6 @@ export function resolveAnswer(batch, input) {
   return { ok: true, answers };
 }
 
-export function formatBatchLog(batch, answers) {
-  return batch
-    .map((q) => {
-      const a = (answers.find((x) => x.n === q.n));
-      return `Q${q.n} [${q.topic}] ${q.text}\n  A${q.n} (${a.source}): ${a.answer}`;
-    })
-    .join('\n');
-}
-
 export function recordAnswers(qs, answers) {
   return qs.map((q) => {
     const a = answers.find((x) => x.n === q.id);
@@ -146,7 +137,7 @@ export function applyResponse(qs, response) {
 
 export const BATCH_HINT = 'type y to accept all defaults, "N: answer; M: answer" to change some (the rest keep their defaults), or done to accept every remaining default and end the interview';
 
-const storePath = (repoDir) => join(repoDir, 'objective', 'OPEN-QUESTIONS.md');
+const storePath = (repoDir) => join(repoDir, 'objective', 'QUESTIONS.md');
 
 export function readQuestions(repoDir) {
   return existsSync(storePath(repoDir)) ? parseQuestions(readFileSync(storePath(repoDir), 'utf8')) : [];

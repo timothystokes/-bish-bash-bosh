@@ -22,7 +22,7 @@ const buildConfig = {
 };
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 
-const KIT = ['PHASES.md', 'INTERVIEW.md', 'READINESS.md', 'OPEN-QUESTIONS.md', 'CONVERSATION.md'];
+const KIT = ['PHASES.md', 'INTERVIEW.md', 'READINESS.md', 'QUESTIONS.md'];
 
 // Seeds a project fixture (objective kit + plan.md + package.json + hodgepodge.yml), committed clean.
 function sandbox() {
@@ -37,7 +37,7 @@ function sandbox() {
 test('objective seed copies the general kit and a starter plan; nothing is solution-specific', () => {
   const { repo } = sandbox();
   for (const f of KIT) assert.ok(existsSync(join(repo, 'objective', f)), f);
-  assert.equal(readFileSync(join(repo, 'objective', 'OPEN-QUESTIONS.md'), 'utf8').trim(), readFileSync(join(root, 'templates', 'objective', 'OPEN-QUESTIONS.md'), 'utf8').trim(), 'no question until hodge bootstraps the objective');
+  assert.equal(readFileSync(join(repo, 'objective', 'QUESTIONS.md'), 'utf8').trim(), readFileSync(join(root, 'templates', 'objective', 'QUESTIONS.md'), 'utf8').trim(), 'no question until hodge bootstraps the objective');
   assert.match(readFileSync(join(repo, 'plan.md'), 'utf8'), /- \[ \]/);
   assert.equal(git(repo, 'status', '--porcelain'), '');
   assert.ok(!existsSync(join(repo, 'specs')), 'specs come from the conversation, not the seed');
@@ -75,7 +75,7 @@ test('the kit is part of the interview prompt together with stage and current re
   assert.match(p, /READINESS\.md/);
   assert.doesNotMatch(p, /## Readiness gaps/, 'no readiness check until the interview is ending');
   assert.match(p, /## Stage: broad/);
-  assert.match(p, /never open objective\/CONVERSATION\.md/i);
+  assert.match(p, /never open objective\/QUESTIONS\.md/i);
   const closing = buildInterviewPrompt(repo, 'Build a greeter CLI', true);
   assert.match(closing, /## Readiness gaps/);
   assert.match(closing, /specs\/ has no \*\.md specs/);
@@ -121,7 +121,7 @@ const agent = (writes) => ({
 });
 
 // A project seeded with the kit; `objective` is passed to `runInterview` explicitly (the objective lives in
-// `objective/OPEN-QUESTIONS.md` as question 1 once `hodge` bootstraps it; these tests call `runInterview` directly).
+// `objective/QUESTIONS.md` as question 1 once `hodge` bootstraps it; these tests call `runInterview` directly).
 const briefed = (/** @type {string} */ objective) => sandbox();
 
 test('interview with a kit: lint-clean but not ready is kept as incomplete (a round), not discarded', async () => {
@@ -154,7 +154,7 @@ test('interview with a kit: a ready result is ok; it may write objective/', asyn
     config, repoDir: repo, runId: 'r1', identity, objective: 'Build a greeter',
     adapter: agent({
       'specs/greet.md': goodSpec,
-      'objective/OPEN-QUESTIONS.md': '# Open questions\n\n- [x] Locale? Out of scope.\n',
+      'objective/QUESTIONS.md': '# Questions\n\n- [x] Locale? Out of scope.\n',
     }),
   });
   assert.equal(res.status, 'ok', JSON.stringify(res));
