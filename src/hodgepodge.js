@@ -4,7 +4,7 @@ import { createInterface } from 'node:readline';
 import { CONFIG_FILE } from './project-config.js';
 import { lintSpecs } from './spec-lint.js';
 import { checkReadiness } from './readiness.js';
-import { initProject, ADAPTER_CHOICES, MODEL_CHOICES } from './init.js';
+import { initProject, ADAPTER_CHOICES, MODEL_CHOICES, ROLE_NAMES } from './init.js';
 import { exportBundle } from './clean-room.js';
 import { createLocalStatusSource, readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
@@ -84,32 +84,21 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
       return choices ? askChoice(ask, out, label, choices) : ask(`${label}: `);
     };
     try {
-      const buildAdapter = await askChoice(ask, out, 'build adapter', ADAPTER_CHOICES);
-      if (!buildAdapter) {
-        err('hodgepodge init: aborted (no build adapter given)\n');
-        return 2;
-      }
-      const buildModel = await askModel(buildAdapter, 'build model');
-      if (!buildModel) {
-        err('hodgepodge init: aborted (no build model given)\n');
-        return 2;
-      }
-      const addQa = await ask('add a qa role? (y/N): ');
-      let qa;
-      if (/^y(es)?$/i.test(addQa ?? '')) {
-        const qaAdapter = await askChoice(ask, out, 'qa adapter', ADAPTER_CHOICES);
-        if (!qaAdapter) {
-          err('hodgepodge init: aborted (no qa adapter given)\n');
+      const roles = {};
+      for (const name of ROLE_NAMES) {
+        const adapter = await askChoice(ask, out, `${name} adapter`, ADAPTER_CHOICES);
+        if (!adapter) {
+          err(`hodgepodge init: aborted (no ${name} adapter given)\n`);
           return 2;
         }
-        const qaModel = await askModel(qaAdapter, 'qa model');
-        if (!qaModel) {
-          err('hodgepodge init: aborted (no qa model given)\n');
+        const model = await askModel(adapter, `${name} model`);
+        if (!model) {
+          err(`hodgepodge init: aborted (no ${name} model given)\n`);
           return 2;
         }
-        qa = { adapter: qaAdapter, model: qaModel };
+        roles[name] = { adapter, model };
       }
-      const res = initProject({ dir, build: { adapter: buildAdapter, model: buildModel }, qa });
+      const res = initProject({ dir, roles });
       out(`${JSON.stringify(res)}\n`);
       return res.ok ? 0 : 1;
     } finally {

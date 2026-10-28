@@ -25,20 +25,24 @@ export const MODEL_CHOICES = {
   // openai-http hits an arbitrary /chat/completions endpoint: no catalog, type the model directly.
 };
 
-// `hodgepodge init`: writes <dir>/hodgepodge.yml (default dir: cwd) for the build role (and optionally
-// qa) the owner chose, with default budgets and allowedPaths. The same adapter/model also seed the
-// `interview` and `reverse` roles `hodge` needs, so `hodge` works right after init (hand-edit
-// hodgepodge.yml to use a different adapter/model for those). Refuses if a config already exists.
-// There is no sandbox to scaffold: no target repo, no runtime copy, no launcher scripts.
-export function initProject({ dir, build, qa = undefined }) {
-  if (!build?.adapter || !build?.model) return { ok: false, reason: 'build adapter and model are required' };
+// The four roles hodge and podge use, hardcoded (not a user choice): hodge needs `interview`
+// (and `reverse` for `hodge --reverse`), podge needs `build` (and `qa` when a plan calls for it).
+// `hodgepodge init` asks for all four directly; there is no "add a qa role?" gate.
+export const ROLE_NAMES = ['interview', 'reverse', 'build', 'qa'];
+
+// `hodgepodge init`: writes <dir>/hodgepodge.yml (default dir: cwd) with every role (`interview`,
+// `reverse`, `build`, `qa`) the owner picked, plus default budgets and allowedPaths. Refuses if a
+// config already exists. There is no sandbox to scaffold: no target repo, no runtime copy, no
+// launcher scripts.
+export function initProject({ dir, roles }) {
+  for (const name of ROLE_NAMES) {
+    if (!roles?.[name]?.adapter || !roles[name]?.model) return { ok: false, reason: `${name} adapter and model are required` };
+  }
   const projectDir = resolve(dir ?? '.');
   const configPath = join(projectDir, CONFIG_FILE);
   if (existsSync(configPath)) return { ok: false, reason: `${configPath} already exists` };
-  const roles = { build, interview: { ...build }, reverse: { ...build } };
-  if (qa) roles.qa = qa;
   const cfg = {
-    roles,
+    roles: { interview: roles.interview, reverse: roles.reverse, build: roles.build, qa: roles.qa },
     budgets: { ...DEFAULT_BUDGETS },
     allowedPaths: [...DEFAULT_ALLOWED_PATHS],
     requireTestPlan: true,

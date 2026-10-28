@@ -21,7 +21,7 @@ Hodgepodge holds the harness only. It operates directly on your project (the cur
 npm install
 npm link          # puts hodgepodge, hodge and podge on your PATH (or use ./bin/hodgepodge)
 cd your-project
-hodgepodge init   # interactive: asks which adapter/model to use for build, and optionally qa
+hodgepodge init   # interactive: asks which adapter/model to use for each role (interview, reverse, build, qa)
 ```
 
 `init` writes `hodgepodge.yml` in the current directory (config: roles, budgets, allowedPaths) with sensible default budgets and allowed paths; it refuses to run if `hodgepodge.yml` already exists. It does no scaffolding: no target repo, no runtime copy, no launcher scripts. Then run the commands directly in your project; they take no config, repo or objective flags, and no `--dir`:
@@ -53,7 +53,7 @@ When a spec declares a format, `hodge` adds that format's skill snippet (`prompt
 `hodgepodge.yml` (YAML, at the project root) is validated against `src/config.schema.json`. The key parts (run artifacts `record.json`, `usage.json`, `diagnosis.json` and `done.json` have schemas in `src/schemas/`):
 
 - `allowedPaths`: where the agent works and what it may write (`init` defaults to `src/`, `bin/`, `lib/` and `package.json`, since a CLI entry point and its `bin` mapping are not solution-specific).
-- `roles`: map roles (`build`, `interview`, `reverse`, optional `qa`, ...) to an adapter and model. Models live in config only. `init` asks for `build` (and seeds `interview`/`reverse` with the same adapter/model so `hodge` works right after init) and optionally `qa`; hand-edit `hodgepodge.yml` to use different adapters/models per role.
+- `roles`: map roles (`interview`, `reverse`, `build`, `qa`) to an adapter and model. Models live in config only. `init` asks for all four roles directly (interview and reverse for `hodge`, build and qa for `podge`); hand-edit `hodgepodge.yml` to use different adapters/models per role.
 - `maxQaCycles`: optional, default 5; the most QA cycles `podge` runs when a `qa` role is configured.
 - `budgets`: `maxWallClockSeconds`, `maxIterations`. They are per run id and shared by `hodge` and `podge`. `init` defaults to 7200 s and 20 iterations. The harness does not track tokens or cost: watch real spend on the model backend. `usage.json` holds wall-clock `{seconds}` only.
 - `mode`: `forward` (default), `interview`, `reverse`, `brownfield`, `test-hardening`, `clean-room`.
