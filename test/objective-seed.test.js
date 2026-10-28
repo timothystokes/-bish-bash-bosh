@@ -22,7 +22,7 @@ const buildConfig = {
 };
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 
-const KIT = ['PHASES.md', 'INTERVIEW.md', 'READINESS.md', 'BRIEF.md', 'OPEN-QUESTIONS.md', 'CONVERSATION.md'];
+const KIT = ['PHASES.md', 'INTERVIEW.md', 'READINESS.md', 'OPEN-QUESTIONS.md', 'CONVERSATION.md'];
 
 // Seeds a project fixture (objective kit + plan.md + package.json + hodgepodge.yml), committed clean.
 function sandbox() {
@@ -37,7 +37,7 @@ function sandbox() {
 test('objective seed copies the general kit and a starter plan; nothing is solution-specific', () => {
   const { repo } = sandbox();
   for (const f of KIT) assert.ok(existsSync(join(repo, 'objective', f)), f);
-  assert.match(readFileSync(join(repo, 'objective', 'BRIEF.md'), 'utf8'), /Not yet written/);
+  assert.equal(readFileSync(join(repo, 'objective', 'OPEN-QUESTIONS.md'), 'utf8').trim(), readFileSync(join(root, 'templates', 'objective', 'OPEN-QUESTIONS.md'), 'utf8').trim(), 'no question until hodge bootstraps the objective');
   assert.match(readFileSync(join(repo, 'plan.md'), 'utf8'), /- \[ \]/);
   assert.equal(git(repo, 'status', '--porcelain'), '');
   assert.ok(!existsSync(join(repo, 'specs')), 'specs come from the conversation, not the seed');
@@ -120,12 +120,9 @@ const agent = (writes) => ({
   },
 });
 
-const briefed = (/** @type {string} */ objective) => {
-  const { repo, config } = sandbox();
-  writeFileSync(join(repo, 'objective', 'BRIEF.md'), `# Objective brief\n\n${objective}\n`);
-  git(repo, '-c', 'user.name=t', '-c', 'user.email=t@x', 'commit', '-qam', 'brief');
-  return { repo, config };
-};
+// A project seeded with the kit; `objective` is passed to `runInterview` explicitly (the objective lives in
+// `objective/OPEN-QUESTIONS.md` as question 1 once `hodge` bootstraps it; these tests call `runInterview` directly).
+const briefed = (/** @type {string} */ objective) => sandbox();
 
 test('interview with a kit: lint-clean but not ready is kept as incomplete (a round), not discarded', async () => {
   const { repo, config } = briefed('Build a greeter');

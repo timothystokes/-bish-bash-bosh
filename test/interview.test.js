@@ -155,8 +155,8 @@ test('hodge on a repo without a kit scaffolds objective/ and keeps asking until 
   /** @type {Record<string, string>[]} */
   const rounds = [
     { 'objective/RESPONSE.json': gaps([], 'Who uses the greeter?') },
-    { 'objective/RESPONSE.json': gaps([1], 'Should names be trimmed?'), 'objective/notes.md': 'n\n' },
-    { 'objective/RESPONSE.json': gaps([2], 'Anything out of scope?'), 'objective/notes.md': 'm\n' },
+    { 'objective/RESPONSE.json': gaps([2], 'Should names be trimmed?'), 'objective/notes.md': 'n\n' },
+    { 'objective/RESPONSE.json': gaps([3], 'Anything out of scope?'), 'objective/notes.md': 'm\n' },
   ];
   const prompts = /** @type {string[]} */ ([]);
   let n = 0;
@@ -178,7 +178,7 @@ test('hodge on a repo without a kit scaffolds objective/ and keeps asking until 
   assert.equal(code, 1, 'paused at EOF, not ok');
   assert.ok(n >= 3, `agent ran once per answer, ran ${n} times`);
   assert.match(out.join(''), /Who uses the greeter\?[\s\S]*Should names be trimmed\?[\s\S]*Anything out of scope\?/);
-  assert.match(prompts[1], /Q1 \[Greeter\] Who uses the greeter\?: Yes/);
+  assert.match(prompts[1], /Q2 \[Greeter\] Who uses the greeter\?: Yes/);
   assert.equal(git(dir, 'status', '--porcelain', '--', '.', ':!.hodge.lock'), '');
   assert.equal(readFileSync(join(dir, 'README.md'), 'utf8'), '# target\n');
 });

@@ -1,14 +1,17 @@
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { hasObjectiveKit } from './readiness.js';
 import { runInterview } from './hodge-interview.js';
 import { BATCH_HINT, formatBatchLog, nextBatch, readQuestions, recordAnswers, renderBatch, resolveAnswer, unanswered, writeQuestions } from './hodge-questions.js';
 import { LOCK_FILE } from './run-lock.js';
 
-const PLACEHOLDER = /^Not yet written/m;
 const ENDED = 'Ended the interview: the owner said done.';
 const isDone = (a) => /^(done|finished)$/i.test(a);
+
+// Q1 is the objective description, bootstrapped once and never re-asked: it is already "specified" (nothing to
+// derive a spec from) but stays visible to the agent every round as persistent context (see `objectiveOf`).
+const objectiveOf = (qs) => qs.find((q) => q.id === 1)?.answer ?? '';
 
 const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' });
 
@@ -22,15 +25,16 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
   // dirty-working-tree check since it is harness-internal, never committed.
   if (git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') return gated('working tree is not clean');
 
-  const briefPath = join(repoDir, 'objective', 'BRIEF.md');
-  let brief = existsSync(briefPath) ? readFileSync(briefPath, 'utf8') : '';
-  if (brief.trim() === '' || PLACEHOLDER.test(brief)) {
+  let qs = readQuestions(repoDir);
+  let brief = objectiveOf(qs);
+  if (brief.trim() === '') {
     const description = (await ask('Describe the objective in a sentence or two: what should exist when this is done, and why?\n> ') ?? '').trim();
     if (description === '') return gated('no objective description given');
-    brief = `# Objective brief\n\n${description}\n`;
-    writeFileSync(briefPath, brief);
+    brief = description;
+    qs = [{ id: 1, topic: 'objective', text: 'Describe the objective in a sentence or two: what should exist when this is done, and why?', default: '', answer: brief, specified: true }];
+    writeQuestions(repoDir, qs);
     git(repoDir, 'add', '-A', '--', '.', `:!${LOCK_FILE}`);
-    git(repoDir, 'commit', '-q', '-m', 'hodge: brief');
+    git(repoDir, 'commit', '-q', '-m', 'hodge: objective');
   }
 
   const runDir = join(repoDir, 'runs', runId);

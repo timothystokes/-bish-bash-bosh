@@ -99,34 +99,35 @@ const resp = (/** @type {number[]} */ resolved, /** @type {string[]} */ gaps = [
 /** @type {Record<string, string | null>[]} */
 const fullRounds = [
   { 'objective/RESPONSE.json': resp([], ['Who uses the greeter?']), 'objective/notes.md': 'n\n' },
-  { 'specs/greet.md': coarse, 'objective/RESPONSE.json': resp([1], ['Should names be trimmed?']) },
-  { 'specs/greet.md': goodSpec, 'objective/RESPONSE.json': resp([2]) },
+  { 'specs/greet.md': coarse, 'objective/RESPONSE.json': resp([2], ['Should names be trimmed?']) },
+  { 'specs/greet.md': goodSpec, 'objective/RESPONSE.json': resp([3]) },
 ];
 
 test('asks for the description first, then alternates rounds and answers broad to fine until ready', async () => {
   const { repo, config } = sandbox();
   const a = scripted(fullRounds);
-  const o = owner(['A greeter library for Ann', '1: Developers', '2: Yes, trim']);
+  const o = owner(['A greeter library for Ann', '2: Developers', '3: Yes, trim']);
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ask: o.ask, say: o.say, identity });
   assert.deepEqual(res, { status: 'ok', rounds: 3 });
   assert.match(o.asked[0], /Describe the objective/);
-  assert.match(o.said[0], /1\. Who uses the greeter\?/);
-  assert.match(o.said[1], /2\. Should names be trimmed\?/);
-  assert.match(readFileSync(join(repo, 'objective', 'BRIEF.md'), 'utf8'), /A greeter library for Ann/);
+  assert.match(o.said[0], /2\. Who uses the greeter\?/);
+  assert.match(o.said[1], /3\. Should names be trimmed\?/);
+  const store0 = readFileSync(join(repo, 'objective', 'OPEN-QUESTIONS.md'), 'utf8');
+  assert.match(store0, /1 - Answered: \[x\]; Specified: \[x\]; Topic: objective; Q: Describe the objective.*; A: A greeter library for Ann/);
   const convo = readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8');
   assert.match(convo, /Who uses the greeter\?[\s\S]*Developers/);
   assert.match(convo, /Should names be trimmed\?[\s\S]*Yes, trim/);
   const store = readFileSync(join(repo, 'objective', 'OPEN-QUESTIONS.md'), 'utf8');
-  assert.match(store, /- \[x\] Q1 \[Greeter\] Who uses the greeter\? \| answer: Developers \| spec: specs\/greet\.md/);
-  assert.match(store, /- \[x\] Q2 .*answer: Yes, trim/, 'statuses are updated by code from the response');
+  assert.match(store, /2 - Answered: \[x\]; Specified: \[x\]; Topic: Greeter; Q: Who uses the greeter\?; A: Developers; Spec: specs\/greet\.md/);
+  assert.match(store, /3 - Answered: \[x\]; Specified: \[x\];.*A: Yes, trim/, 'statuses are updated by code from the response');
   assert.equal(git(repo, 'status', '--porcelain'), '');
   // stage and context progress across rounds
   assert.match(a.prompts[0], /## Stage: broad/);
   assert.match(a.prompts[0], /A greeter library for Ann/);
   assert.match(a.prompts[1], /## Stage: broad/);
-  assert.match(a.prompts[1], /Q1 \[Greeter\] Who uses the greeter\?: Developers/);
+  assert.match(a.prompts[1], /Q2 \[Greeter\] Who uses the greeter\?: Developers/);
   assert.match(a.prompts[2], /## Stage: fine/);
-  assert.match(a.prompts[2], /Q2 \[Greeter\] Should names be trimmed\?: Yes, trim/);
+  assert.match(a.prompts[2], /Q3 \[Greeter\] Should names be trimmed\?: Yes, trim/);
   assert.doesNotMatch(a.prompts[2], /Developers/, 'only this round\'s answers are sent');
   assert.doesNotMatch(a.prompts[2], /## Readiness gaps/, 'gaps are listed only once the interview is ending');
   assert.doesNotMatch(a.prompts[2], /Test-plan template/, 'tests are the plan stage, not the interview');
@@ -138,14 +139,14 @@ test('"y" accepts the proposed defaults; the log and the agent see the default a
   const o = owner(['desc', 'Y', 'Yes']);
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ask: o.ask, say: o.say, identity });
   assert.equal(res.status, 'ok');
-  assert.match(readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8'), /A1 \(default\): Yes/);
-  assert.match(a.prompts[1], /Q1 \[Greeter\] Who uses the greeter\?: Yes/);
+  assert.match(readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8'), /A2 \(default\): Yes/);
+  assert.match(a.prompts[1], /Q2 \[Greeter\] Who uses the greeter\?: Yes/);
   assert.match(o.said[0], /y to accept all defaults/i);
 });
 
 test('each round has its own record and all rounds count toward the run budget', async () => {
   const { repo, config } = sandbox();
-  await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted(fullRounds).adapter, ...owner(['d', '1: a', '2: b']), identity });
+  await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted(fullRounds).adapter, ...owner(['d', '2: a', '3: b']), identity });
   for (const d of ['interview', 'interview-2', 'interview-3']) assert.ok(existsSync(join(repo, 'runs', 'r1', d, 'record.json')), d);
   const t = sumRunUsage(repo, 'r1');
   assert.ok(t.seconds >= 0);
@@ -157,12 +158,12 @@ test('an empty answer pauses; rerunning re-asks the pending question and resumes
   const a = scripted(fullRounds);
   const first = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc', '']), identity });
   assert.equal(first.status, 'paused');
-  assert.match(readFileSync(join(repo, 'objective', 'OPEN-QUESTIONS.md'), 'utf8'), /- \[ \] Q1 .*Who uses the greeter\?/, 'question kept for resume');
+  assert.match(readFileSync(join(repo, 'objective', 'OPEN-QUESTIONS.md'), 'utf8'), /2 - Answered: \[ \]; Specified: \[ \];.*Who uses the greeter\?/, 'question kept for resume');
   assert.equal(git(repo, 'status', '--porcelain'), '');
-  const o = owner(['1: Developers', '2: Yes']);
+  const o = owner(['2: Developers', '3: Yes']);
   const second = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ask: o.ask, say: o.say, identity });
   assert.deepEqual(second, { status: 'ok', rounds: 2 });
-  assert.ok(!o.asked.some((p) => /Describe the objective/.test(p)), 'brief is not asked twice');
+  assert.ok(!o.asked.some((p) => /Describe the objective/.test(p)), 'the objective is not asked twice');
   assert.match(o.said[0], /Who uses the greeter/);
   assert.ok(existsSync(join(repo, 'runs', 'r1', 'interview-3', 'record.json')));
 });
@@ -235,13 +236,13 @@ test('rounds with a question never run readiness; "done" ends the interview and 
   const { repo, config } = sandbox();
   const a = scripted([
     { 'specs/greet.md': coarse, 'objective/RESPONSE.json': resp([], ['Should names be trimmed?']) },
-    { 'specs/greet.md': goodSpec, 'objective/RESPONSE.json': resp([1]) },
+    { 'specs/greet.md': goodSpec, 'objective/RESPONSE.json': resp([2]) },
   ]);
   const o = owner(['desc', 'done']);
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ask: o.ask, say: o.say, identity });
   assert.deepEqual(res, { status: 'ok', rounds: 2 });
   assert.match(o.said[0], /done to accept every remaining default/i);
-  assert.match(a.prompts[1], /Q1 \[Greeter\] Should names be trimmed\?: Yes/, 'done accepts the defaults');
+  assert.match(a.prompts[1], /Q2 \[Greeter\] Should names be trimmed\?: Yes/, 'done accepts the defaults');
   assert.doesNotMatch(a.prompts[0], /## Readiness gaps/);
   assert.match(a.prompts[1], /## Readiness gaps[\s\S]*2 requirements/);
   const rec = JSON.parse(readFileSync(join(repo, 'runs', 'r1', 'interview', 'record.json'), 'utf8'));
@@ -254,8 +255,8 @@ test('"done" is remembered: a resumed conversation keeps closing', async () => {
   const { repo, config } = sandbox();
   const a = scripted([
     { 'specs/greet.md': coarse, 'objective/RESPONSE.json': resp([], ['Should names be trimmed?']) },
-    { 'specs/greet.md': coarse, 'objective/RESPONSE.json': resp([1], ['Trim names?']) },
-    { 'specs/greet.md': goodSpec, 'objective/RESPONSE.json': resp([2]) },
+    { 'specs/greet.md': coarse, 'objective/RESPONSE.json': resp([2], ['Trim names?']) },
+    { 'specs/greet.md': goodSpec, 'objective/RESPONSE.json': resp([3]) },
   ]);
   await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc', 'done', '']), identity });
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['y']), identity });
@@ -276,7 +277,7 @@ test('hodge drives the conversation from stdin, operating on cwd', async () => {
     main(['hodge'], {
       stdout: (s) => outs.push(s),
       stderr: (s) => outs.push(s),
-      input: Readable.from(['A greeter\n1: Developers\n2: Yes\n']),
+      input: Readable.from(['A greeter\n2: Developers\n3: Yes\n']),
       registry: { a: () => a.adapter },
       identity,
     }),
@@ -292,7 +293,7 @@ test('code owns the store: agent edits to OPEN-QUESTIONS.md, CONVERSATION.md and
   const { repo, config } = sandbox();
   const a = scripted([
     { 'objective/RESPONSE.json': resp([], ['Who uses the greeter?']), 'objective/OPEN-QUESTIONS.md': '# hacked\n', 'objective/CONVERSATION.md': 'x\n', 'objective/QUESTION.md': 'Free?\n' },
-    { 'specs/greet.md': goodSpec, 'objective/RESPONSE.json': resp([1]) },
+    { 'specs/greet.md': goodSpec, 'objective/RESPONSE.json': resp([2]) },
   ]);
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc', 'y']), identity });
   assert.equal(res.status, 'ok');
@@ -307,11 +308,11 @@ test('an invalid response keeps the round, leaves the answers pending and is rep
   const a = scripted([
     { 'objective/RESPONSE.json': resp([], ['Who uses the greeter?']) },
     { 'specs/greet.md': goodSpec, 'objective/RESPONSE.json': '{"resolved":[{"id":7,"spec":"s"}],"gaps":[]}' },
-    { 'objective/RESPONSE.json': resp([1]) },
+    { 'objective/RESPONSE.json': resp([2]) },
   ]);
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc', 'Y']), identity });
   assert.equal(res.status, 'ok', JSON.stringify(res));
   assert.match(a.prompts[2], /invalid objective\/RESPONSE\.json: resolved id 7 was not answered/);
-  assert.match(a.prompts[2], /Q1 \[Greeter\] Who uses the greeter\?: Yes/, 'the answers are sent again');
+  assert.match(a.prompts[2], /Q2 \[Greeter\] Who uses the greeter\?: Yes/, 'the answers are sent again');
   assert.ok(existsSync(join(repo, 'specs', 'greet.md')), 'work is kept');
 });

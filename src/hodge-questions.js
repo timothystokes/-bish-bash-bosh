@@ -7,26 +7,31 @@ import { join } from 'node:path';
 
 export const STORE_HEADER = `# Open questions
 
-Managed by \`hodge\`; don't edit. One line per question: \`- [ ]\` while open (an \`answer:\` waits for the agent to record it in a spec), \`- [x]\` once a spec records the decision.
-Readiness requires no unchecked items.
+Managed by \`hodge\`; don't edit. One line per question with two checkboxes: \`Answered\` ticks once the owner has
+answered (or accepted the default), \`Specified\` ticks once a spec records the decision.
+Readiness requires every question's Specified box ticked.
 `;
 
 export const MAX_BATCH_TOPICS = 3;
 export const MAX_BATCH_QUESTIONS = 8;
 
-const clean = (s) => s.replace(/\s*\n\s*/g, ' ').replace(/\s\|\s/g, ' / ').trim();
+const clean = (s) => s.replace(/\s*\n\s*/g, ' ').replace(/\s*;\s*/g, ', ').trim();
 const normal = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 export function parseQuestions(text) {
   const out = [];
   for (const line of text.split('\n')) {
-    const m = /^- \[([ x])\] Q(\d+) \[([^\]]*)\] (.*)$/.exec(line);
+    const m = /^(\d+) - Answered: \[([ x])\]; Specified: \[([ x])\]; (.*)$/.exec(line);
     if (!m) continue;
-    const [first, ...fields] = m[4].split(' | ');
-    const q = { id: Number(m[2]), topic: m[3], text: first, default: '', done: m[1] === 'x' };
-    for (const f of fields) {
-      const kv = /^(default|answer|spec): (.*)$/.exec(f);
-      if (kv) q[(kv[1])] = kv[2];
+    const q = { id: Number(m[1]), topic: '', text: '', default: '', specified: m[3] === 'x' };
+    for (const f of m[4].split('; ')) {
+      const kv = /^(Topic|Q|Default|A|Spec): (.*)$/.exec(f);
+      if (!kv) continue;
+      if (kv[1] === 'Topic') q.topic = kv[2];
+      else if (kv[1] === 'Q') q.text = kv[2];
+      else if (kv[1] === 'Default') q.default = kv[2];
+      else if (kv[1] === 'A') q.answer = kv[2];
+      else if (kv[1] === 'Spec') q.spec = kv[2];
     }
     out.push(q);
   }
@@ -35,15 +40,20 @@ export function parseQuestions(text) {
 
 export function formatQuestions(questions) {
   const lines = questions.map((q) => {
-    const fields = [q.done ? '' : `default: ${clean(q.default)}`, q.answer === undefined ? '' : `answer: ${clean(q.answer)}`, q.spec ? `spec: ${clean(q.spec)}` : ''].filter(Boolean);
-    return `- [${q.done ? 'x' : ' '}] Q${q.id} [${clean(q.topic)}] ${clean(q.text)}${fields.map((f) => ` | ${f}`).join('')}`;
+    const fields = [
+      `Topic: ${clean(q.topic)}`,
+      `Q: ${clean(q.text)}`,
+      q.answer === undefined ? `Default: ${clean(q.default)}` : `A: ${clean(q.answer)}`,
+      q.spec ? `Spec: ${clean(q.spec)}` : '',
+    ].filter(Boolean);
+    return `${q.id} - Answered: [${q.answer === undefined ? ' ' : 'x'}]; Specified: [${q.specified ? 'x' : ' '}]; ${fields.join('; ')}`;
   });
   return `${STORE_HEADER}${lines.length ? `\n${lines.join('\n')}\n` : ''}`;
 }
 
-export const unanswered = (qs) => qs.filter((q) => !q.done && q.answer === undefined);
+export const unanswered = (qs) => qs.filter((q) => !q.specified && q.answer === undefined);
 
-export const pendingAnswers = (qs) => qs.filter((q) => !q.done && q.answer !== undefined);
+export const pendingAnswers = (qs) => qs.filter((q) => !q.specified && q.answer !== undefined);
 
 // The next batch to ask, in store order: at most 3 topics and 8 questions.
 export function nextBatch(qs) {
@@ -118,18 +128,18 @@ export function parseResponse(text, answered) {
   return { ok: true, response: j };
 }
 
-// Answered questions the agent resolved become done with their spec; answered ones it did not resolve are asked
+// Answered questions the agent resolved become specified with their spec; answered ones it did not resolve are asked
 // again with the owner's answer as the default; gaps become new questions (a gap repeating an existing question is dropped).
 export function applyResponse(qs, response) {
   const out = qs.map((q) => {
-    if (q.done || q.answer === undefined) return q;
+    if (q.specified || q.answer === undefined) return q;
     const r = response.resolved.find((x) => x.id === q.id);
-    return r ? { ...q, done: true, spec: clean(r.spec) } : { id: q.id, topic: q.topic, text: q.text, default: q.answer, done: false };
+    return r ? { ...q, specified: true, spec: clean(r.spec) } : { id: q.id, topic: q.topic, text: q.text, default: q.answer, specified: false };
   });
   let next = Math.max(0, ...out.map((q) => q.id)) + 1;
   for (const g of response.gaps) {
     if (out.some((q) => normal(q.text) === normal(g.question))) continue;
-    out.push({ id: next++, topic: clean(g.topic), text: clean(g.question), default: clean(g.default), done: false });
+    out.push({ id: next++, topic: clean(g.topic), text: clean(g.question), default: clean(g.default), specified: false });
   }
   return out;
 }

@@ -123,7 +123,7 @@ export function checkReadiness(repoDir) {
   const oq = join(repoDir, 'objective', 'OPEN-QUESTIONS.md');
   if (existsSync(oq)) {
     for (const line of readFileSync(oq, 'utf8').split('\n')) {
-      const m = /^\s*[-*] \[ \] (.+)$/.exec(line);
+      const m = /^\d+ - Answered: \[[ x]\]; Specified: \[ \]; (.+)$/.exec(line);
       if (m) gaps.push(`open question unresolved: ${brief(m[1])}`);
     }
   }

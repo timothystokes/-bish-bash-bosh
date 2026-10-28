@@ -13,22 +13,22 @@ import { freshDir, seedObjectiveProject, writeProjectConfig } from './support/pr
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
 
 /** @param {number} id @param {string} topic @param {object} [more] */
-const q = (id, topic, more = {}) => ({ id, topic, text: `Question ${id}?`, default: `d${id}`, done: false, ...more });
+const q = (id, topic, more = {}) => ({ id, topic, text: `Question ${id}?`, default: `d${id}`, specified: false, ...more });
 
 test('Q-1: the store round-trips through code-owned lines with ids, defaults, answers and specs', () => {
-  const qs = [q(1, 'Greeting'), q(2, 'Greeting', { answer: 'yes | no\nmaybe' }), q(3, 'Errors', { done: true, answer: '64', spec: 'specs/e.md' })];
+  const qs = [q(1, 'Greeting'), q(2, 'Greeting', { answer: 'yes; no\nmaybe' }), q(3, 'Errors', { specified: true, answer: '64', spec: 'specs/e.md' })];
   const text = formatQuestions(qs);
   assert.ok(text.startsWith(STORE_HEADER));
-  assert.match(text, /^- \[ \] Q1 \[Greeting\] Question 1\? \| default: d1$/m);
-  assert.match(text, /^- \[x\] Q3 \[Errors\] Question 3\? \| answer: 64 \| spec: specs\/e\.md$/m);
+  assert.match(text, /^1 - Answered: \[ \]; Specified: \[ \]; Topic: Greeting; Q: Question 1\?; Default: d1$/m);
+  assert.match(text, /^3 - Answered: \[x\]; Specified: \[x\]; Topic: Errors; Q: Question 3\?; A: 64; Spec: specs\/e\.md$/m);
   assert.deepEqual(parseQuestions(text), parseQuestions(formatQuestions(parseQuestions(text))));
-  assert.equal(parseQuestions(text)[1].answer, 'yes / no maybe', 'separators and newlines in an answer are flattened');
+  assert.equal(parseQuestions(text)[1].answer, 'yes, no maybe', 'separators and newlines in an answer are flattened');
   assert.deepEqual(parseQuestions(STORE_HEADER), []);
 });
 
 test('Q-2: code picks the batch: unanswered open questions in order, at most 3 topics and 8 questions', () => {
   const qs = [
-    q(1, 'A', { done: true }), q(2, 'A', { answer: 'x' }), q(3, 'A'),
+    q(1, 'A', { specified: true }), q(2, 'A', { answer: 'x' }), q(3, 'A'),
     ...[4, 5, 6, 7, 8, 9, 10, 11].map((i) => q(i, 'B')),
     q(12, 'C'), q(13, 'D'),
   ];
@@ -36,7 +36,7 @@ test('Q-2: code picks the batch: unanswered open questions in order, at most 3 t
   assert.deepEqual(unanswered(qs).map((x) => x.id).slice(0, 2), [3, 4]);
   assert.deepEqual(pendingAnswers(qs).map((x) => x.id), [2]);
   assert.deepEqual(nextBatch([q(1, 'A'), q(2, 'B'), q(3, 'C'), q(4, 'D')]).map((b) => b.n), [1, 2, 3]);
-  assert.deepEqual(nextBatch([q(1, 'A', { done: true })]), []);
+  assert.deepEqual(nextBatch([q(1, 'A', { specified: true })]), []);
 });
 
 test('Q-3: the batch renders as topics over numbered questions with defaults', () => {
@@ -75,16 +75,16 @@ test('Q-5: the agent response is validated against the answers it was given', ()
   }
 });
 
-test('Q-6: code updates status from the response: resolved are done with their spec, unresolved are re-asked, gaps are new', () => {
+test('Q-6: code updates status from the response: resolved are specified with their spec, unresolved are re-asked, gaps are new', () => {
   const qs = [q(1, 'A', { answer: 'one' }), q(2, 'A', { answer: 'two' }), q(3, 'B')];
   const out = applyResponse(qs, {
     resolved: [{ id: 1, spec: 'specs/a.md' }],
     gaps: [{ topic: 'C', question: 'New gap?', default: 'dn' }, { topic: 'B', question: 'question 3?', default: 'dup' }],
   });
-  assert.deepEqual(out[0], { ...qs[0], done: true, spec: 'specs/a.md' });
-  assert.deepEqual(out[1], { id: 2, topic: 'A', text: 'Question 2?', default: 'two', done: false });
+  assert.deepEqual(out[0], { ...qs[0], specified: true, spec: 'specs/a.md' });
+  assert.deepEqual(out[1], { id: 2, topic: 'A', text: 'Question 2?', default: 'two', specified: false });
   assert.deepEqual(out[2], qs[2]);
-  assert.deepEqual(out.slice(3), [{ id: 4, topic: 'C', text: 'New gap?', default: 'dn', done: false }], 'a repeated question is dropped, new ids continue');
+  assert.deepEqual(out.slice(3), [{ id: 4, topic: 'C', text: 'New gap?', default: 'dn', specified: false }], 'a repeated question is dropped, new ids continue');
 });
 
 test('Q-7: a round is driven by code: the agent gets only the answers by id, never the conversation or the store', async () => {
@@ -104,7 +104,7 @@ test('Q-7: a round is driven by code: the agent gets only the answers by id, nev
       return { transcript: 't', exitStatus: 0, changedFiles: [] };
     },
   };
-  const replies = ['desc', '2: 64'];
+  const replies = ['desc', '3: 64'];
   /** @type {string[]} */
   const said = [];
   await runObjective({
@@ -112,11 +112,11 @@ test('Q-7: a round is driven by code: the agent gets only the answers by id, nev
     ask: async () => replies.shift() ?? null, say: (t) => said.push(t),
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
   });
-  assert.match(said[0], /## Greeting\n1\. Print to stdout\? Default: yes[\s\S]*## Errors\n2\. Exit code on bad input\? Default: 2/);
+  assert.match(said[0], /## Greeting\n2\. Print to stdout\? Default: yes[\s\S]*## Errors\n3\. Exit code on bad input\? Default: 2/);
   assert.match(said[0], /y to accept all defaults/i);
-  assert.match(readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8'), /A2 \(owner\): 64[\s\S]*A1 \(default\): yes|A1 \(default\): yes[\s\S]*A2 \(owner\): 64/);
-  assert.match(prompts[1], /Q1 \[Greeting\] Print to stdout\?: yes/);
-  assert.match(prompts[1], /Q2 \[Errors\] Exit code on bad input\?: 64/);
-  for (const p of prompts) assert.doesNotMatch(p, /A2 \(owner\)|## objective\/CONVERSATION/, 'the conversation log is never shown');
+  assert.match(readFileSync(join(repo, 'objective', 'CONVERSATION.md'), 'utf8'), /A3 \(owner\): 64[\s\S]*A2 \(default\): yes|A2 \(default\): yes[\s\S]*A3 \(owner\): 64/);
+  assert.match(prompts[1], /Q2 \[Greeting\] Print to stdout\?: yes/);
+  assert.match(prompts[1], /Q3 \[Errors\] Exit code on bad input\?: 64/);
+  for (const p of prompts) assert.doesNotMatch(p, /A3 \(owner\)|## objective\/CONVERSATION/, 'the conversation log is never shown');
   assert.match(prompts[1], /never open objective\/CONVERSATION\.md/i);
 });

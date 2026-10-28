@@ -19,7 +19,7 @@ const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templa
 const ALLOWED = ['specs/', 'objective/'];
 
 /** Files code owns: whatever the agent does to them is discarded. */
-const CODE_OWNED = ['objective/BRIEF.md', 'objective/CONVERSATION.md', 'objective/OPEN-QUESTIONS.md'];
+const CODE_OWNED = ['objective/CONVERSATION.md', 'objective/OPEN-QUESTIONS.md'];
 const RESPONSE_FILE = 'objective/RESPONSE.json';
 
 export function buildInterviewPrompt(repoDir, objective, closing = false, moreQuestions = '', note = '') {
@@ -64,14 +64,11 @@ export function stageOf(repoDir) {
 // said done, or no question was left).
 function kitSections(repoDir, closing, note) {
   if (!hasObjectiveKit(repoDir)) return [];
-  const briefPath = join(repoDir, 'objective', 'BRIEF.md');
   const gaps = closing ? checkReadiness(repoDir).gaps : [];
   const qs = readQuestions(repoDir);
   const answers = pendingAnswers(qs);
   return [
     '## Kit (read when needed): objective/PHASES.md, objective/INTERVIEW.md (protocol), objective/READINESS.md (what `ready` checks). Never open objective/CONVERSATION.md or objective/OPEN-QUESTIONS.md: the harness asks the questions, logs the answers and tracks their status.',
-    '## objective/BRIEF.md',
-    existsSync(briefPath) ? readFileSync(briefPath, 'utf8').trimEnd() : '',
     `## Answers this round (${answers.length}): Q<id> [topic] question: owner's answer`,
     answers.map((q) => `Q${q.id} [${q.topic}] ${q.text}: ${q.answer}`).join('\n') || '(none)',
     `## Questions still to ask the owner: ${unanswered(qs).length}`,
