@@ -4,8 +4,6 @@ import { stringify as stringifyYaml } from 'yaml';
 import { validateConfig } from './config.js';
 import { CONFIG_FILE } from './project-config.js';
 
-const DEFAULT_ALLOWED_PATHS = ['src/', 'bin/', 'lib/', 'package.json'];
-
 // Suggested picks shown by `hodgepodge init`'s interactive prompt (src/hodgepodge.js). This is a
 // convenience catalog only, not enforced anywhere: any adapter/model string still works (see
 // src/adapters/index.js's registry and specs/adapters.md's documented exception for this list).
@@ -19,7 +17,7 @@ export const MODEL_CHOICES = {
 };
 
 // `hodgepodge init`: writes <dir>/.hodgepodge/config.yml (default dir: cwd) with the single
-// adapter/model the owner picked, plus default allowedPaths. Refuses if a config already exists.
+// adapter/model the owner picked. Refuses if a config already exists.
 // There is no sandbox to scaffold: no target repo, no runtime copy, no launcher scripts.
 export function initProject({ dir, adapter, model }) {
   if (!adapter || !model) return { ok: false, reason: 'adapter and model are required' };
@@ -29,8 +27,6 @@ export function initProject({ dir, adapter, model }) {
   const cfg = {
     adapter,
     model,
-    allowedPaths: [...DEFAULT_ALLOWED_PATHS],
-    requireTestPlan: true,
   };
   const valid = validateConfig(cfg);
   if (!valid.ok) return { ok: false, reason: `invalid config: ${valid.errors.join('; ')}` };

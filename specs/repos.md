@@ -1,6 +1,6 @@
 # Spec: Repo model
 - Hodgepodge holds the harness only. It never holds delivered work.
-- Every command operates directly on the current working directory: the project being built. There is no separate sandbox dir and no `--dir` flag; `.hodgepodge/config.yml` (config: adapter, model, allowedPaths) lives under the project's `.hodgepodge/` directory, alongside the project's own files.
+- Every command operates directly on the current working directory: the project being built. There is no separate sandbox dir and no `--dir` flag; `.hodgepodge/config.yml` (config: adapter, model) lives under the project's `.hodgepodge/` directory, alongside the project's own files.
 - Repo gate: the harness must refuse to run if the project directory is hodgepodge's own checkout (the harness never builds itself by accident).
 - Per-step commits go to the project's own branch; humans review completed work (`hodgepodge promote` opens a PR, never merges) before it is promoted further.
 - Promotion beyond that PR review is deferred (likely a traditional CD pipeline).

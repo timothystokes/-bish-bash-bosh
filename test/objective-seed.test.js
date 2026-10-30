@@ -15,8 +15,6 @@ const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFil
 const buildConfig = {
   adapter: 'agent-x',
   model: 'model-y',
-  allowedPaths: ['src/', 'bin/', 'lib/', 'package.json'],
-  requireTestPlan: true,
 };
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 
@@ -38,12 +36,11 @@ test('objective seed has no kit to copy: nothing under .hodgepodge until hodge b
   assert.ok(!existsSync(join(repo, 'specs')), 'specs come from the conversation, not the seed');
 });
 
-test('config has a single adapter/model and requires the test plan', () => {
+test('config has a single adapter/model', () => {
   const { config } = sandbox();
   assert.deepEqual(validateConfig(config), { ok: true, errors: [] });
   assert.equal(config.adapter, 'agent-x');
   assert.equal(config.model, 'model-y');
-  assert.equal(config.requireTestPlan, true);
 });
 
 test('hodge has no --objective option (the objective is gathered interactively)', async () => {

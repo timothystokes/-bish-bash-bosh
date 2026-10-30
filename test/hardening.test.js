@@ -29,7 +29,6 @@ function makeRepo() {
 const config = (/** @type {object} */ extra = {}) => ({
   mode: 'test-hardening',
   adapter: 'f', model: 'm',
-  allowedPaths: ['src/', 'tests/'],
   ...extra,
 });
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };

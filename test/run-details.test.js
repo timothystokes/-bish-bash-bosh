@@ -137,7 +137,7 @@ test('renderFrame says so when nothing is declared, no QA ran and there is no do
 
 test('hodgepodge status prints formats, readiness, qa and done in the JSON', async () => {
   const repo = makeRepo();
-  const cfg = { adapter: 'f', model: 'm', allowedPaths: ['src/'] };
+  const cfg = { adapter: 'f', model: 'm' };
   writeProjectConfig(repo, cfg);
   let out = '';
   const code = await withCwd(repo, () => main(['status', '--run-id', 'r1'], { stdout: (/** @type {string} */ s) => (out += s), stderr: () => {} }));

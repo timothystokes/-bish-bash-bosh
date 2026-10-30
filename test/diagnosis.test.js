@@ -81,16 +81,16 @@ test('runStep: a gated failure records diagnosis.json and returns its root cause
   const res = await runStep({
     config: {
       adapter: 'x', model: 'y',
-      allowedPaths: ['src/'],
     },
     repoDir: dir, runId: 'r1',
-    adapter: createFakeAdapter({ exitStatus: 0, transcript: 'ok', writes: { 'other/x.js': 'x\n' } }),
+    // Triggers the anti-stub gate so runStep fails/gates without needing a test-plan setup.
+    adapter: createFakeAdapter({ exitStatus: 0, transcript: 'ok', writes: { 'other/x.js': '// TODO: finish this\n' } }),
     testCommand: ['node', '-e', 'process.exit(0)'],
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
   });
   assert.equal(res.status, 'failed');
-  assert.match(String(res.reason), /scope/);
+  assert.match(String(res.reason), /stub|TODO/i);
   const d = JSON.parse(readFileSync(join(iterationDir(dir, 'r1', 1), 'diagnosis.json'), 'utf8'));
   assert.equal(validateDiagnosis(d).ok, true);
-  assert.match(d.rootCause, /scope/);
+  assert.match(d.rootCause, /stub|TODO/i);
 });

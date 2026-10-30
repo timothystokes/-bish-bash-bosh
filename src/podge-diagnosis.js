@@ -26,7 +26,7 @@ export function parseDiagnosis(transcript) {
 
 /** Per-gate defaults for fix/test/prevention: a failure becomes a sign (prompt/spec/gate change), not a retry. */
 const GATE_ADVICE = {
-  scope: ['Keep changes inside allowedPaths, or widen allowedPaths deliberately in config.', 'Add a scope-gate test for the offending path.', 'State the allowed paths in the prompt or spec.'],
+  scope: ['Keep the plan step to plan.md and tests/ only.', 'Add a scope-gate test for the offending path.', 'State the plan-step scope in the prompt or spec.'],
   'anti-stub': ['Replace the stub with a real implementation.', 'Add a test that fails on the stubbed behaviour.', 'Add a "no stubs" line to the prompt.'],
   formats: ['Make the output conform to the declared format.', 'Add a conformance case for the failing artifact.', 'Name the format and output path in the spec.'],
   tests: ['Fix the regression the tests show.', 'Add or tighten the test that should have caught it.', 'Run scoped tests after each change (prompt).'],

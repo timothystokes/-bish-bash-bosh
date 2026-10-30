@@ -26,7 +26,6 @@ function makeRepo() {
 
 const config = (/** @type {string} */ _targetRepo) => ({
   adapter: 'x', model: 'y',
-  allowedPaths: ['src/'],
 });
 
 const adapter = (f = {}) =>

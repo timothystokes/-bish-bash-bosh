@@ -26,7 +26,6 @@ function makeRepo() {
 
 const config = {
   adapter: 'f', model: 'm',
-  allowedPaths: ['src/'],
 };
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 const pass = ['node', '-e', 'process.exit(0)'];

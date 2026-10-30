@@ -85,7 +85,6 @@ function makeRepo() {
 
 const config = {
   adapter: 'x', model: 'y',
-  allowedPaths: ['src/'],
 };
 const pass = ['node', '-e', 'process.exit(0)'];
 const self = { root: '/nonexistent/hodgepodge', remotes: [] };
@@ -94,16 +93,6 @@ const fake = (/** @type {Record<string, string>} */ writes) =>
 
 /** @param {string} dir */
 const record = (dir) => JSON.parse(readFileSync(join(dir, '.hodgepodge/runs/r1/iterations/001/record.json'), 'utf8'));
-
-test('runStep fails and reverts when the agent edits outside allowedPaths (scope gate)', async () => {
-  const dir = makeRepo();
-  const res = await runStep({ config, repoDir: dir, runId: 'r1', adapter: fake({ 'package.json': '{}\n' }), testCommand: pass, identity: self });
-  assert.equal(res.status, 'failed');
-  assert.equal(git(dir, 'ls-files', 'package.json'), '');
-  const gate = record(dir).gates.find((/** @type {{name: string}} */ g) => g.name === 'scope');
-  assert.equal(gate.ok, false);
-  assert.match(gate.detail, /package\.json/);
-});
 
 test('runStep fails and reverts when the diff contains a stub (anti-stub gate)', async () => {
   const dir = makeRepo();
@@ -125,13 +114,13 @@ test('runStep fails when the type gate fails, and records every gate', async () 
   });
   assert.equal(res.status, 'failed');
   const names = record(dir).gates.map((/** @type {{name: string}} */ g) => g.name);
-  assert.deepEqual(names, ['repo', 'scope', 'anti-stub', 'tests', 'types']);
+  assert.deepEqual(names, ['repo', 'anti-stub', 'tests', 'types']);
   assert.equal(record(dir).gates.find((/** @type {{name: string}} */ g) => g.name === 'types').ok, false);
 });
 
-test('runStep passes all gates for clean in-scope work', async () => {
+test('runStep passes all gates for clean work, with no path restriction', async () => {
   const dir = makeRepo();
-  const res = await runStep({ config, repoDir: dir, runId: 'r1', adapter: fake({ 'src/a.js': 'export const a = 1;\n' }), testCommand: pass, identity: self });
+  const res = await runStep({ config, repoDir: dir, runId: 'r1', adapter: fake({ 'package.json': '{"name":"x"}\n' }), testCommand: pass, identity: self });
   assert.equal(res.status, 'ok');
   assert.ok(record(dir).gates.every((/** @type {{ok: boolean}} */ g) => g.ok));
 });

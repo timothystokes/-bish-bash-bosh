@@ -52,8 +52,6 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
   const config = {
     adapter: 'agent',
     model: 'm',
-    allowedPaths: ['src/'],
-    requireTestPlan: true,
   };
 
   const interviewFixture = {

@@ -18,7 +18,7 @@ function makeRepo() {
   git(dir, 'config', 'user.email', 't@example.com');
   git(dir, 'config', 'user.name', 'T');
   mkdirSync(join(dir, 'specs'));
-  writeFileSync(join(dir, 'specs', 'a.md'), '# Spec A\n');
+  writeFileSync(join(dir, 'specs', 'a.md'), '# Spec: A\nImplementation: none\n');
   writeFileSync(join(dir, 'plan.md'), '# plan\n');
   git(dir, 'add', '-A');
   git(dir, 'commit', '-qm', 'init');
@@ -28,7 +28,6 @@ function makeRepo() {
 const cfg = (/** @type {string} */ adapter) => ({
   adapter,
   model: 'm',
-  allowedPaths: ['src/'],
 });
 
 /** @param {string[]} chunks */
@@ -62,13 +61,21 @@ test('resolveAdapter throws on an unknown adapter id', () => {
 });
 
 test('podge step prints JSON {sha, iteration, status} and exits 0', async () => {
+  // With no tests/PLAN.md yet, iteration 1 is the plan step: the agent must write the
+  // test plan (mapped, with the mapped tests present) and leave the suite red.
   const dir = makeRepo();
   commitProjectConfig(dir, cfg('f'));
   const out = /** @type {string[]} */ ([]);
   const code = await withCwd(dir, () =>
     main(['podge', 'step', '--run-id', 'r1'], {
-      registry: { f: () => createFakeAdapter({ exitStatus: 0, transcript: 'ok', writes: { 'src/a.js': 'x\n' } }) },
-      testCommand: ['node', '-e', 'process.exit(0)'],
+      registry: {
+        f: () => createFakeAdapter({
+          exitStatus: 0,
+          transcript: 'ok',
+          writes: { 'tests/PLAN.md': '| specs/a.md | tests/a.test.js |\n', 'tests/a.test.js': '// red\n' },
+        }),
+      },
+      testCommand: ['node', '-e', 'process.exit(1)'],
       identity: { root: '/nonexistent/hodgepodge', remotes: [] },
       stdout: capture(out),
       stderr: () => {},

@@ -73,8 +73,6 @@ function makeTarget({ tests = TESTS, planMd = PLAN_MD } = {}) {
 const cfg = (extra = {}) => ({
   adapter: 'agent',
   model: 'm',
-  allowedPaths: ['src/', 'out/'],
-  requireTestPlan: true,
   maxQaCycles: 5,
   ...extra,
 });
@@ -234,7 +232,7 @@ test('phase 6 regression: a requirement with no passing test keeps a ticked plan
   const qa = scripted([() => findingsBlock([])]);
   // The requirement stays unproven forever (the build keeps ticking the same plan), so bound the
   // loop with a control-file stop instead of a (now-removed) run budget. The control file lives
-  // outside the project repo (specs/control-and-safety.md), so it is never an allowedPaths gate hit.
+  // outside the project repo (specs/control-and-safety.md), so it never lands inside the working tree.
   const controlFile = join(mkdtempSync(join(tmpdir(), 'hodge-p6-ctl-')), 'control.json');
   const builder = {
     async run(/** @type {{cwd: string}} */ req) {

@@ -32,7 +32,6 @@ test('config schema accepts a single adapter/model and maxQaCycles', () => {
   const cfg = {
     adapter: 'a',
     model: 'm',
-    allowedPaths: ['src/**'],
     maxQaCycles: 3,
   };
   assert.equal(check('config', cfg).ok, true);

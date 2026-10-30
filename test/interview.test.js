@@ -29,7 +29,6 @@ const config = (/** @type {{adapter?: string, model?: string}} */ overrides = {}
   adapter: 'f',
   model: 'm',
   ...overrides,
-  allowedPaths: ['src/'],
 });
 
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };

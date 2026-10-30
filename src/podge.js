@@ -34,7 +34,7 @@ export async function runPodge(cmd, argv, deps, out, err) {
       inboxDir: project.dir,
       ...(cmd === 'podge' && parsed.control ? { controlFile: resolve(parsed.control) } : {}),
       ...(cmd === 'podge' && config.maxQaCycles !== undefined ? { qaAdapter: debugAdapter(resolveAdapter(config, deps.registry ?? defaultRegistry), 'qa', debug, out) } : {}),
-      requireTestPlan: config.requireTestPlan === true,
+      requireTestPlan: true,
       ...(debug ? { log: (m) => out(`[debug] ${m}\n`) } : {}),
     });
     out(`${JSON.stringify(res)}\n`);

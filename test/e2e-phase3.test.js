@@ -20,7 +20,7 @@ const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
 /**
  * @param {string[]} argv
  */
-async function hodge(argv, registry) {
+async function hodge(argv, registry, extra = {}) {
   /** @type {string[]} */
   const outs = [];
   const code = await main(argv, {
@@ -28,6 +28,7 @@ async function hodge(argv, registry) {
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
     stdout: (s) => outs.push(s),
     stderr: () => {},
+    ...extra,
   });
   return { code, res: JSON.parse(outs.join('')) };
 }
@@ -39,6 +40,11 @@ test('phase 3 exit: pause, steer and stop via hodgepodge control drive podge', a
   git(dir, 'config', 'user.name', 'T');
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'toy', type: 'module', scripts: { test: 'node -e 0' } }));
   writeFileSync(join(dir, 'plan.md'), '- [ ] a\n- [ ] b\n- [ ] c\n');
+  mkdirSync(join(dir, 'specs'));
+  writeFileSync(join(dir, 'specs', 'a.md'), '# Spec: A\nImplementation: none\n');
+  mkdirSync(join(dir, 'tests'));
+  writeFileSync(join(dir, 'tests', 'PLAN.md'), '| specs/a.md | tests/a.test.js |\n');
+  writeFileSync(join(dir, 'tests', 'a.test.js'), '// a\n');
   git(dir, 'add', '-A');
   git(dir, 'commit', '-qm', 'target');
 
@@ -46,7 +52,6 @@ test('phase 3 exit: pause, steer and stop via hodgepodge control drive podge', a
   const ctl = join(tmp, 'control.json');
   const config = {
     adapter: 'scripted', model: 'm',
-    allowedPaths: ['src/'],
   };
 
   /** @type {string[]} */
@@ -68,7 +73,11 @@ test('phase 3 exit: pause, steer and stop via hodgepodge control drive podge', a
   assert.equal((await hodge(['control', '--file', ctl, 'pause'])).res.ok, true);
   assert.equal((await hodge(['control', '--file', ctl, 'steer', 'prefer small functions'])).res.ok, true);
   commitProjectConfig(dir, config);
-  const running = withCwd(dir, () => hodge(['podge', '--run-id', 'p3', '--control', ctl], { scripted: () => adapter }));
+  // Red until the first iteration's file lands, then green: satisfies the test-plan gate's
+  // "red before the first build iteration" rule without needing a real test framework.
+  const testCommand = ['node', '-e', "process.exit(require('fs').existsSync('src/f1.txt') ? 0 : 1)"];
+  const running = withCwd(dir, () =>
+    hodge(['podge', '--run-id', 'p3', '--control', ctl], { scripted: () => adapter }, { testCommand }));
   await sleep(300);
   assert.equal(prompts.length, 0, 'no iteration while paused');
   assert.equal(existsSync(join(dir, 'runs', 'p3')), false);

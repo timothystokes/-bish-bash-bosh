@@ -11,7 +11,6 @@ import { createFakeAdapter } from '../src/adapter.js';
 
 const baseConfig = () => ({
   adapter: 'a', model: 'm',
-  allowedPaths: ['src/**'],
 });
 
 test('forward prompt carries the loop rules', () => {

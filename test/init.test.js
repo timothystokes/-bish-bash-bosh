@@ -10,7 +10,7 @@ import { main, helpText } from '../src/cli.js';
 import { freshDir, withCwd } from './support/project.js';
 
 
-test('writes .hodgepodge/config.yml with a single adapter/model and allowedPaths', () => {
+test('writes .hodgepodge/config.yml with a single adapter/model', () => {
   const dir = freshDir('init-');
   const res = initProject({ dir, adapter: 'agent-x', model: 'model-y' });
   assert.equal(res.ok, true, JSON.stringify(res));
@@ -20,17 +20,11 @@ test('writes .hodgepodge/config.yml with a single adapter/model and allowedPaths
   assert.deepEqual(validateConfig(cfg), { ok: true, errors: [] });
   assert.equal(cfg.adapter, 'agent-x');
   assert.equal(cfg.model, 'model-y');
-  assert.equal(cfg.requireTestPlan, true);
+  assert.ok(!('allowedPaths' in cfg), 'allowedPaths is gone: the agent may write any path');
+  assert.ok(!('requireTestPlan' in cfg), 'requireTestPlan is gone: the test plan is always part of the build loop');
   assert.ok(!('roles' in cfg), 'roles is gone: there is a single adapter/model, not one per role');
   assert.ok(!('targetRepo' in cfg), 'targetRepo is gone: there is no separate target dir');
   assert.ok(!('hodgepodge' in cfg), 'hodgepodge (runtime-copy path) is gone: there is no runtime copy');
-});
-
-test('default allowedPaths let the build agent write bin/ and lib/ as well as src/', () => {
-  const dir = freshDir('init-');
-  initProject({ dir, adapter: 'agent-x', model: 'model-y' });
-  const cfg = parseYaml(readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8'));
-  assert.deepEqual(cfg.allowedPaths, ['src/', 'bin/', 'lib/', 'package.json']);
 });
 
 test('refuses to run if .hodgepodge/config.yml already exists (no silent overwrite)', () => {

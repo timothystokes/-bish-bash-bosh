@@ -110,7 +110,6 @@ test('syncImplementation derives Implementation and Evidence from per-requiremen
 
 const config = {
   adapter: 'x', model: 'y',
-  allowedPaths: ['src/', 'plan.md', 'tests/', 'specs/'],
 };
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 const fake = (/** @type {Record<string, string>} */ writes) => createFakeAdapter({ exitStatus: 0, transcript: 'ok', writes });

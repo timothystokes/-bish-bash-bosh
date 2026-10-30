@@ -37,7 +37,7 @@ async function hodge(argv, registry) {
 }
 
 /** @param {Record<string, unknown>} extra */
-const makeConfig = (extra) => ({ allowedPaths: ['src/', 'package.json'], ...extra });
+const makeConfig = (extra) => ({ ...extra });
 const pkg = JSON.stringify({ name: 'toy', type: 'module', scripts: { test: 'node --test tests/*.test.js' } });
 
 test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite passes', async () => {

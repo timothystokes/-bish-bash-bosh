@@ -11,7 +11,7 @@ import { freshDir, initGitRepo, seedObjectiveProject, withCwd, writeProjectConfi
 
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
-const buildConfig = { adapter: 'a', model: 'm', allowedPaths: ['src/', 'bin/', 'lib/', 'package.json'], requireTestPlan: true };
+const buildConfig = { adapter: 'a', model: 'm' };
 
 const goodSpec = `# Spec: Greeter
 Implementation: none

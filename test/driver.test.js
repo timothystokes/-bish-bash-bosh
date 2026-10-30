@@ -29,7 +29,6 @@ function makeRepo(plan) {
 
 const config = () => ({
   adapter: 'f', model: 'm',
-  allowedPaths: ['src/'],
 });
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 const pass = ['node', '-e', 'process.exit(0)'];
@@ -117,13 +116,15 @@ test('runLoop without requireTestPlan does not run spec-lint', async () => {
   assert.notEqual(res.status, 'gated');
 });
 
-test('config accepts optional requireTestPlan boolean', () => {
-  assert.equal(validateConfig({ ...config(), requireTestPlan: true }).ok, true);
-  assert.equal(validateConfig({ ...config(), requireTestPlan: 'yes' }).ok, false);
+test('config rejects requireTestPlan: it is not a config field, only a runStep/runLoop option', () => {
+  assert.equal(validateConfig({ ...config(), requireTestPlan: true }).ok, false);
 });
 
 test('podge prints loop JSON, exit 0 when done, 1 otherwise', async () => {
   const dir = makeRepo('- [ ] one\n');
+  // `podge` (unlike a direct runLoop call) always lints specs, so give it one that passes structurally.
+  writeFileSync(join(dir, 'specs', 'a.md'), '# Spec: A\nImplementation: none\n');
+  git(dir, 'commit', '-aqm', 'fix spec title');
   commitProjectConfig(dir, config());
   const out = /** @type {string[]} */ ([]);
   const code = await withCwd(dir, () =>

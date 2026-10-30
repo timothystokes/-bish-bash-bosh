@@ -24,7 +24,7 @@ cd your-project
 hodgepodge init   # interactive: asks which adapter/model to use for every phase (interview, reverse, build, qa)
 ```
 
-`init` writes `.hodgepodge/config.yml` in the current directory (config: adapter, model, allowedPaths) with sensible default allowed paths; it refuses to run if `.hodgepodge/config.yml` already exists. It does no scaffolding: no target repo, no runtime copy, no launcher scripts. Then run the commands directly in your project; they take no config, repo or objective flags, and no `--dir`:
+`init` writes `.hodgepodge/config.yml` in the current directory (config: adapter, model); it refuses to run if `.hodgepodge/config.yml` already exists. It does no scaffolding: no target repo, no runtime copy, no launcher scripts. Then run the commands directly in your project; they take no config, repo or objective flags, and no `--dir`:
 
 ```sh
 hodge            # requirements and specs: asks for the objective, then interviews you in topic-grouped question batches with defaults, picked and tracked by code (reply `y` for all defaults, or `2: x; 5: y` to override; `done` accepts the remaining defaults) until the specs are ready (or `hodge --reverse` to derive them from code)
@@ -52,8 +52,7 @@ When a spec declares a format, `hodge` adds that format's skill snippet (`prompt
 
 `.hodgepodge/config.yml` (YAML, at the project root) is validated against `src/config.schema.json`. The key parts (run artifacts `record.json`, `usage.json`, `diagnosis.json` and `done.json` have schemas in `src/schemas/`):
 
-- `allowedPaths`: where the agent works and what it may write (`init` defaults to `src/`, `bin/`, `lib/` and `package.json`, since a CLI entry point and its `bin` mapping are not solution-specific).
-- `adapter`/`model`: a single adapter and model used for every phase (interview, reverse, build, qa). Models live in config only. `init` asks for them interactively; hand-edit `.hodgepodge/config.yml` to change them later.
+- `adapter`/`model`: a single adapter and model used for every phase (interview, reverse, build, qa). Models live in config only. `init` asks for them interactively; hand-edit `.hodgepodge/config.yml` to change them later. The agent may write anywhere in the project; the plan step and test-hardening mode are the only places scope is restricted (to `plan.md`/`tests/`, and `tests/` only, respectively — structural, not configurable).
 - `maxQaCycles`: optional, no default; set it to enable the QA cycle (the most cycles `podge` runs before giving up).
 - `usage.json` holds wall-clock `{seconds}` per iteration, summed across a run for visibility (`hodgepodge status`/`tui`). The harness does not track tokens or cost, and there is no run-wide cap: watch real spend on the model backend.
 - `mode`: `forward` (default), `interview`, `reverse`, `brownfield`, `test-hardening`, `clean-room`.

@@ -68,7 +68,7 @@ test('O-3: prompts carry the entries only when given', () => {
 
 test('O-3: `hodgepodge console <kind>` writes each stdin line and stops at /quit; no model, no lock', async () => {
   const dir = tmp();
-  writeProjectConfig(dir, { adapter: 'fake', model: 'm', allowedPaths: ['src/'] });
+  writeProjectConfig(dir, { adapter: 'fake', model: 'm' });
   const out = /** @type {string[]} */ ([]);
   const code = await withCwd(dir, () =>
     main(['console', 'hodge'], {
@@ -106,7 +106,6 @@ function makeRepo() {
 const cfg = {
   adapter: 'fake',
   model: 'm',
-  allowedPaths: ['src/'],
 };
 
 test('O-3: runStep sends the project todos in its prompt and consumes them after an ok step', async () => {

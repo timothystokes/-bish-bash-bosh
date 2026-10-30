@@ -151,7 +151,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   } else {
     const staged = git(repoDir, 'diff', '--cached', '--name-only').split('\n').filter(Boolean);
     const diffOk = [
-      record('scope', checkScopeGate(staged, planStep ? ['plan.md', 'tests/'] : cfg.allowedPaths)),
+      ...(planStep ? [record('scope', checkScopeGate(staged, ['plan.md', 'tests/']))] : []),
       record('anti-stub', checkAntiStubGate(diff)),
       ...(declaresFormats(repoDir) ? [record('formats', checkFormatGate(repoDir))] : []),
       ...(hardening ? [record('tests-only', checkScopeGate(staged, ['tests/']))] : []),

@@ -108,7 +108,6 @@ test('clean-room prompt tells the builder it only has specs and tests', () => {
 const config = () => ({
   mode: 'clean-room',
   adapter: 'f', model: 'm',
-  allowedPaths: ['src/'],
 });
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 

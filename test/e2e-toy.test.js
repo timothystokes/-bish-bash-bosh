@@ -42,8 +42,6 @@ test('toy objective: podge takes a red target to green unattended', async () => 
   const dir = makeToyTarget();
   const config = {
     adapter: 'agent', model: 'm',
-    allowedPaths: ['src/'],
-    requireTestPlan: true,
   };
   commitProjectConfig(dir, config);
   const fixture = {
@@ -89,8 +87,6 @@ test('toy objective: green-from-the-start suite is gated (tests must fail first)
   git(dir, 'commit', '-qm', 'already green');
   const config = {
     adapter: 'agent', model: 'm',
-    allowedPaths: ['src/'],
-    requireTestPlan: true,
   };
   commitProjectConfig(dir, config);
   /** @type {string[]} */

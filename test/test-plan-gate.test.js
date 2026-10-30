@@ -75,7 +75,6 @@ test('red check is skipped once build iterations exist (green allowed)', () => {
 
 const config = (/** @type {string} */ _dir) => ({
   adapter: 'fake', model: 'm',
-  allowedPaths: ['src/'],
 });
 const identity = { remotes: [], root: '/nonexistent-harness' };
 
