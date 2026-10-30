@@ -16,12 +16,12 @@ import { LOCK_FILE } from './run-lock.js';
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 
-/** Interview writes specs and objective notes only; tests are the plan stage's job. */
-const ALLOWED = ['specs/', 'objective/'];
+/** Interview writes specs and `.hodgepodge` notes only; tests are the plan stage's job. */
+const ALLOWED = ['specs/', '.hodgepodge/'];
 
 /** Files code owns: whatever the agent does to them is discarded. */
-const CODE_OWNED = ['objective/QUESTIONS.md'];
-const RESPONSE_FILE = 'objective/RESPONSE.json';
+const CODE_OWNED = ['.hodgepodge/interview.md'];
+const RESPONSE_FILE = '.hodgepodge/response.json';
 
 export function buildInterviewPrompt(repoDir, objective, closing = false, moreQuestions = '', note = '') {
   const specsDir = join(repoDir, 'specs');
@@ -59,17 +59,16 @@ export function stageOf(repoDir) {
   return existsSync(specsDir) && readdirSync(specsDir).some((f) => f.endsWith('.md')) ? 'fine' : 'broad';
 }
 
-// With an objective kit, the interview prompt carries pointers to the protocol files plus only what changes per
-// round: the brief, this round's answers keyed by question id and the stage. The question store and the conversation
-// log are code-owned and never shown. The readiness gaps are listed only once the interview is closing (the owner
-// said done, or no question was left).
+// With a started interview, the prompt carries only what changes per round: the brief, this round's answers
+// keyed by question id and the stage. The question store and the conversation log are code-owned and never
+// shown. The readiness gaps are listed only once the interview is closing (the owner said done, or no question
+// was left).
 function kitSections(repoDir, closing, note) {
   if (!hasObjectiveKit(repoDir)) return [];
   const gaps = closing ? checkReadiness(repoDir).gaps : [];
   const qs = readQuestions(repoDir);
   const answers = pendingAnswers(qs);
   return [
-    '## Kit (read when needed): objective/PHASES.md, objective/INTERVIEW.md (protocol), objective/READINESS.md (what `ready` checks). Never open objective/QUESTIONS.md: the harness asks the questions and tracks their status.',
     `## Answers this round (${answers.length}): Q<id> [topic] question: owner's answer`,
     answers.map((q) => `Q${q.id} [${q.topic}] ${q.text}: ${q.answer}`).join('\n') || '(none)',
     `## Questions still to ask the owner: ${unanswered(qs).length}`,
@@ -77,7 +76,7 @@ function kitSections(repoDir, closing, note) {
     stageOf(repoDir) === 'broad'
       ? 'No specs yet: look for gaps in purpose, users, capabilities, scope, constraints and success; draft a spec once an answer settles a decision.'
       : 'Specs exist: go deeper on the capability with the most gaps; update specs/ from the answers.',
-    'Finish by writing objective/RESPONSE.json (resolved ids and gaps, see above).',
+    'Finish by writing .hodgepodge/response.json (resolved ids and gaps, see above).',
     ...(note ? [`## Previous round`, note] : []),
     ...(closing
       ? [
@@ -105,7 +104,7 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
   const self = identity ?? harnessIdentity();
   const g = checkRepoGate(repoDir, self);
   if (!g.ok) return gated(g.reason);
-  // `.hodge.lock` lives in the project root now (no separate sandbox dir); exclude it from the
+  // `.hodgepodge/lock` is harness-internal; exclude it from the
   // dirty-working-tree check since it is harness-internal, never committed.
   if (git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') return gated('working tree is not clean');
   const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
@@ -122,7 +121,6 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
   let responseText = null;
   if (kit) {
     for (const f of CODE_OWNED) git(repoDir, 'checkout', 'HEAD', '--', f);
-    rmSync(join(repoDir, 'objective', 'QUESTION.md'), { force: true });
     if (existsSync(join(repoDir, RESPONSE_FILE))) {
       responseText = readFileSync(join(repoDir, RESPONSE_FILE), 'utf8');
       rmSync(join(repoDir, RESPONSE_FILE));
@@ -158,13 +156,13 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
     reason = `agent exited ${result.exitStatus}`;
   } else if (outside.length > 0) {
     status = 'failed';
-    reason = `wrote outside specs/ and objective/: ${outside.join(', ')}`;
+    reason = `wrote outside specs/ and .hodgepodge/: ${outside.join(', ')}`;
   } else if (badResponse) {
     status = 'incomplete';
     reason = badResponse;
   } else if (staged.length === 0 && !(closing && !openGaps())) {
     status = 'failed';
-    reason = 'agent made no changes (nothing written to objective/ or specs/)';
+    reason = 'agent made no changes (nothing written to .hodgepodge/ or specs/)';
   } else if (!checking) {
     status = 'incomplete';
     reason = 'interview in progress: waiting for the owner\'s answer';
@@ -183,7 +181,7 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
     git(repoDir, 'clean', '-fdq', '-e', LOCK_FILE);
   }
 
-  const dir = join(repoDir, 'runs', runId, round === 1 ? 'interview' : `interview-${round}`);
+  const dir = join(repoDir, '.hodgepodge', 'runs', runId, round === 1 ? 'interview' : `interview-${round}`);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'transcript.txt'), formatTranscript(prompt, result.transcript));
   writeFileSync(join(dir, 'diff.patch'), diff);

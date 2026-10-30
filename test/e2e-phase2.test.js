@@ -103,6 +103,6 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
 
   execFileSync('npm', ['test', '--silent'], { cwd: dir, stdio: 'pipe' });
   assert.equal(git(dir, 'status', '--porcelain'), '');
-  const rec = JSON.parse(readFileSync(join(dir, 'runs', 'p2', 'iterations', '002', 'record.json'), 'utf8'));
+  const rec = JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'p2', 'iterations', '002', 'record.json'), 'utf8'));
   assert.equal(rec.status, 'ok');
 });

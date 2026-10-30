@@ -94,7 +94,7 @@ const fake = (/** @type {Record<string, string>} */ writes) =>
   createFakeAdapter({ exitStatus: 0, transcript: 't', writes });
 
 /** @param {string} dir */
-const record = (dir) => JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
+const record = (dir) => JSON.parse(readFileSync(join(dir, '.hodgepodge/runs/r1/iterations/001/record.json'), 'utf8'));
 
 test('runStep fails and reverts when the agent edits outside allowedPaths (scope gate)', async () => {
   const dir = makeRepo();

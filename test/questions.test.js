@@ -43,19 +43,18 @@ test('Q-3: the batch renders as topics over numbered questions with defaults', (
   assert.equal(renderBatch(nextBatch([q(1, 'A'), q(2, 'B'), q(3, 'A')])), '## A\n1. Question 1? Default: d1\n3. Question 3? Default: d3\n\n## B\n2. Question 2? Default: d2');
 });
 
-test('Q-4: "y" accepts every default; index answers override only the named questions; bad replies are rejected with a hint', () => {
+test('Q-4: "N: answer" overrides only the named questions; bad replies are rejected with a hint', () => {
   const b = nextBatch([q(1, 'A'), q(2, 'A'), q(3, 'B')]);
-  const all = resolveAnswer(b, 'y');
-  assert.ok(all.ok && all.answers.every((a) => a.source === 'default'));
   const some = resolveAnswer(b, '2: yes, with a default; 3: 64');
   assert.ok(some.ok);
-  assert.deepEqual(some.answers.map((a) => [a.n, a.answer, a.source]), [[1, 'd1', 'default'], [2, 'yes, with a default', 'owner'], [3, '64', 'owner']]);
+  assert.deepEqual(some.overrides, [{ n: 2, answer: 'yes, with a default' }, { n: 3, answer: '64' }]);
   for (const bad of ['9: x', 'maybe', '', '2:']) {
     const r = resolveAnswer(b, bad);
     assert.equal(r.ok, false, bad);
     assert.match(/** @type {{reason: string}} */ (r).reason, /N: answer|index/i);
   }
-  assert.deepEqual(recordAnswers([q(1, 'A'), q(3, 'B')], some.answers).map((x) => x.answer), ['d1', '64']);
+  const answers = [{ n: 1, answer: 'd1' }, { n: 2, answer: 'yes, with a default' }, { n: 3, answer: '64' }];
+  assert.deepEqual(recordAnswers([q(1, 'A'), q(3, 'B')], answers).map((x) => x.answer), ['d1', '64']);
 });
 
 test('Q-5: the agent response is validated against the answers it was given', () => {
@@ -99,11 +98,11 @@ test('Q-7: a round is driven by code: the agent gets only the answers by id, nev
   const adapter = {
     async run(req) {
       prompts.push(req.prompt);
-      if (prompts.length === 1) writeFileSync(join(req.cwd, 'objective', 'RESPONSE.json'), JSON.stringify(batch));
+      if (prompts.length === 1) writeFileSync(join(req.cwd, '.hodgepodge', 'response.json'), JSON.stringify(batch));
       return { transcript: 't', exitStatus: 0, changedFiles: [] };
     },
   };
-  const replies = ['desc', '3: 64'];
+  const replies = ['desc', '3: 64', 'ok'];
   /** @type {string[]} */
   const said = [];
   await runObjective({
@@ -112,10 +111,10 @@ test('Q-7: a round is driven by code: the agent gets only the answers by id, nev
     identity: { root: '/nonexistent/hodgepodge', remotes: [] },
   });
   assert.match(said[0], /## Greeting\n2\. Print to stdout\? Default: yes[\s\S]*## Errors\n3\. Exit code on bad input\? Default: 2/);
-  assert.match(said[0], /y to accept all defaults/i);
-  assert.match(readFileSync(join(repo, 'objective', 'QUESTIONS.md'), 'utf8'), /Default: yes[\s\S]*Default: 64|Default: 64[\s\S]*Default: yes/, 'answered-but-unresolved questions keep the owner\'s answer as their new default');
+  assert.match(said[0], /ok when ready to continue/i);
+  assert.match(readFileSync(join(repo, '.hodgepodge', 'interview.md'), 'utf8'), /Default: yes[\s\S]*Default: 64|Default: 64[\s\S]*Default: yes/, 'answered-but-unresolved questions keep the owner\'s answer as their new default');
   assert.match(prompts[1], /Q2 \[Greeting\] Print to stdout\?: yes/);
   assert.match(prompts[1], /Q3 \[Errors\] Exit code on bad input\?: 64/);
-  for (const p of prompts) assert.doesNotMatch(p, /## objective\/QUESTIONS/, 'the question store is never shown');
-  assert.match(prompts[1], /never open objective\/QUESTIONS\.md/i);
+  for (const p of prompts) assert.doesNotMatch(p, /## \.hodgepodge\/interview/, 'the question store is never shown');
+  assert.match(prompts[1], /never open `?\.hodgepodge\/interview\.md`?/i);
 });

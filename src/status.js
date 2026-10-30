@@ -4,7 +4,7 @@ import { sumRunUsage } from './budget-gate.js';
 import { readRunDetails } from './run-details.js';
 
 function lastIteration(repoDir, runId) {
-  const base = join(repoDir, 'runs', runId, 'iterations');
+  const base = join(repoDir, '.hodgepodge', 'runs', runId, 'iterations');
   if (!existsSync(base)) return null;
   const last = readdirSync(base)
     .filter((n) => /^\d+$/.test(n) && existsSync(join(base, n, 'record.json')))

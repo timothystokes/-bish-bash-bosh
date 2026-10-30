@@ -1,15 +1,11 @@
-import { mkdirSync, readdirSync, existsSync, writeFileSync, copyFileSync, rmSync } from 'node:fs';
+import { mkdirSync, existsSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { stringify as stringifyYaml } from 'yaml';
 import { validateConfig } from './config.js';
 import { CONFIG_FILE } from './project-config.js';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const templates = join(root, 'templates');
-
 // Sensible defaults for a live agent: one conversation round plus several steps (same figures the
-// former sandbox scaffolding used), and the paths an objective-kit build is allowed to touch.
+// former sandbox scaffolding used), and the paths a build is allowed to touch.
 const DEFAULT_BUDGETS = { maxWallClockSeconds: 7200, maxIterations: 20 };
 const DEFAULT_ALLOWED_PATHS = ['src/', 'bin/', 'lib/', 'package.json'];
 
@@ -28,10 +24,10 @@ export const MODEL_CHOICES = {
 // The four roles hodge and podge use, hardcoded (not a user choice): hodge needs `interview`
 // (and `reverse` for `hodge --reverse`), podge needs `build` (and `qa` when a plan calls for it).
 // `hodgepodge init` asks for a single adapter/model and applies it to all four; hand-edit
-// hodgepodge.yml afterward to use a different adapter/model for a specific role.
+// .hodgepodge/config.yml afterward to use a different adapter/model for a specific role.
 export const ROLE_NAMES = ['interview', 'reverse', 'build', 'qa'];
 
-// `hodgepodge init`: writes <dir>/hodgepodge.yml (default dir: cwd) with every role (`interview`,
+// `hodgepodge init`: writes <dir>/.hodgepodge/config.yml (default dir: cwd) with every role (`interview`,
 // `reverse`, `build`, `qa`) the owner picked, plus default budgets and allowedPaths. Refuses if a
 // config already exists. There is no sandbox to scaffold: no target repo, no runtime copy, no
 // launcher scripts.
@@ -50,20 +46,7 @@ export function initProject({ dir, roles }) {
   };
   const valid = validateConfig(cfg);
   if (!valid.ok) return { ok: false, reason: `invalid config: ${valid.errors.join('; ')}` };
+  mkdirSync(dirname(configPath), { recursive: true });
   writeFileSync(configPath, stringifyYaml(cfg));
   return { ok: true, dir: projectDir, config: configPath };
-}
-
-function copyTree(from, to) {
-  mkdirSync(to, { recursive: true });
-  for (const e of readdirSync(from, { withFileTypes: true })) {
-    if (e.isDirectory()) copyTree(join(from, e.name), join(to, e.name));
-    else copyFileSync(join(from, e.name), join(to, e.name));
-  }
-}
-
-// Add the objective kit to an existing project: nothing already there (plan.md, package.json, specs) is touched.
-export function addObjectiveKit(repo) {
-  copyTree(join(templates, 'objective'), join(repo, 'objective'));
-  rmSync(join(repo, 'objective', 'plan.md'));
 }

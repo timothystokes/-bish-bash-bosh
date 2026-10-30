@@ -14,7 +14,7 @@ test('helpText mentions hodge and usage', () => {
 test('helpText no longer documents a --dir flag; every command operates on cwd', () => {
   assert.doesNotMatch(helpText(), /--dir <sandbox>/);
   assert.match(helpText(), /no `--dir` flag/);
-  assert.match(helpText(), /hodgepodge\.yml/);
+  assert.match(helpText(), /\.hodgepodge\/config\.yml/);
 });
 
 test('bin/hodgepodge --help prints help and exits 0', () => {

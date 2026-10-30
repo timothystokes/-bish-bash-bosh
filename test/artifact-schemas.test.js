@@ -95,7 +95,7 @@ test('done.json written by writeDoneReport conforms; bad shapes do not', () => {
       gaps: ['R-x-1: no passing test names it'],
     };
     writeDoneReport(repo, 'run1', report);
-    const r = check('done', JSON.parse(readFileSync(join(repo, 'runs', 'run1', 'done.json'), 'utf8')));
+    const r = check('done', JSON.parse(readFileSync(join(repo, '.hodgepodge', 'runs', 'run1', 'done.json'), 'utf8')));
     assert.equal(r.ok, true, r.errors.join('; '));
     assert.equal(check('done', { ...report, requirements: [{ ...report.requirements[0], status: 'maybe' }] }).ok, false);
     assert.equal(check('done', { ...report, gaps: 'none' }).ok, false);

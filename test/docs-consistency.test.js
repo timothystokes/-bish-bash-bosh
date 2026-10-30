@@ -21,7 +21,6 @@ const registry = Object.keys(FORMATS).sort();
 for (const [name, text] of /** @type {[string, () => string][]} */ ([
   ['README.md', () => read('README.md')],
   ['specs/formats.md', () => read('specs/formats.md')],
-  ['templates/objective/READINESS.md', () => read('templates/objective/READINESS.md')],
   ['CLI help', () => helpText()],
 ])) {
   test(`G-4: ${name} lists exactly the registered formats`, () => {

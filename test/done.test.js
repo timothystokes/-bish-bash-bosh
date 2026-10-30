@@ -128,7 +128,7 @@ test('runLoop: done only after verification passes, and writes done.json evidenc
   const dir = makeRepo();
   const res = await runLoop({ config, repoDir: dir, runId: 'r', adapter: fake({ 'src/b.js': 'export const b = 1;\n' }), testCommand: suite(GREEN).command, typeCommand: ok, identity });
   assert.equal(res.status, 'done');
-  const path = join(dir, 'runs', 'r', 'done.json');
+  const path = join(dir, '.hodgepodge', 'runs', 'r', 'done.json');
   assert.ok(existsSync(path));
   const report = JSON.parse(readFileSync(path, 'utf8'));
   assert.equal(report.ok, true);

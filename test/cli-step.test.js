@@ -104,11 +104,12 @@ test('podge step reports config problems on stderr with exit 2', async () => {
     main(['podge', 'step'], { stdout: () => {}, stderr: capture(err) }));
   assert.equal(missing, 2);
   assert.match(err.join(''), /cannot read config/);
-  assert.match(err.join(''), /hodgepodge\.yml/);
+  assert.match(err.join(''), /config\.yml/);
 
   err.length = 0;
   const badDir = mkdtempSync(join(tmpdir(), 'hodge-bad-'));
-  writeFileSync(join(badDir, 'hodgepodge.yml'), 'nope: true\n');
+  mkdirSync(join(badDir, '.hodgepodge'), { recursive: true });
+  writeFileSync(join(badDir, '.hodgepodge', 'config.yml'), 'nope: true\n');
   const bad = await withCwd(badDir, () => main(['podge', 'step'], { stdout: () => {}, stderr: capture(err) }));
   assert.equal(bad, 2);
   assert.match(err.join(''), /invalid config/);

@@ -42,7 +42,7 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // Source files (not tests, specs, docs, data or run records) scanned for stub markers.
 function sourceFiles(repoDir) {
   const files = execFileSync('git', ['-C', repoDir, 'ls-files'], { encoding: 'utf8' }).split('\n').filter(Boolean);
-  return files.filter((f) => !/^(tests?|specs|objective|runs|node_modules)\//.test(f) && !/\.(md|json|lock)$/.test(f));
+  return files.filter((f) => !/^(tests?|specs|\.hodgepodge|node_modules)\//.test(f) && !/\.(md|json|lock)$/.test(f));
 }
 
 // Harness-derived "done": suite green, types clean, every requirement proven by a passing test whose
@@ -123,7 +123,7 @@ export function syncImplementation(repoDir, requirements) {
 }
 
 export function writeDoneReport(repoDir, runId, report) {
-  const path = join(repoDir, 'runs', runId, 'done.json');
+  const path = join(repoDir, '.hodgepodge', 'runs', runId, 'done.json');
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(report, null, 2)}\n`);
 }

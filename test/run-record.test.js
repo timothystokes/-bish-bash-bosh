@@ -32,7 +32,7 @@ test('validateRunRecord rejects bad fields', () => {
 });
 
 test('iterationDir zero-pads the iteration number', () => {
-  assert.equal(iterationDir('/r', 'run1', 7), join('/r', 'runs', 'run1', 'iterations', '007'));
+  assert.equal(iterationDir('/r', 'run1', 7), join('/r', '.hodgepodge', 'runs', 'run1', 'iterations', '007'));
 });
 
 test('writeIterationRecord writes the spec layout', () => {
@@ -54,7 +54,7 @@ test('writeIterationRecord writes the spec layout', () => {
 test('writeIterationRecord refuses invalid records and leaves nothing behind', () => {
   const repo = tmp();
   assert.throws(() => writeIterationRecord(repo, 'run1', 1, { ...record(), status: /** @type {any} */ ('nope') }), /status/);
-  assert.equal(existsSync(join(repo, 'runs')), false);
+  assert.equal(existsSync(join(repo, '.hodgepodge', 'runs')), false);
 });
 
 test('writeIterationRecord refuses to overwrite an existing iteration', () => {
@@ -62,7 +62,7 @@ test('writeIterationRecord refuses to overwrite an existing iteration', () => {
   writeIterationRecord(repo, 'run1', 1, record());
   assert.throws(() => writeIterationRecord(repo, 'run1', 1, record()), /exists/);
   writeIterationRecord(repo, 'run1', 2, record());
-  assert.deepEqual(readdirSync(join(repo, 'runs', 'run1', 'iterations')).sort(), ['001', '002']);
+  assert.deepEqual(readdirSync(join(repo, '.hodgepodge', 'runs', 'run1', 'iterations')).sort(), ['001', '002']);
 });
 
 test('writeIterationRecord rejects unsafe run ids and iterations', () => {

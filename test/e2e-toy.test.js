@@ -77,8 +77,8 @@ test('toy objective: podge takes a red target to green unattended', async () => 
   // green for real, committed, tree clean, record on disk
   execFileSync('npm', ['test', '--silent'], { cwd: dir, stdio: 'pipe' });
   assert.equal(git(dir, 'status', '--porcelain'), '');
-  assert.ok(existsSync(join(dir, 'runs', 'toy', 'iterations', '001', 'record.json')));
-  const rec = JSON.parse(readFileSync(join(dir, 'runs', 'toy', 'iterations', '001', 'record.json'), 'utf8'));
+  assert.ok(existsSync(join(dir, '.hodgepodge', 'runs', 'toy', 'iterations', '001', 'record.json')));
+  const rec = JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'toy', 'iterations', '001', 'record.json'), 'utf8'));
   assert.equal(rec.status, 'ok');
 });
 

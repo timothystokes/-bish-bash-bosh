@@ -79,18 +79,18 @@ test('placeholders (TBD, TODO, ??, <angle>) outside code are gaps; inside code t
   assert.deepEqual(checkReadiness(repo({ ...ready, 'specs/greet.md': code })), { ready: true, gaps: [] });
 });
 
-test('unchecked items in objective/QUESTIONS.md block readiness; checked ones do not', () => {
-  const open = repo({ ...ready, 'objective/QUESTIONS.md': '# Questions\n\n1 - Answered: [ ]; Specified: [ ]; Topic: L; Q: Which locale?; Default: en\n2 - Answered: [x]; Specified: [x]; Topic: L; Q: Casing?; A: lower\n' });
+test('unchecked items in .hodgepodge/interview.md block readiness; checked ones do not', () => {
+  const open = repo({ ...ready, '.hodgepodge/interview.md': '# Interview\n\n1 - Answered: [ ]; Specified: [ ]; Topic: L; Q: Which locale?; Default: en\n2 - Answered: [x]; Specified: [x]; Topic: L; Q: Casing?; A: lower\n' });
   const r = checkReadiness(open);
   assert.equal(r.ready, false);
   assert.ok(r.gaps.some((g) => /open question/i.test(g) && /Which locale/.test(g)), r.gaps.join('|'));
-  const done = repo({ ...ready, 'objective/QUESTIONS.md': '# Questions\n\n1 - Answered: [x]; Specified: [x]; Topic: L; Q: Which locale?; A: en; Spec: specs/greet.md\n' });
+  const done = repo({ ...ready, '.hodgepodge/interview.md': '# Interview\n\n1 - Answered: [x]; Specified: [x]; Topic: L; Q: Which locale?; A: en; Spec: specs/greet.md\n' });
   assert.deepEqual(checkReadiness(done), { ready: true, gaps: [] });
 });
 
-test('hasObjectiveKit is true only when objective/ exists', () => {
+test('hasObjectiveKit is true only when .hodgepodge/interview.md exists', () => {
   assert.equal(hasObjectiveKit(repo(ready)), false);
-  assert.equal(hasObjectiveKit(repo({ ...ready, 'objective/PHASES.md': 'x\n' })), true);
+  assert.equal(hasObjectiveKit(repo({ ...ready, '.hodgepodge/interview.md': 'x\n' })), true);
 });
 
 test('a vague word in a requirement is a gap, with or without a threshold nearby', () => {

@@ -111,11 +111,11 @@ test('runQaCycle: a [] report is clean; findings are handed to plan.md and commi
   assert.equal(found.cycle, 2);
   assert.equal(found.findings?.length, 1);
   assert.match(readFileSync(join(dir, 'plan.md'), 'utf8'), /- \[ \] QA-2-1 \[high\]/);
-  assert.ok(existsSync(join(dir, 'runs', 'r', 'qa-2', 'findings.json')));
-  assert.equal(JSON.parse(readFileSync(join(dir, 'runs', 'r', 'qa-2', 'findings.json'), 'utf8'))[0].diagnosis.fix, 'Handle empty input');
+  assert.ok(existsSync(join(dir, '.hodgepodge', 'runs', 'r', 'qa-2', 'findings.json')));
+  assert.equal(JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'r', 'qa-2', 'findings.json'), 'utf8'))[0].diagnosis.fix, 'Handle empty input');
   assert.equal(git(dir, 'status', '--porcelain'), '');
   assert.ok(sumRunUsage(dir, 'r').seconds >= 0);
-  assert.equal(JSON.parse(readFileSync(join(dir, 'runs', 'r', 'qa-2', 'record.json'), 'utf8')).usage.seconds >= 0, true);
+  assert.equal(JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'r', 'qa-2', 'record.json'), 'utf8')).usage.seconds >= 0, true);
 });
 
 test('runQaCycle fails (no pass by silence) on a missing report, non-zero exit, or a modified tree; tree stays clean', async () => {

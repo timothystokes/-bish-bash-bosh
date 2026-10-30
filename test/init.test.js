@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
-import { existsSync, readFileSync, writeFileSync, realpathSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { initProject, ROLE_NAMES } from '../src/init.js';
@@ -12,13 +12,13 @@ import { freshDir, withCwd } from './support/project.js';
 const ROLE = { adapter: 'agent-x', model: 'model-y' };
 const ALL_ROLES = Object.fromEntries(ROLE_NAMES.map((name) => [name, ROLE]));
 
-test('writes hodgepodge.yml with all four roles, default budgets and allowedPaths', () => {
+test('writes .hodgepodge/config.yml with all four roles, default budgets and allowedPaths', () => {
   const dir = freshDir('init-');
   const res = initProject({ dir, roles: ALL_ROLES });
   assert.equal(res.ok, true, JSON.stringify(res));
   assert.equal(res.dir, dir);
-  assert.equal(res.config, join(dir, 'hodgepodge.yml'));
-  const cfg = parseYaml(readFileSync(join(dir, 'hodgepodge.yml'), 'utf8'));
+  assert.equal(res.config, join(dir, '.hodgepodge', 'config.yml'));
+  const cfg = parseYaml(readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8'));
   assert.deepEqual(validateConfig(cfg), { ok: true, errors: [] });
   assert.deepEqual(cfg.roles, ALL_ROLES);
   assert.equal(cfg.requireTestPlan, true);
@@ -29,7 +29,7 @@ test('writes hodgepodge.yml with all four roles, default budgets and allowedPath
 test('default budgets fit a live agent: one conversation round plus several steps', () => {
   const dir = freshDir('init-');
   initProject({ dir, roles: ALL_ROLES });
-  const b = parseYaml(readFileSync(join(dir, 'hodgepodge.yml'), 'utf8')).budgets;
+  const b = parseYaml(readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8')).budgets;
   assert.deepEqual(Object.keys(b).sort(), ['maxIterations', 'maxWallClockSeconds']);
   assert.ok(b.maxWallClockSeconds >= 3600);
   assert.ok(b.maxIterations >= 10);
@@ -38,17 +38,18 @@ test('default budgets fit a live agent: one conversation round plus several step
 test('default allowedPaths let the build agent write bin/ and lib/ as well as src/', () => {
   const dir = freshDir('init-');
   initProject({ dir, roles: ALL_ROLES });
-  const cfg = parseYaml(readFileSync(join(dir, 'hodgepodge.yml'), 'utf8'));
+  const cfg = parseYaml(readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8'));
   assert.deepEqual(cfg.allowedPaths, ['src/', 'bin/', 'lib/', 'package.json']);
 });
 
-test('refuses to run if hodgepodge.yml already exists (no silent overwrite)', () => {
+test('refuses to run if .hodgepodge/config.yml already exists (no silent overwrite)', () => {
   const dir = freshDir('init-');
-  writeFileSync(join(dir, 'hodgepodge.yml'), 'roles: {}\n');
+  mkdirSync(join(dir, '.hodgepodge'), { recursive: true });
+  writeFileSync(join(dir, '.hodgepodge', 'config.yml'), 'roles: {}\n');
   const res = initProject({ dir, roles: ALL_ROLES });
   assert.equal(res.ok, false);
   assert.match(res.reason, /already exists/);
-  assert.equal(readFileSync(join(dir, 'hodgepodge.yml'), 'utf8'), 'roles: {}\n');
+  assert.equal(readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8'), 'roles: {}\n');
 });
 
 test('requires an adapter and model for every role: interview, reverse, build, qa', () => {
@@ -63,7 +64,7 @@ test('requires an adapter and model for every role: interview, reverse, build, q
 test('no scaffolding: no target repo, no runtime copy, no launcher scripts', () => {
   const dir = freshDir('init-');
   initProject({ dir, roles: ALL_ROLES });
-  for (const f of ['target', '.hodgepodge', 'hodge', 'podge', 'hodgepodge']) assert.ok(!existsSync(join(dir, f)), f);
+  for (const f of ['target', 'hodge', 'podge']) assert.ok(!existsSync(join(dir, f)), f);
 });
 
 test('help lists init with no --dir (every command operates on cwd)', () => {
@@ -87,8 +88,8 @@ test('cli init asks for a single adapter/model and applies it to all four roles'
   const j = JSON.parse(r.out.match(/\{.*\}/s)[0]);
   assert.equal(j.ok, true);
   assert.equal(j.dir, realpathSync(dir));
-  assert.equal(j.config, join(realpathSync(dir), 'hodgepodge.yml'));
-  const cfg = parseYaml(readFileSync(join(dir, 'hodgepodge.yml'), 'utf8'));
+  assert.equal(j.config, join(realpathSync(dir), '.hodgepodge', 'config.yml'));
+  const cfg = parseYaml(readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8'));
   for (const name of ROLE_NAMES) assert.deepEqual(cfg.roles[name], { adapter: 'copilot', model: 'm1' }, name);
 });
 
@@ -96,16 +97,17 @@ test('cli init picks adapter/model by number from the suggested list', async () 
   const dir = freshDir('init-');
   const r = await withCwd(dir, () => run(['init'], ['1', '1']));
   assert.equal(r.code, 0, r.err);
-  const cfg = parseYaml(readFileSync(join(dir, 'hodgepodge.yml'), 'utf8'));
+  const cfg = parseYaml(readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8'));
   for (const name of ROLE_NAMES) assert.deepEqual(cfg.roles[name], { adapter: 'copilot', model: 'gpt-5' }, name);
 });
 
-test('cli init refuses when hodgepodge.yml already exists (exit 1, no prompts)', async () => {
+test('cli init refuses when .hodgepodge/config.yml already exists (exit 1, no prompts)', async () => {
   const dir = freshDir('init-');
-  writeFileSync(join(dir, 'hodgepodge.yml'), 'roles: {}\n');
+  mkdirSync(join(dir, '.hodgepodge'), { recursive: true });
+  writeFileSync(join(dir, '.hodgepodge', 'config.yml'), 'roles: {}\n');
   const r = await withCwd(dir, () => run(['init'], []));
   assert.equal(r.code, 1);
-  assert.match(r.err, /hodgepodge\.yml already exists/);
+  assert.match(r.err, /config\.yml already exists/);
 });
 
 test('cli init aborts (exit 2) if no adapter or model is given', async () => {

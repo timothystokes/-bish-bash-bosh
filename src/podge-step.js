@@ -72,7 +72,7 @@ const git = (dir, ...args) =>
   execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' });
 
 function nextIteration(dir, runId) {
-  const base = join(dir, 'runs', runId, 'iterations');
+  const base = join(dir, '.hodgepodge', 'runs', runId, 'iterations');
   if (!existsSync(base)) return 1;
   const nums = readdirSync(base).filter((n) => /^\d+$/.test(n)).map(Number);
   return nums.length === 0 ? 1 : Math.max(...nums) + 1;
@@ -96,7 +96,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   const gated = (reason) => (log(`step gated: ${reason}`), { sha: null, iteration: 0, status: 'gated', reason });
   const g = checkRepoGate(repoDir, self);
   if (!g.ok) return gated(g.reason);
-  // `.hodge.lock` lives in the project root now (no separate sandbox dir); exclude it from the
+  // `.hodgepodge/lock` is harness-internal; exclude it from the
   // dirty-working-tree check since it is harness-internal, never committed.
   if (git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') {
     return gated('working tree is not clean');

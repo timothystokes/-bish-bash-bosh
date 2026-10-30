@@ -40,7 +40,7 @@ function checkIds(runId, iteration) {
 
 export function iterationDir(repoDir, runId, iteration) {
   checkIds(runId, iteration);
-  return join(repoDir, 'runs', runId, 'iterations', String(iteration).padStart(3, '0'));
+  return join(repoDir, '.hodgepodge', 'runs', runId, 'iterations', String(iteration).padStart(3, '0'));
 }
 
 // Write one iteration record atomically (temp dir then rename); never overwrites.

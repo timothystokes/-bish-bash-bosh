@@ -69,8 +69,8 @@ test('help documents hodgepodge sync and hodgepodge promote', () => {
 
 test('hodgepodge sync uploads run records, then skips them on a repeat', async () => {
   const repo = mkdtempSync(join(tmpdir(), 'hodge-sync-'));
-  mkdirSync(join(repo, 'runs', 'r1'), { recursive: true });
-  writeFileSync(join(repo, 'runs', 'r1', 'a.json'), '{}');
+  mkdirSync(join(repo, '.hodgepodge', 'runs', 'r1'), { recursive: true });
+  writeFileSync(join(repo, '.hodgepodge', 'runs', 'r1', 'a.json'), '{}');
   /** @type {Record<string, string>} */
   const store = {};
   const exec = fakeRun(({ args }) => {

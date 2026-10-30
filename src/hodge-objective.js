@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { hasObjectiveKit } from './readiness.js';
 import { runInterview } from './hodge-interview.js';
 import { BATCH_HINT, nextBatch, readQuestions, recordAnswers, renderBatch, resolveAnswer, unanswered, writeQuestions } from './hodge-questions.js';
 import { LOCK_FILE } from './run-lock.js';
@@ -19,9 +18,8 @@ const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgs
 // later, until `hodgepodge ready` passes. Everything lives in the target repo, so a paused conversation resumes.
 export async function runObjective({ config, repoDir, runId, adapter, ask, say, maxRounds = 30, inboxDir = undefined, identity = undefined }) {
   const gated = (reason) => ({ status: 'gated', rounds: 0, reason });
-  if (!hasObjectiveKit(repoDir)) return gated('no objective kit in the project (run `hodge` once; it adds objective/ automatically)');
-  // `.hodge.lock` lives in the project root now (no separate sandbox dir); exclude it from the
-  // dirty-working-tree check since it is harness-internal, never committed.
+  // `.hodgepodge/lock` is harness-internal; exclude it from the
+  // dirty-working-tree check since it is never committed.
   if (git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') return gated('working tree is not clean');
 
   let qs = readQuestions(repoDir);
@@ -36,7 +34,7 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
     git(repoDir, 'commit', '-q', '-m', 'hodge: objective');
   }
 
-  const runDir = join(repoDir, 'runs', runId);
+  const runDir = join(repoDir, '.hodgepodge', 'runs', runId);
   let round = (existsSync(runDir) ? readdirSync(runDir).filter((d) => /^interview(-\d+)?$/.test(d)).length : 0) + 1;
   let ran = 0;
   let lastStall = '';
@@ -51,14 +49,20 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
     const batch = nextBatch(qs);
     if (batch.length === 0) return true;
     say(`\n${renderBatch(batch)}\n(${BATCH_HINT})\n`);
+    // The owner answers one line at a time: each line overrides one or more defaults, kept here until "ok"
+    // (or "done") finalises the batch with any un-overridden question falling back to its default.
+    const overrides = new Map();
     let answers;
     for (;;) {
       const reply = (await ask('> ') ?? '').trim();
       if (reply === '') return false;
       if (isDone(reply)) {
         closing = true;
-        const rest = unanswered(qs).map((q) => ({ n: q.id, topic: q.topic, text: q.text, default: q.default }));
-        answers = rest.map((q) => ({ n: q.n, answer: q.default, source: ('default') }));
+        answers = unanswered(qs).map((q) => ({ n: q.id, answer: overrides.get(q.id) ?? q.default, source: overrides.has(q.id) ? 'owner' : 'default' }));
+        break;
+      }
+      if (/^ok$/i.test(reply)) {
+        answers = batch.map((q) => ({ n: q.n, answer: overrides.get(q.n) ?? q.default, source: overrides.has(q.n) ? 'owner' : 'default' }));
         break;
       }
       const r = resolveAnswer(batch, reply);
@@ -66,8 +70,7 @@ export async function runObjective({ config, repoDir, runId, adapter, ask, say, 
         say(`${r.reason}\n`);
         continue;
       }
-      answers = r.answers;
-      break;
+      for (const o of r.overrides) overrides.set(o.n, o.answer);
     }
     writeQuestions(repoDir, recordAnswers(qs, answers));
     git(repoDir, 'add', '-A', '--', '.', `:!${LOCK_FILE}`);

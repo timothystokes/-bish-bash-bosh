@@ -45,17 +45,17 @@ test('H-14: interview prompt captures Out of scope', () => {
 });
 
 test('H-14: objective interview protocol asks for Out of scope per spec', () => {
-  const kit = readFileSync(join(snapDir, '..', '..', 'templates', 'objective', 'INTERVIEW.md'), 'utf8');
+  const kit = readFileSync(join(snapDir, '..', '..', 'prompts', 'interview-loop.md'), 'utf8');
   assert.match(kit, /Out of scope/);
 });
 
-test('interview drafts specs from each answer and reports resolved ids and gaps with defaults in RESPONSE.json, never reading the log', () => {
-  const kit = readFileSync(join(snapDir, '..', '..', 'templates', 'objective', 'INTERVIEW.md'), 'utf8');
+test('interview drafts specs from each answer and reports resolved ids and gaps with defaults in response.json, never reading the log', () => {
+  const kit = readFileSync(join(snapDir, '..', '..', 'prompts', 'interview-loop.md'), 'utf8');
   for (const text of [loadModePrompt('interview'), kit]) {
-    assert.match(text, /draft[^.\n]*spec[^.\n]*(each|every) answer/i);
-    assert.match(text, /RESPONSE\.json/);
+    assert.match(text, /draft[^.]*?spec[^.]*?(each|every) answer/i);
+    assert.match(text, /response\.json/i);
     assert.match(text, /"default"/);
-    assert.match(text, /never open objective\/QUESTIONS\.md/i);
+    assert.match(text, /never open `?\.hodgepodge\/interview\.md`?/i);
   }
 });
 

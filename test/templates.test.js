@@ -57,8 +57,3 @@ test('toy seed passes spec-lint and every requirement ID is in a test name', () 
   const tests = read('toy/tests/add.test.js');
   for (const id of ids) assert.match(tests, new RegExp(`test\\('[^']*${id}\\b`), id);
 });
-
-test('objective PHASES names every spec template section', () => {
-  const t = read('objective/PHASES.md');
-  for (const s of ['Implementation:', 'Requirements', 'Dimensions', 'Formats', 'Out of scope']) assert.ok(t.includes(s), s);
-});

@@ -1,16 +1,12 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { loadInterviewIntro } from './prompts.js';
 
-// The question store (`objective/QUESTIONS.md`) is owned by code: the agent never reads or edits it. Code picks
-// the batch to ask, records the owner's answers, hands only those answers to the agent, and updates each question's
-// status from the agent's `objective/RESPONSE.json`.
+// The question store (`.hodgepodge/interview.md`) is owned by code: the agent never reads or edits it. Code
+// picks the batch to ask, records the owner's answers, hands only those answers to the agent, and updates each
+// question's status from the agent's `.hodgepodge/response.json`.
 
-export const STORE_HEADER = `# Questions
-
-Managed by \`hodge\`; don't edit. One line per question with two checkboxes: \`Answered\` ticks once the owner has
-answered (or accepted the default), \`Specified\` ticks once a spec records the decision.
-Readiness requires every question's Specified box ticked.
-`;
+export const STORE_HEADER = loadInterviewIntro();
 
 export const MAX_BATCH_TOPICS = 3;
 export const MAX_BATCH_QUESTIONS = 8;
@@ -72,25 +68,24 @@ export function renderBatch(batch) {
     .join('\n\n');
 }
 
-const HINT = 'answer with "N: answer; M: answer" (unlisted questions keep their defaults), or y for all defaults';
+const HINT = 'answer with "N: answer" (one per line), or ok to continue with the remaining defaults';
 
+// The owner answers a batch one line at a time: each line either overrides one or more defaults ("N: answer",
+// `;`-separated for more than one) or, once satisfied, types "ok" to continue with whatever defaults were not
+// overridden. This only parses a single line's overrides; `hodge-objective.js` accumulates them across lines.
 export function resolveAnswer(batch, input) {
   const text = input.trim();
-  const fromDefaults = () => batch.map((q) => ({ n: q.n, answer: q.default, source: 'default' }));
-  if (/^(y|yes)$/i.test(text)) return { ok: true, answers: fromDefaults() };
   const pairs = [...text.matchAll(/(?:^|[;\n])\s*(\d+)\s*[:=]\s*([^;\n]*)/g)];
   const rest = pairs.reduce((s, m) => s.replace(m[0], ''), text).replace(/[;\s]/g, '');
   if (pairs.length === 0 || rest !== '') return { ok: false, reason: `Not understood: ${HINT}.` };
-  const answers = fromDefaults();
+  const overrides = [];
   for (const m of pairs) {
     const n = Number(m[1]);
-    const a = answers.find((x) => x.n === n);
-    if (!a) return { ok: false, reason: `No question with index ${n}: ${HINT}.` };
+    if (!batch.some((q) => q.n === n)) return { ok: false, reason: `No question with index ${n}: ${HINT}.` };
     if (m[2].trim() === '') return { ok: false, reason: `Empty answer for ${n}: ${HINT}.` };
-    a.answer = m[2].trim();
-    a.source = 'owner';
+    overrides.push({ n, answer: m[2].trim() });
   }
-  return { ok: true, answers };
+  return { ok: true, overrides };
 }
 
 export function recordAnswers(qs, answers) {
@@ -135,9 +130,9 @@ export function applyResponse(qs, response) {
   return out;
 }
 
-export const BATCH_HINT = 'type y to accept all defaults, "N: answer; M: answer" to change some (the rest keep their defaults), or done to accept every remaining default and end the interview';
+export const BATCH_HINT = 'enter "N: answer" to overwrite defaults, one per line; enter ok when ready to continue with the remaining defaults';
 
-const storePath = (repoDir) => join(repoDir, 'objective', 'QUESTIONS.md');
+const storePath = (repoDir) => join(repoDir, '.hodgepodge', 'interview.md');
 
 export function readQuestions(repoDir) {
   return existsSync(storePath(repoDir)) ? parseQuestions(readFileSync(storePath(repoDir), 'utf8')) : [];

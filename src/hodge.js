@@ -1,10 +1,7 @@
-import { execFileSync } from 'node:child_process';
 import { resolveAdapter, defaultRegistry } from './adapters/index.js';
-import { acquireRunLock, LOCK_FILE } from './run-lock.js';
-import { hasObjectiveKit } from './readiness.js';
+import { acquireRunLock } from './run-lock.js';
 import { runObjective } from './hodge-objective.js';
 import { runReverse } from './hodge-reverse.js';
-import { addObjectiveKit } from './init.js';
 import { debugAdapter, createAsker, parseRunArgs, loadRunProject } from './cli-lib.js';
 
 // `hodge`: the interview flow that gathers requirements and writes specs, or (with --reverse)
@@ -41,13 +38,6 @@ export async function runHodge(argv, deps, out, err) {
       const input = deps.input ?? process.stdin;
       const { ask, close } = createAsker(input, out);
       try {
-        // Interviewing is a conversation, never a single shot: a project without the kit gets it first.
-        if (!hasObjectiveKit(repo)) {
-          addObjectiveKit(repo);
-          // `.hodge.lock` lives in the project root now; exclude it from this commit (harness-internal, never committed).
-          execFileSync('git', ['-C', repo, 'add', '-A', '--', '.', `:!${LOCK_FILE}`]);
-          execFileSync('git', ['-C', repo, '-c', 'commit.gpgsign=false', '-c', 'user.name=hodge', '-c', 'user.email=hodge@localhost', 'commit', '-q', '-m', 'hodge: add objective kit']);
-        }
         const res = await runObjective({
           config,
           repoDir: repo,

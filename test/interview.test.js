@@ -54,7 +54,7 @@ const agent = (writes, exitStatus = 0) => {
 };
 
 test('interview prompt exists, carries the objective and the spec template, not the test-plan template', () => {
-  assert.match(loadModePrompt('interview'), /one spec per file/i);
+  assert.match(loadModePrompt('interview'), /one decision/i);
   const dir = makeRepo();
   const p = buildInterviewPrompt(dir, 'Build a greeter');
   assert.match(p, /Build a greeter/);
@@ -71,8 +71,8 @@ test('a single-shot interview (no question left) that is lint-clean is committed
   assert.equal(res.sha, git(dir, 'rev-parse', 'HEAD'));
   assert.equal(git(dir, 'status', '--porcelain'), '');
   assert.equal(lintSpecs(dir, { testPlan: false }).ok, true);
-  assert.ok(existsSync(join(dir, 'runs', 'r1', 'interview', 'record.json')));
-  assert.equal(JSON.parse(readFileSync(join(dir, 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'ok');
+  assert.ok(existsSync(join(dir, '.hodgepodge', 'runs', 'r1', 'interview', 'record.json')));
+  assert.equal(JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'ok');
   assert.match(a.prompts[0], /Build a greeter/);
 });
 
@@ -89,7 +89,7 @@ test('spec-lint problems at the end of the interview keep the work and are repor
   assert.equal(res.status, 'incomplete');
   assert.match(res.reason ?? '', /must start with a "# Spec: <name>" title/);
   assert.equal(existsSync(join(dir, 'specs', 'bad.md')), true);
-  assert.equal(JSON.parse(readFileSync(join(dir, 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'incomplete');
+  assert.equal(JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'incomplete');
   assert.equal(git(dir, 'status', '--porcelain'), '');
 });
 
@@ -102,7 +102,7 @@ test('the test-plan mapping is not an interview check: specs without tests/PLAN.
   assert.equal(lintSpecs(dir, { testPlan: false }).ok, true);
 });
 
-test('refuses when the agent writes outside specs/ and objective/ (tests are the plan stage)', async () => {
+test('refuses when the agent writes outside specs/ and .hodgepodge/ (tests are the plan stage)', async () => {
   const dir = makeRepo();
   const res = await runInterview({
     config: config(),
@@ -148,15 +148,15 @@ test('gates: empty objective, dirty tree, harness repo, missing role make no age
 const gaps = (/** @type {number[]} */ resolved, /** @type {string} */ question) =>
   JSON.stringify({ resolved: resolved.map((id) => ({ id, spec: 'specs/greet.md' })), gaps: [{ topic: 'Greeter', question, default: 'Yes' }] });
 
-test('hodge on a repo without a kit scaffolds objective/ and keeps asking until ready', async () => {
+test('hodge on a fresh repo self-bootstraps the interview store and keeps asking until ready', async () => {
   const dir = makeRepo();
   commitProjectConfig(dir, config({ interview: { adapter: 'iv', model: 'm' } }));
   const out = /** @type {string[]} */ ([]);
   /** @type {Record<string, string>[]} */
   const rounds = [
-    { 'objective/RESPONSE.json': gaps([], 'Who uses the greeter?') },
-    { 'objective/RESPONSE.json': gaps([2], 'Should names be trimmed?'), 'objective/notes.md': 'n\n' },
-    { 'objective/RESPONSE.json': gaps([3], 'Anything out of scope?'), 'objective/notes.md': 'm\n' },
+    { '.hodgepodge/response.json': gaps([], 'Who uses the greeter?') },
+    { '.hodgepodge/response.json': gaps([2], 'Should names be trimmed?'), '.hodgepodge/notes.md': 'n\n' },
+    { '.hodgepodge/response.json': gaps([3], 'Anything out of scope?'), '.hodgepodge/notes.md': 'm\n' },
   ];
   const prompts = /** @type {string[]} */ ([]);
   let n = 0;
@@ -171,15 +171,15 @@ test('hodge on a repo without a kit scaffolds objective/ and keeps asking until 
     main(['hodge'], {
       registry: { iv: () => adapter, f: () => { throw new Error('build role must not be used'); } },
       identity,
-      input: Readable.from(['Build a greeter\n', 'y\n', 'y\n', '']),
+      input: Readable.from(['Build a greeter\n', 'ok\n', 'ok\n', '']),
       stdout: (s) => { out.push(s); }, stderr: () => {},
     }));
-  assert.ok(existsSync(join(dir, 'objective', 'INTERVIEW.md')), 'kit scaffolded');
+  assert.ok(existsSync(join(dir, '.hodgepodge', 'interview.md')), 'store self-bootstrapped');
   assert.equal(code, 1, 'paused at EOF, not ok');
   assert.ok(n >= 3, `agent ran once per answer, ran ${n} times`);
   assert.match(out.join(''), /Who uses the greeter\?[\s\S]*Should names be trimmed\?[\s\S]*Anything out of scope\?/);
   assert.match(prompts[1], /Q2 \[Greeter\] Who uses the greeter\?: Yes/);
-  assert.equal(git(dir, 'status', '--porcelain', '--', '.', ':!.hodge.lock'), '');
+  assert.equal(git(dir, 'status', '--porcelain', '--', '.', ':!.hodgepodge/lock'), '');
   assert.equal(readFileSync(join(dir, 'README.md'), 'utf8'), '# target\n');
 });
 
@@ -188,7 +188,7 @@ test('hodge usage errors exit 2', async () => {
   const e = (/** @type {string} */ s) => { err.push(s); };
   const missing = mkdtempSync(join(tmpdir(), 'hodge-int-missing-'));
   assert.equal(await withCwd(missing, () => main(['hodge'], { stdout: () => {}, stderr: e })), 2);
-  assert.match(err.join(''), /hodgepodge\.yml/);
+  assert.match(err.join(''), /config\.yml/);
 
   const norole = mkdtempSync(join(tmpdir(), 'hodge-int-norole-'));
   writeProjectConfig(norole, config({}));

@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { acquireRunLock, LOCK_FILE } from '../src/run-lock.js';
 import { main } from '../src/cli.js';
 import { commitProjectConfig, initGitRepo, withCwd } from './support/project.js';
@@ -25,9 +25,11 @@ test('acquire writes the PID, a second acquire is refused naming the holder, rel
 
 test('a stale lock (dead PID) or garbage lock is cleared', () => {
   const dir = tmp();
+  mkdirSync(dirname(join(dir, LOCK_FILE)), { recursive: true });
   writeFileSync(join(dir, LOCK_FILE), '2147483646\n');
   assert.equal(acquireRunLock(dir).ok, true);
   const dir2 = tmp();
+  mkdirSync(dirname(join(dir2, LOCK_FILE)), { recursive: true });
   writeFileSync(join(dir2, LOCK_FILE), 'junk');
   assert.equal(acquireRunLock(dir2).ok, true);
 });
@@ -59,6 +61,7 @@ test('hodge, podge and podge step refuse a project held by a live process, and r
       assert.equal(r.code, 2, args.join(' '));
       assert.match(r.err, /another run holds this project/);
     }
+    mkdirSync(dirname(join(dir, LOCK_FILE)), { recursive: true });
     writeFileSync(join(dir, LOCK_FILE), '2147483646\n');
     const r = await main(['podge', 'step'], { stdout: () => {}, stderr: () => {}, registry: {} });
     assert.notEqual(r, undefined);

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,8 +64,11 @@ test('L-2: build and plan prompts are at most 120 words, others at most 150', ()
   assert.ok(words(loadQaPrompt()) <= 150, 'qa prompt too long');
 });
 
-test('L-2: AGENTS.md and every objective-kit file stay small', () => {
+test('L-2: AGENTS.md and every mode prompt file stay small', () => {
   assert.ok(statSync(join(root, 'AGENTS.md')).size <= 2800, 'AGENTS.md too large');
-  const kit = join(root, 'templates', 'objective');
-  for (const f of readdirSync(kit)) assert.ok(readFileSync(join(kit, f)).length <= 1800, `${f} too large`);
+  const dir = join(root, 'prompts');
+  for (const f of readdirSync(dir)) {
+    if (!f.endsWith('.md')) continue;
+    assert.ok(statSync(join(dir, f)).size <= 1800, `${f} too large`);
+  }
 });

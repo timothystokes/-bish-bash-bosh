@@ -36,12 +36,12 @@ function makeRepo() {
     ].join('\n'),
   );
   writeFileSync(join(dir, 'specs', 'b.md'), '# B\n## Requirements\n- R-b-1: it must work\n');
-  mkdirSync(join(dir, 'runs', 'r1', 'qa-1'), { recursive: true });
-  writeFileSync(join(dir, 'runs', 'r1', 'qa-1', 'record.json'), JSON.stringify({ status: 'findings', cycle: 1, usage: { seconds: 1 } }));
-  writeFileSync(join(dir, 'runs', 'r1', 'qa-1', 'findings.json'), JSON.stringify([finding]));
-  mkdirSync(join(dir, 'runs', 'r1', 'qa-2'), { recursive: true });
-  writeFileSync(join(dir, 'runs', 'r1', 'qa-2', 'record.json'), JSON.stringify({ status: 'clean', cycle: 2, usage: { seconds: 1 } }));
-  writeFileSync(join(dir, 'runs', 'r1', 'qa-2', 'findings.json'), '[]');
+  mkdirSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-1'), { recursive: true });
+  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-1', 'record.json'), JSON.stringify({ status: 'findings', cycle: 1, usage: { seconds: 1 } }));
+  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-1', 'findings.json'), JSON.stringify([finding]));
+  mkdirSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-2'), { recursive: true });
+  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-2', 'record.json'), JSON.stringify({ status: 'clean', cycle: 2, usage: { seconds: 1 } }));
+  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-2', 'findings.json'), '[]');
   writeDoneReport(dir, 'r1', {
     ok: false,
     suite: { ok: true },
@@ -98,8 +98,8 @@ test('readRunDetails on an empty repo has no formats, QA or done evidence', () =
 
 test('readRunDetails ignores unreadable done.json and qa-N records', () => {
   const dir = makeRepo();
-  writeFileSync(join(dir, 'runs', 'r1', 'done.json'), '{not json');
-  writeFileSync(join(dir, 'runs', 'r1', 'qa-2', 'record.json'), '{not json');
+  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'done.json'), '{not json');
+  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-2', 'record.json'), '{not json');
   const d = readRunDetails(dir, 'r1');
   assert.equal(d.done, null);
   assert.deepEqual(d.qa.map((c) => c.cycle), [1]);

@@ -64,10 +64,10 @@ test('successful step commits work and the run record, emits status', async () =
   assert.equal(res.sha, git(dir, 'rev-parse', 'HEAD'));
   assert.equal(git(dir, 'status', '--porcelain'), '');
   assert.ok(existsSync(join(dir, 'src', 'new.js')));
-  const rec = JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
+  const rec = JSON.parse(readFileSync(join(dir, '.hodgepodge/runs/r1/iterations/001/record.json'), 'utf8'));
   assert.equal(rec.status, 'ok');
   assert.deepEqual(rec.changedFiles, ['src/new.js']);
-  assert.match(readFileSync(join(dir, 'runs/r1/iterations/001/diff'), 'utf8'), /src\/new\.js/);
+  assert.match(readFileSync(join(dir, '.hodgepodge/runs/r1/iterations/001/diff'), 'utf8'), /src\/new\.js/);
 });
 
 test('second step advances the iteration number', async () => {
@@ -76,7 +76,7 @@ test('second step advances the iteration number', async () => {
   await runStep({ ...args, adapter: adapter() });
   const res = await runStep({ ...args, adapter: adapter({ writes: { 'src/two.js': '1\n' } }) });
   assert.equal(res.iteration, 2);
-  assert.deepEqual(readdirSync(join(dir, 'runs/r1/iterations')).sort(), ['001', '002']);
+  assert.deepEqual(readdirSync(join(dir, '.hodgepodge/runs/r1/iterations')).sort(), ['001', '002']);
 });
 
 test('failing tests: work reverted, only the record is committed', async () => {
@@ -88,10 +88,10 @@ test('failing tests: work reverted, only the record is committed', async () => {
   assert.equal(res.status, 'failed');
   assert.ok(!existsSync(join(dir, 'src', 'new.js')));
   assert.equal(git(dir, 'status', '--porcelain'), '');
-  const rec = JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
+  const rec = JSON.parse(readFileSync(join(dir, '.hodgepodge/runs/r1/iterations/001/record.json'), 'utf8'));
   assert.equal(rec.status, 'failed');
-  assert.match(readFileSync(join(dir, 'runs/r1/iterations/001/diff'), 'utf8'), /src\/new\.js/);
-  assert.match(readFileSync(join(dir, 'runs/r1/iterations/001/test.json'), 'utf8'), /boom/);
+  assert.match(readFileSync(join(dir, '.hodgepodge/runs/r1/iterations/001/diff'), 'utf8'), /src\/new\.js/);
+  assert.match(readFileSync(join(dir, '.hodgepodge/runs/r1/iterations/001/test.json'), 'utf8'), /boom/);
 });
 
 test('failing step with runs/ git-ignored (nothing to commit) still returns failed and records a commit', async () => {
@@ -127,7 +127,7 @@ test('repo gate refuses when repoDir is the hodgepodge checkout before touching 
   });
   assert.equal(res.status, 'gated');
   assert.equal(res.sha, null);
-  assert.ok(!existsSync(join(dir, 'runs')));
+  assert.ok(!existsSync(join(dir, '.hodgepodge', 'runs')));
   assert.ok(!existsSync(join(dir, 'src')));
 });
 
@@ -184,7 +184,7 @@ test('step caps adapter limits to the remaining run budget and records wall-cloc
   });
   assert.deepEqual(Object.keys(seen), ['maxWallClockSeconds']);
   assert.ok(seen.maxWallClockSeconds <= 60);
-  const u = JSON.parse(readFileSync(join(dir, 'runs/rc/iterations/001/usage.json'), 'utf8'));
+  const u = JSON.parse(readFileSync(join(dir, '.hodgepodge/runs/rc/iterations/001/usage.json'), 'utf8'));
   assert.equal(typeof u.seconds, 'number');
 });
 
@@ -209,7 +209,7 @@ test('format gate: output violating the declared schema fails the step and is re
   });
   assert.equal(res.status, 'failed');
   assert.ok(!existsSync(join(dir, 'src', 'order.json')));
-  const rec = JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
+  const rec = JSON.parse(readFileSync(join(dir, '.hodgepodge/runs/r1/iterations/001/record.json'), 'utf8'));
   const g = rec.gates.find((/** @type {{name: string}} */ x) => x.name === 'formats');
   assert.equal(g.ok, false);
   assert.match(g.detail, /src\/order\.json/);
@@ -223,14 +223,14 @@ test('format gate: conforming output passes and records the gate', async () => {
     adapter: adapter({ writes: { 'src/order.json': '{"total": 1}' } }), testCommand: pass, identity: self,
   });
   assert.equal(res.status, 'ok');
-  const rec = JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
+  const rec = JSON.parse(readFileSync(join(dir, '.hodgepodge/runs/r1/iterations/001/record.json'), 'utf8'));
   assert.ok(rec.gates.some((/** @type {{name: string, ok: boolean}} */ x) => x.name === 'formats' && x.ok));
 });
 
 test('format gate: absent when no spec declares formats', async () => {
   const dir = makeRepo();
   await runStep({ config: config('o/target'), repoDir: dir, runId: 'r1', adapter: adapter(), testCommand: pass, identity: self });
-  const rec = JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
+  const rec = JSON.parse(readFileSync(join(dir, '.hodgepodge/runs/r1/iterations/001/record.json'), 'utf8'));
   assert.ok(!rec.gates.some((/** @type {{name: string}} */ x) => x.name === 'formats'));
 });
 
@@ -252,7 +252,7 @@ test('tests gate: a planning-only step skips the tests gate even when the suite 
     adapter: adapter({ writes: { 'plan.md': '# plan\n- [ ] one\n' } }), testCommand: fail, identity: self,
   });
   assert.equal(res.status, 'ok');
-  const rec = JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
+  const rec = JSON.parse(readFileSync(join(dir, '.hodgepodge/runs/r1/iterations/001/record.json'), 'utf8'));
   const g = rec.gates.find((/** @type {{name: string}} */ x) => x.name === 'tests');
   assert.equal(g.ok, true);
   assert.match(g.detail, /planning-only/);
@@ -265,7 +265,7 @@ test('tests gate: a step that touches code passes while only previously failing 
     adapter: adapter({ writes: { 'src/other.js': 'export const y = 2;\n' } }), testCommand: redSuite, identity: self,
   });
   assert.equal(res.status, 'ok');
-  const rec = JSON.parse(readFileSync(join(dir, 'runs/r1/iterations/001/record.json'), 'utf8'));
+  const rec = JSON.parse(readFileSync(join(dir, '.hodgepodge/runs/r1/iterations/001/record.json'), 'utf8'));
   const g = rec.gates.find((/** @type {{name: string}} */ x) => x.name === 'tests');
   assert.equal(g.ok, true);
   assert.match(g.detail, /no regression/);

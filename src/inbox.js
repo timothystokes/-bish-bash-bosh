@@ -31,7 +31,7 @@ export function consumeInbox(dir, kind, used) {
 }
 
 const INTRO = {
-  hodge: 'The owner added these while you ran. Assess each, add it to the open questions (objective/), and ask it in the next batch unless it is already answered.',
+  hodge: 'The owner added these while you ran. Assess each, add it to the open questions (.hodgepodge/), and ask it in the next batch unless it is already answered.',
   podge: 'The owner added these while you ran. End-of-session checklist: add each to plan.md as an unchecked item before you assess the next best action.',
 };
 

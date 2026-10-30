@@ -27,7 +27,7 @@ export const DIMENSIONS = [
 const PLACEHOLDER = /\b(TBD|TODO|FIXME)\b|\?\?|<[^>\n]+>/;
 
 export function hasObjectiveKit(repoDir) {
-  return existsSync(join(repoDir, 'objective'));
+  return existsSync(join(repoDir, '.hodgepodge', 'interview.md'));
 }
 
 // Text with fenced blocks and inline code removed.
@@ -86,7 +86,7 @@ export function dimensionStates(bullets) {
 }
 
 // Deterministic "enough to leave the conversation" check: the requirements are captured at a fine grain.
-// Mirrors objective/READINESS.md.
+// Mirrors the readiness section of prompts/interview-loop.md.
 export function checkReadiness(repoDir) {
   const lint = lintSpecs(repoDir, { testPlan: false });
   const gaps = [...lint.problems];
@@ -120,7 +120,7 @@ export function checkReadiness(repoDir) {
 
   gaps.push(...checkFormats(repoDir));
 
-  const oq = join(repoDir, 'objective', 'QUESTIONS.md');
+  const oq = join(repoDir, '.hodgepodge', 'interview.md');
   if (existsSync(oq)) {
     for (const line of readFileSync(oq, 'utf8').split('\n')) {
       const m = /^\d+ - Answered: \[[ x]\]; Specified: \[ \]; (.+)$/.exec(line);

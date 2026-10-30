@@ -61,9 +61,9 @@ test('sumRunUsage counts interview seconds without counting it as an iteration',
   const { mkdirSync, writeFileSync } = await import('node:fs');
   const dir = mkdtempSync(join(tmpdir(), 'hodge-budget-'));
   rec(dir, 1, 5);
-  mkdirSync(join(dir, 'runs', 'r1', 'interview'), { recursive: true });
+  mkdirSync(join(dir, '.hodgepodge', 'runs', 'r1', 'interview'), { recursive: true });
   writeFileSync(
-    join(dir, 'runs', 'r1', 'interview', 'record.json'),
+    join(dir, '.hodgepodge', 'runs', 'r1', 'interview', 'record.json'),
     JSON.stringify({ status: 'ok', usage: { seconds: 7 } }),
   );
   assert.deepEqual(sumRunUsage(dir, 'r1'), { seconds: 12, iterations: 1 });

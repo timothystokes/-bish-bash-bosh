@@ -58,10 +58,10 @@ test('hodgepodge status prints JSON and includes control state', async () => {
   assert.equal(j.control.paused, true);
 });
 
-test('hodgepodge status needs a project config (hodgepodge.yml)', async () => {
+test('hodgepodge status needs a project config (.hodgepodge/config.yml)', async () => {
   let e = '';
   const missing = mkdtempSync(join(tmpdir(), 'hodge-status-missing-'));
   const code = await withCwd(missing, () => main(['status'], { stdout: () => {}, stderr: (/** @type {string} */ s) => (e += s) }));
   assert.equal(code, 2);
-  assert.match(e, /hodgepodge\.yml/);
+  assert.match(e, /config\.yml/);
 });

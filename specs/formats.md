@@ -6,7 +6,7 @@ Status: partly implemented (X-3: declaration parsing, registry, readiness gaps; 
 - Tools live inside the harness (`package.json` dependencies) and validate the specs and their format artifacts. They are not used on, and need not support the language of, the delivered project. Where a declared format constrains a step's output (for example a JSON Schema for a file the loop produces), the harness runs the same embedded tool as a gate on that output.
 - Output declaration: a bullet may add `-> <output path>` (`- json-schema: specs/schemas/order.json -> out/order.json`): a repo-relative file the loop produces that must conform to the artifact. A missing output is skipped (not yet produced); an existing one that is not valid JSON or violates the schema is a gap.
 - Known formats: `gherkin`, `json-schema`, `openapi`.
-- Consistency: README, this spec, `templates/objective/READINESS.md` and CLI help must list exactly the registry (`test/docs-consistency.test.js`).
+- Consistency: README, this spec and CLI help must list exactly the registry (`test/docs-consistency.test.js`).
 - Registry: `src/formats.js` `FORMATS` maps `name -> {validate(path), crossCheck(paths), conform?(schema, data, schemaPaths)}`; `checkFormats` runs it and `checkReadiness` includes its gaps. `json-schema`: `validate` checks the artifact against the meta-schema; `crossCheck` loads all declared schemas into one `ajv` instance (duplicate `$id` and unresolved `$ref` are problems); `conform` validates an output against a schema.
 - Skill snippets (G-9): `prompts/formats/<format>.md`, one per registered format (`loadFormatSkill`; `test/format-skills.test.js`). `hodge` (the interview prompt) appends a `## Format skill: <format>` section for each known format that any spec declares, so the agent is guided only on formats in use. Snippets carry no model or vendor names.
 - Loop gate (F-11): `runStep` runs `checkFormatGate` (the same `checkFormats` gaps) after the scope and anti-stub gates when any spec declares a format; a gap fails the step (`formats` in `record.json` gates, detail lists the gaps) and the work is reverted.
@@ -35,4 +35,4 @@ Later (deferred): XState statecharts (`xstate`, `@xstate/graph`), property specs
 
 ## Out of scope
 - Validating the delivered project's own artifacts for languages the harness tools do not cover.
-- Choosing formats for the owner: the interview proposes them, the owner confirms (`templates/objective/INTERVIEW.md` "Proposing formats"; F-10).
+- Choosing formats for the owner: the interview proposes them, the owner confirms (`prompts/formats/<format>.md` skills appended to the interview prompt; F-10).

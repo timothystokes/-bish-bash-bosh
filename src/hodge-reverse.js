@@ -45,7 +45,7 @@ export async function runReverse({ config, repoDir, runId, adapter, focus = unde
   const self = identity ?? harnessIdentity();
   const g = checkRepoGate(repoDir, self);
   if (!g.ok) return gated(g.reason);
-  // `.hodge.lock` lives in the project root now (no separate sandbox dir); exclude it from the
+  // `.hodgepodge/lock` is harness-internal; exclude it from the
   // dirty-working-tree check since it is harness-internal, never committed.
   if (git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') return gated('working tree is not clean');
   const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
@@ -93,7 +93,7 @@ export async function runReverse({ config, repoDir, runId, adapter, focus = unde
     git(repoDir, 'clean', '-fdq', '-e', LOCK_FILE);
   }
 
-  const dir = join(repoDir, 'runs', runId, 'reverse');
+  const dir = join(repoDir, '.hodgepodge', 'runs', runId, 'reverse');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'transcript.txt'), formatTranscript(prompt, result.transcript));
   writeFileSync(join(dir, 'diff.patch'), diff);

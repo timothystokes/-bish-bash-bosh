@@ -77,7 +77,7 @@ test('lint-clean spec with green characterization suite is committed with a reco
   assert.equal(res.sha, git(dir, 'rev-parse', 'HEAD'));
   assert.equal(git(dir, 'status', '--porcelain'), '');
   assert.equal(lintSpecs(dir).ok, true);
-  assert.equal(JSON.parse(readFileSync(join(dir, 'runs', 'r1', 'reverse', 'record.json'), 'utf8')).status, 'ok');
+  assert.equal(JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'reverse', 'record.json'), 'utf8')).status, 'ok');
   assert.ok(existsSync(join(dir, 'specs', 'greet.md')));
 });
 

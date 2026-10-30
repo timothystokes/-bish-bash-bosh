@@ -161,7 +161,7 @@ test('phase 6 regression: lint, formats, scripted build, derived done, QA cycle,
   execFileSync('npm', ['test', '--silent'], { cwd: dir, stdio: 'pipe' });
   assert.equal(git(dir, 'status', '--porcelain'), '');
 
-  const done = JSON.parse(readFileSync(join(dir, 'runs', 'p6', 'done.json'), 'utf8'));
+  const done = JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'p6', 'done.json'), 'utf8'));
   assert.equal(done.ok, true);
   assert.deepEqual(done.requirements.map((/** @type {any} */ r) => [r.id, r.status]), [
     ['R-greet-1', 'passing'],
@@ -170,8 +170,8 @@ test('phase 6 regression: lint, formats, scripted build, derived done, QA cycle,
   ]);
   assert.match(readFileSync(join(dir, 'specs', 'greet.md'), 'utf8'), /^# Spec: greet\nImplementation: implemented\nEvidence: /);
 
-  assert.deepEqual(readdirSync(join(dir, 'runs', 'p6')).filter((f) => f.startsWith('qa-')).sort(), ['qa-1', 'qa-2']);
-  const f1 = JSON.parse(readFileSync(join(dir, 'runs', 'p6', 'qa-1', 'findings.json'), 'utf8'));
+  assert.deepEqual(readdirSync(join(dir, '.hodgepodge', 'runs', 'p6')).filter((f) => f.startsWith('qa-')).sort(), ['qa-1', 'qa-2']);
+  const f1 = JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'p6', 'qa-1', 'findings.json'), 'utf8'));
   assert.equal(f1[0].diagnosis.rootCause, 'output never generated');
   assert.match(readFileSync(join(dir, 'plan.md'), 'utf8'), /- \[x\] QA-1-1/);
 
@@ -179,7 +179,7 @@ test('phase 6 regression: lint, formats, scripted build, derived done, QA cycle,
   assert.deepEqual(details.formats?.map((/** @type {any} */ d) => d.format), ['json-schema']);
   assert.equal(details.qa?.length, 2);
   assert.equal(details.done?.ok, true);
-  assert.equal(existsSync(join(dir, '.hodge.lock')), false, 'the run lock is released');
+  assert.equal(existsSync(join(dir, '.hodgepodge', 'lock')), false, 'the run lock is released');
 });
 
 test('phase 6 regression: an output that does not conform to the declared schema is stopped by the formats gate with a diagnosis', async () => {
@@ -200,10 +200,10 @@ test('phase 6 regression: an output that does not conform to the declared schema
   assert.equal(qa.calls(), 0, 'QA never runs on a gated build');
   assert.equal(existsSync(join(dir, 'out', 'greeting.json')), false, 'the non-conforming output is not kept');
   assert.equal(git(dir, 'status', '--porcelain'), '');
-  const rec = JSON.parse(readFileSync(join(dir, 'runs', 'p6', 'iterations', '001', 'record.json'), 'utf8'));
+  const rec = JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'p6', 'iterations', '001', 'record.json'), 'utf8'));
   assert.equal(rec.status, 'failed');
   assert.ok(rec.gates.some((/** @type {any} */ g) => g.name === 'formats' && g.ok === false), JSON.stringify(rec.gates));
-  const diag = JSON.parse(readFileSync(join(dir, 'runs', 'p6', 'iterations', '001', 'diagnosis.json'), 'utf8'));
+  const diag = JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'p6', 'iterations', '001', 'diagnosis.json'), 'utf8'));
   assert.equal(diag.rootCause, 'gate formats failed');
   assert.match(diag.evidence, /greeting\.json/);
 });
@@ -229,7 +229,7 @@ test('phase 6 regression: a requirement with no passing test keeps a ticked plan
   assert.notEqual(res.status, 'done', JSON.stringify(res));
   assert.equal(qa.calls(), 0);
   assert.match(readFileSync(join(dir, 'plan.md'), 'utf8'), /- \[ \] Verify: R-greet-3: no passing test/);
-  const done = JSON.parse(readFileSync(join(dir, 'runs', 'p6', 'done.json'), 'utf8'));
+  const done = JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'p6', 'done.json'), 'utf8'));
   assert.equal(done.ok, false);
 });
 
@@ -246,7 +246,8 @@ test('phase 6 regression: spec-lint stops podge before any agent call when a req
 test('phase 6 regression: a second run in the same sandbox is refused while the first holds the lock', async () => {
   const dir = makeTarget();
   commitProjectConfig(dir, cfg());
-  writeFileSync(join(dir, '.hodge.lock'), `${process.pid}\n`);
+  mkdirSync(join(dir, '.hodgepodge'), { recursive: true });
+  writeFileSync(join(dir, '.hodgepodge', 'lock'), `${process.pid}\n`);
   /** @type {string[]} */
   const errs = [];
   const code = await withCwd(dir, () =>
@@ -258,5 +259,5 @@ test('phase 6 regression: a second run in the same sandbox is refused while the 
     }));
   assert.notEqual(code, 0);
   assert.match(errs.join(''), /lock|already running/i);
-  assert.equal(readdirSync(join(dir)).includes('runs'), false);
+  assert.equal(existsSync(join(dir, '.hodgepodge', 'runs')), false);
 });

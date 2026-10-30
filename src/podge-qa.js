@@ -58,7 +58,7 @@ export function findingsToPlanItems(plan, cycle, findings) {
 
 // Number of QA cycles already recorded for a run (`runs/<runId>/qa-N/`).
 export function qaCycles(repoDir, runId) {
-  const dir = join(repoDir, 'runs', runId);
+  const dir = join(repoDir, '.hodgepodge', 'runs', runId);
   if (!existsSync(dir)) return 0;
   const nums = readdirSync(dir).map((d) => /^qa-(\d+)$/.exec(d)?.[1]).filter(Boolean).map(Number);
   return nums.length === 0 ? 0 : Math.max(...nums);
@@ -74,7 +74,7 @@ export async function runQaCycle({ config, repoDir, runId, adapter, identity }) 
   const self = identity ?? harnessIdentity();
   const g = checkRepoGate(repoDir, self);
   if (!g.ok) return { status: 'gated', cycle, reason: g.reason };
-  // `.hodge.lock` lives in the project root now (no separate sandbox dir); exclude it from the
+  // `.hodgepodge/lock` is harness-internal; exclude it from the
   // dirty-working-tree check since it is harness-internal, never committed.
   if (git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') return { status: 'gated', cycle, reason: 'working tree is not clean' };
   const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
@@ -106,7 +106,7 @@ export async function runQaCycle({ config, repoDir, runId, adapter, identity }) 
     res = { status: parsed.findings.length === 0 ? 'clean' : 'findings', cycle, findings: parsed.findings };
   }
 
-  const dir = join(repoDir, 'runs', runId, `qa-${cycle}`);
+  const dir = join(repoDir, '.hodgepodge', 'runs', runId, `qa-${cycle}`);
   const tmp = `${dir}.tmp`;
   rmSync(tmp, { recursive: true, force: true });
   mkdirSync(tmp, { recursive: true });

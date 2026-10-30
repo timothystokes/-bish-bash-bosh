@@ -28,10 +28,10 @@ function fakeS3() {
 
 function runsDir() {
   const dir = mkdtempSync(join(tmpdir(), 'hodge-art-'));
-  mkdirSync(join(dir, 'runs', 'r1', 'iterations', '001'), { recursive: true });
-  writeFileSync(join(dir, 'runs', 'r1', 'iterations', '001', 'record.json'), '{"a":1}');
-  writeFileSync(join(dir, 'runs', 'r1', 'summary.json'), '{"b":2}');
-  writeFileSync(join(dir, 'runs', 'other.json'), 'x');
+  mkdirSync(join(dir, '.hodgepodge', 'runs', 'r1', 'iterations', '001'), { recursive: true });
+  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'iterations', '001', 'record.json'), '{"a":1}');
+  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'summary.json'), '{"b":2}');
+  writeFileSync(join(dir, '.hodgepodge', 'runs', 'other.json'), 'x');
   return dir;
 }
 
@@ -50,7 +50,7 @@ test('syncArtifacts is idempotent: unchanged files are skipped, changed files re
   const again = await syncArtifacts({ client, bucket: 'b', repoDir, runId: 'r1' });
   assert.equal(again.uploaded.length, 0);
   assert.equal(again.skipped.length, 2);
-  writeFileSync(join(repoDir, 'runs', 'r1', 'summary.json'), '{"b":3}');
+  writeFileSync(join(repoDir, '.hodgepodge', 'runs', 'r1', 'summary.json'), '{"b":3}');
   const third = await syncArtifacts({ client, bucket: 'b', repoDir, runId: 'r1' });
   assert.deepEqual(third.uploaded, ['runs/r1/summary.json']);
 });

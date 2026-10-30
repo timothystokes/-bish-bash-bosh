@@ -155,5 +155,5 @@ test('podge reports usage errors with exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
   const code = await withCwd(dir, () => main(['podge'], { stdout: () => {}, stderr: (s) => { err.push(s); } }));
   assert.equal(code, 2);
-  assert.match(err.join(''), /podge: cannot read config .*hodgepodge\.yml/);
+  assert.match(err.join(''), /podge: cannot read config .*config\.yml/);
 });

@@ -84,8 +84,8 @@ function verifyPlanDone({ repoDir, runId, testCommand = ['npm', 'test'], typeCom
   writeDoneReport(repoDir, runId, v.report);
   if (!v.ok) writeFileSync(join(repoDir, 'plan.md'), applyGaps(plan, v.gaps));
   const git = (...a) => execFileSync('git', ['-C', repoDir, ...a], { encoding: 'utf8' });
-  // `.hodge.lock` lives in the project root now (no separate sandbox dir); exclude it from
-  // staging/commit since it is harness-internal, never committed.
+  // `.hodgepodge/lock` is harness-internal; exclude it from
+  // staging/commit since it is never committed.
   git('add', '-A', '--', '.', `:!${LOCK_FILE}`);
   if (git('status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') git('commit', '-q', '-m', `podge verify ${runId}: ${v.ok ? 'done' : 'gaps'}`);
   return !v.ok;

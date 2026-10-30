@@ -3,9 +3,9 @@ import { join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { validateConfig } from './config.js';
 
-export const CONFIG_FILE = 'hodgepodge.yml';
+export const CONFIG_FILE = '.hodgepodge/config.yml';
 
-// Load the project config: `<dir>/hodgepodge.yml` (default dir: the current working directory) holds
+// Load the project config: `<dir>/.hodgepodge/config.yml` (default dir: the current working directory) holds
 // roles, budgets and the rest (`src/config.schema.json`). There is no separate sandbox or target repo:
 // hodgepodge always operates on this project directory directly.
 export function loadProjectConfig(dir = '.') {

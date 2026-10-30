@@ -12,12 +12,12 @@ function listFiles(dir, prefix = '') {
   return out;
 }
 
-// Sync a run's records (`runs/<runId>/**`) to S3 under the same key. Idempotent: a file whose
-// sha256 matches the stored object is skipped. Git stays the source of truth; this is a copy.
+// Sync a run's records (`.hodgepodge/runs/<runId>/**`) to S3 under the `runs/<runId>/**` key. Idempotent:
+// a file whose sha256 matches the stored object is skipped. Git stays the source of truth; this is a copy.
 export async function syncArtifacts({ client, bucket, repoDir, runId }) {
   if (!bucket) throw new Error('bucket is required');
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(runId) || runId.includes('..')) throw new Error(`invalid runId: ${runId}`);
-  const root = join(repoDir, 'runs', runId);
+  const root = join(repoDir, '.hodgepodge', 'runs', runId);
   const result = { uploaded: [], skipped: [] };
   if (!existsSync(root)) return result;
   for (const rel of listFiles(root)) {
