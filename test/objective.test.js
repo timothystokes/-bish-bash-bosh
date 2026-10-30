@@ -5,13 +5,13 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node
 import { join, dirname } from 'node:path';
 import { Readable } from 'node:stream';
 import { runObjective } from '../src/hodge-objective.js';
-import { sumRunUsage } from '../src/budget-gate.js';
+import { sumRunUsage } from '../src/run-usage.js';
 import { main } from '../src/cli.js';
 import { freshDir, initGitRepo, seedObjectiveProject, withCwd, writeProjectConfig } from './support/project.js';
 
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
-const buildConfig = { roles: { build: { adapter: 'a', model: 'm' } }, budgets: { maxWallClockSeconds: 7200, maxIterations: 20 }, allowedPaths: ['src/', 'bin/', 'lib/', 'package.json'], requireTestPlan: true };
+const buildConfig = { roles: { build: { adapter: 'a', model: 'm' } }, allowedPaths: ['src/', 'bin/', 'lib/', 'package.json'], requireTestPlan: true };
 
 const goodSpec = `# Spec: Greeter
 Implementation: none
@@ -141,7 +141,7 @@ test('"ok" accepts the proposed defaults; the log and the agent see the default 
   assert.match(o.said[0], /ok when ready to continue/i);
 });
 
-test('each round has its own record and all rounds count toward the run budget', async () => {
+test('each round has its own record and all rounds count toward usage totals', async () => {
   const { repo, config } = sandbox();
   await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted(fullRounds).adapter, ...owner(['d', '2: a', 'ok', '3: b', 'ok']), identity });
   for (const d of ['interview', 'interview-2', 'interview-3']) assert.ok(existsSync(join(repo, '.hodgepodge', 'runs', 'r1', d, 'record.json')), d);

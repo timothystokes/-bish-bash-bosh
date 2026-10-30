@@ -6,8 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { validateFinding, parseFindings, findingsToPlanItems, runQaCycle, qaCycles } from '../src/podge-qa.js';
 import { runLoop } from '../src/podge-driver.js';
-import { sumRunUsage } from '../src/budget-gate.js';
-import { writeIterationRecord } from '../src/podge-run-record.js';
+import { sumRunUsage } from '../src/run-usage.js';
 import { validateConfig } from '../src/config.js';
 import { loadQaPrompt } from '../src/prompts.js';
 import { main } from '../src/cli.js';
@@ -42,7 +41,6 @@ function makeRepo(plan = '- [x] one\n') {
 
 const config = (extra = {}) => ({
   roles: { build: { adapter: 'b', model: 'm' }, qa: { adapter: 'q', model: 'm2' } },
-  budgets: { maxWallClockSeconds: 60, maxIterations: 20 },
   allowedPaths: ['src/'],
   ...extra,
 });
@@ -100,13 +98,13 @@ test('config accepts an optional qa role and maxQaCycles; rejects a non-positive
 
 test('runQaCycle: a [] report is clean; findings are handed to plan.md and committed; the record counts toward run seconds', async () => {
   const dir = makeRepo();
-  const clean = await runQaCycle({ config: config(), repoDir: dir, runId: 'r', adapter: qaAdapter(block([])), identity });
+  const clean = await runQaCycle({ repoDir: dir, runId: 'r', adapter: qaAdapter(block([])), identity });
   assert.equal(clean.status, 'clean');
   assert.equal(clean.cycle, 1);
   assert.equal(qaCycles(dir, 'r'), 1);
   assert.equal(readFileSync(join(dir, 'plan.md'), 'utf8'), '- [x] one\n');
 
-  const found = await runQaCycle({ config: config(), repoDir: dir, runId: 'r', adapter: qaAdapter(block([finding])), identity });
+  const found = await runQaCycle({ repoDir: dir, runId: 'r', adapter: qaAdapter(block([finding])), identity });
   assert.equal(found.status, 'findings');
   assert.equal(found.cycle, 2);
   assert.equal(found.findings?.length, 1);
@@ -120,7 +118,7 @@ test('runQaCycle: a [] report is clean; findings are handed to plan.md and commi
 
 test('runQaCycle fails (no pass by silence) on a missing report, non-zero exit, or a modified tree; tree stays clean', async () => {
   const dir = makeRepo();
-  const run = (/** @type {any} */ adapter) => runQaCycle({ config: config(), repoDir: dir, runId: 'r', adapter, identity });
+  const run = (/** @type {any} */ adapter) => runQaCycle({ repoDir: dir, runId: 'r', adapter, identity });
   const none = await run(qaAdapter('looks fine to me'));
   assert.equal(none.status, 'failed');
   assert.match(none.reason ?? '', /findings/);
@@ -134,14 +132,9 @@ test('runQaCycle fails (no pass by silence) on a missing report, non-zero exit, 
   assert.equal(readFileSync(join(dir, 'plan.md'), 'utf8'), '- [x] one\n');
 });
 
-test('runQaCycle reports over-budget when wall-clock is exhausted, and gates the harness repo', async () => {
+test('runQaCycle gates when the run repo is the harness itself', async () => {
   const dir = makeRepo();
-  writeIterationRecord(dir, 'r', 1, { status: 'ok', usage: { seconds: 60 }, changedFiles: [], gates: [], prompt: '', transcript: '', diff: '', test: {} });
-  git(dir, 'add', '-A');
-  git(dir, 'commit', '-qm', 'spent');
-  const over = await runQaCycle({ config: config(), repoDir: dir, runId: 'r', adapter: qaAdapter(block([])), identity });
-  assert.equal(over.status, 'over-budget');
-  const self = await runQaCycle({ config: config(), repoDir: dir, runId: 'r2', adapter: qaAdapter(block([])), identity: { root: dir, remotes: [] } });
+  const self = await runQaCycle({ repoDir: dir, runId: 'r2', adapter: qaAdapter(block([])), identity: { root: dir, remotes: [] } });
   assert.equal(self.status, 'gated');
 });
 

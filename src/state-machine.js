@@ -9,7 +9,6 @@ function validate(c) {
   const positive = (k, v) => {
     if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) throw new Error(`${k} must be a positive number`);
   };
-  positive('maxIterations', c.budgets?.maxIterations);
   positive('iterationsPerExecution', c.iterationsPerExecution);
   positive('pollSeconds', c.pollSeconds);
 }
@@ -20,7 +19,6 @@ function validate(c) {
 // Input: `{runId, executionIterations: 0}`.
 export function buildStateMachine(config) {
   validate(config);
-  const { budgets } = config;
   return {
     Comment: 'hodge loop: one podge step per Fargate Spot task',
     StartAt: 'ReadPointers',
@@ -39,14 +37,7 @@ export function buildStateMachine(config) {
           { Variable: '$.pointers.stop', BooleanEquals: true, Next: 'Stopped' },
           { Variable: '$.pointers.paused', BooleanEquals: true, Next: 'WaitWhilePaused' },
           { Variable: '$.pointers.status', StringEquals: 'done', Next: 'Done' },
-          {
-            Or: [
-              { Variable: '$.pointers.status', StringEquals: 'gated' },
-              { Variable: '$.pointers.status', StringEquals: 'over-budget' },
-            ],
-            Next: 'Halted',
-          },
-          { Variable: '$.pointers.iteration', NumericGreaterThanEquals: budgets.maxIterations, Next: 'BudgetExhausted' },
+          { Variable: '$.pointers.status', StringEquals: 'gated', Next: 'Halted' },
           { Variable: '$.executionIterations', NumericGreaterThanEquals: config.iterationsPerExecution, Next: 'StartSuccessor' },
         ],
         Default: 'CountIteration',
@@ -100,8 +91,7 @@ export function buildStateMachine(config) {
       Handoff: { Type: 'Succeed' },
       Stopped: { Type: 'Succeed' },
       Done: { Type: 'Succeed' },
-      BudgetExhausted: { Type: 'Succeed' },
-      Halted: { Type: 'Fail', Error: 'HodgeHalted', Cause: 'last step was gated or over budget' },
+      Halted: { Type: 'Fail', Error: 'HodgeHalted', Cause: 'last step was gated' },
     },
   };
 }

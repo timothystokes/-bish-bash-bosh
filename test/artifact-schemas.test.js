@@ -31,7 +31,6 @@ test('every artifact schema compiles in strict mode and has an $id', () => {
 test('config schema accepts the qa role and maxQaCycles', () => {
   const cfg = {
     roles: { build: { adapter: 'a', model: 'm' }, qa: { adapter: 'b', model: 'n' } },
-    budgets: { maxWallClockSeconds: 1, maxIterations: 1 },
     allowedPaths: ['src/**'],
     maxQaCycles: 3,
   };

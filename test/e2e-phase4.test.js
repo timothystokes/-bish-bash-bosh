@@ -36,9 +36,8 @@ async function hodge(argv, registry) {
   return { code, res: JSON.parse(outs.join('')) };
 }
 
-const budgets = { maxWallClockSeconds: 60, maxIterations: 3 };
 /** @param {Record<string, unknown>} extra */
-const makeConfig = (extra) => ({ budgets, allowedPaths: ['src/', 'package.json'], ...extra });
+const makeConfig = (extra) => ({ allowedPaths: ['src/', 'package.json'], ...extra });
 const pkg = JSON.stringify({ name: 'toy', type: 'module', scripts: { test: 'node --test tests/*.test.js' } });
 
 test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite passes', async () => {

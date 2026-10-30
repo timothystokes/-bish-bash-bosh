@@ -46,7 +46,6 @@ test('phase 3 exit: pause, steer and stop via hodgepodge control drive podge', a
   const ctl = join(tmp, 'control.json');
   const config = {
     roles: { build: { adapter: 'scripted', model: 'm' } },
-    budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
     allowedPaths: ['src/'],
   };
 

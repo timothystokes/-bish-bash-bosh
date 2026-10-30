@@ -68,7 +68,7 @@ test('O-3: prompts carry the entries only when given', () => {
 
 test('O-3: `hodgepodge console <kind>` writes each stdin line and stops at /quit; no model, no lock', async () => {
   const dir = tmp();
-  writeProjectConfig(dir, { roles: { build: { adapter: 'fake', model: 'm' } }, budgets: { maxWallClockSeconds: 60, maxIterations: 5 }, allowedPaths: ['src/'] });
+  writeProjectConfig(dir, { roles: { build: { adapter: 'fake', model: 'm' } }, allowedPaths: ['src/'] });
   const out = /** @type {string[]} */ ([]);
   const code = await withCwd(dir, () =>
     main(['console', 'hodge'], {
@@ -105,7 +105,6 @@ function makeRepo() {
 
 const cfg = {
   roles: { build: { adapter: 'fake', model: 'm' }, interview: { adapter: 'fake', model: 'm' } },
-  budgets: { maxWallClockSeconds: 600, maxIterations: 5 },
   allowedPaths: ['src/'],
 };
 

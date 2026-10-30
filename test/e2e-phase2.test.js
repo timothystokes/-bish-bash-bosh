@@ -51,7 +51,6 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
 
   const config = {
     roles: { interview: { adapter: 'interviewer', model: 'm' }, build: { adapter: 'builder', model: 'm' } },
-    budgets: { maxWallClockSeconds: 60, maxIterations: 3 },
     allowedPaths: ['src/'],
     requireTestPlan: true,
   };

@@ -26,7 +26,6 @@ function makeRepo() {
 
 const config = {
   roles: { build: { adapter: 'f', model: 'm' } },
-  budgets: { maxWallClockSeconds: 60, maxIterations: 10 },
   allowedPaths: ['src/'],
 };
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
@@ -122,7 +121,16 @@ test('runLoop waits while paused and resumes when unpaused', async () => {
     if (sleeps === 3) writeFileSync(f, JSON.stringify({ paused: false }));
     assert.equal(prompts.length, 0);
   };
-  const res = await runLoop({ config: { ...config, budgets: { ...config.budgets, maxIterations: 1 } }, repoDir: dir, runId: 'r', adapter: recordingAdapter(prompts), testCommand: pass, identity, controlFile: f, sleep });
+  const inner = recordingAdapter(prompts);
+  // Stop the loop after the first step once resumed; the plan fixture never finishes on its own.
+  const adapter = {
+    async run(/** @type {any} */ req) {
+      const r = await inner.run(req);
+      writeFileSync(f, JSON.stringify({ stop: true }));
+      return r;
+    },
+  };
+  const res = await runLoop({ config, repoDir: dir, runId: 'r', adapter, testCommand: pass, identity, controlFile: f, sleep });
   assert.equal(sleeps, 3);
   assert.equal(prompts.length, 1);
   assert.equal(res.steps.filter((x) => x.status === 'ok').length, 1);
@@ -144,7 +152,16 @@ test('steer note is injected into exactly the next prompt, then consumed', async
   const f = ctlFile();
   writeFileSync(f, JSON.stringify({ steer: 'prefer small functions' }));
   const prompts = /** @type {string[]} */ ([]);
-  const res = await runLoop({ config: { ...config, budgets: { ...config.budgets, maxIterations: 2 } }, repoDir: dir, runId: 'r', adapter: recordingAdapter(prompts), testCommand: pass, identity, controlFile: f });
+  const inner = recordingAdapter(prompts);
+  // Stop the loop after the second step; the plan fixture never finishes on its own.
+  const adapter = {
+    async run(/** @type {any} */ req) {
+      const r = await inner.run(req);
+      if (prompts.length === 2) writeFileSync(f, JSON.stringify({ stop: true }));
+      return r;
+    },
+  };
+  const res = await runLoop({ config, repoDir: dir, runId: 'r', adapter, testCommand: pass, identity, controlFile: f });
   assert.equal(res.steps.filter((x) => x.status === 'ok').length, 2);
   assert.match(prompts[0], /prefer small functions/);
   assert.doesNotMatch(prompts[1], /prefer small functions/);
@@ -165,7 +182,15 @@ test('invalid control file stops the loop (fail closed)', async () => {
 test('without controlFile behaviour is unchanged and no file is created', async () => {
   const dir = makeRepo();
   const prompts = /** @type {string[]} */ ([]);
-  const res = await runLoop({ config: { ...config, budgets: { ...config.budgets, maxIterations: 1 } }, repoDir: dir, runId: 'r', adapter: recordingAdapter(prompts), testCommand: pass, identity });
+  // No controlFile and no run budget: bound the loop by letting the agent finish the plan.
+  const adapter = {
+    async run(/** @type {any} */ req) {
+      prompts.push(req.prompt);
+      writeFileSync(join(req.cwd, 'plan.md'), '- [x] one\n- [x] two\n- [x] three\n');
+      return { exitStatus: 0, transcript: 't', changedFiles: ['plan.md'] };
+    },
+  };
+  const res = await runLoop({ config, repoDir: dir, runId: 'r', adapter, testCommand: pass, identity });
   assert.equal(res.steps.filter((x) => x.status === 'ok').length, 1);
   assert.equal(existsSync(join(dir, 'control.json')), false);
 });

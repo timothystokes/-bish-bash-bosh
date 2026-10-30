@@ -66,7 +66,7 @@ export async function runLoop(opts) {
         if (qaCycles(stepOpts.repoDir, stepOpts.runId) >= max) {
           return withQa({ status: 'failed', steps, reason: `qa cycle limit (${max}) reached: the last findings were not re-verified` });
         }
-        const q = await runQaCycle({ config: stepOpts.config, repoDir: stepOpts.repoDir, runId: stepOpts.runId, adapter: qaAdapter, identity: stepOpts.identity });
+        const q = await runQaCycle({ repoDir: stepOpts.repoDir, runId: stepOpts.runId, adapter: qaAdapter, identity: stepOpts.identity });
         qa.push(q);
         if (q.status === 'clean') return withQa({ status: 'done', steps });
         if (q.status !== 'findings') return withQa({ status: q.status, steps, reason: `qa ${q.status}: ${q.reason ?? ''}`.trim() });

@@ -10,7 +10,6 @@ import { writeDoneReport } from '../src/podge-done.js';
 import { main } from '../src/cli.js';
 import { writeProjectConfig, withCwd } from './support/project.js';
 
-const budgets = { maxWallClockSeconds: 100, maxIterations: 5 };
 const control = /** @type {const} */ ({ ok: true, paused: false, stop: false });
 
 const diagnosis = { rootCause: 'rc', evidence: 'ev', fix: 'fx', test: 't', prevention: 'pv' };
@@ -106,13 +105,13 @@ test('readRunDetails ignores unreadable done.json and qa-N records', () => {
 });
 
 test('readRunStatus carries details when the source provides them', () => {
-  const s = readRunStatus(createLocalStatusSource(makeRepo()), 'r1', budgets);
+  const s = readRunStatus(createLocalStatusSource(makeRepo()), 'r1');
   assert.equal(s.details.formats.length, 2);
   assert.equal(s.details.qa.length, 2);
 });
 
 test('renderFrame shows formats, readiness dimensions, QA findings and done evidence', () => {
-  const status = readRunStatus(createLocalStatusSource(makeRepo()), 'r1', budgets);
+  const status = readRunStatus(createLocalStatusSource(makeRepo()), 'r1');
   const frame = renderFrame({ status, control, tail: [], prompt: null });
   assert.match(frame, /formats\s+openapi api\/openapi\.yaml/);
   assert.match(frame, /json-schema schemas\/x\.json -> out\/x\.json/);
@@ -129,7 +128,7 @@ test('renderFrame shows formats, readiness dimensions, QA findings and done evid
 
 test('renderFrame says so when nothing is declared, no QA ran and there is no done report', () => {
   const dir = mkdtempSync(join(tmpdir(), 'hodge-details-'));
-  const status = readRunStatus(createLocalStatusSource(dir), 'r1', budgets);
+  const status = readRunStatus(createLocalStatusSource(dir), 'r1');
   const frame = renderFrame({ status, control, tail: [], prompt: null });
   assert.match(frame, /formats\s+none declared/);
   assert.match(frame, /qa\s+not run/);
@@ -138,7 +137,7 @@ test('renderFrame says so when nothing is declared, no QA ran and there is no do
 
 test('hodgepodge status prints formats, readiness, qa and done in the JSON', async () => {
   const repo = makeRepo();
-  const cfg = { roles: { build: { adapter: 'f', model: 'm' } }, budgets, allowedPaths: ['src/'] };
+  const cfg = { roles: { build: { adapter: 'f', model: 'm' } }, allowedPaths: ['src/'] };
   writeProjectConfig(repo, cfg);
   let out = '';
   const code = await withCwd(repo, () => main(['status', '--run-id', 'r1'], { stdout: (/** @type {string} */ s) => (out += s), stderr: () => {} }));

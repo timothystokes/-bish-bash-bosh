@@ -47,9 +47,6 @@ test('diagnose covers non-gate failures and agent-reported fields override defau
   const crash = diagnose({ status: 'failed', gates: [{ name: 'repo', ok: true }], transcript: 'x' });
   assert.ok(crash);
   assert.match(crash.rootCause, /agent/i);
-  const over = diagnose({ status: 'over-budget', gates: [], transcript: '' });
-  assert.ok(over);
-  assert.match(over.rootCause, /budget/i);
   const merged = diagnose({
     status: 'failed',
     gates: [{ name: 'tests', ok: false, detail: 'red' }],
@@ -84,7 +81,6 @@ test('runStep: a gated failure records diagnosis.json and returns its root cause
   const res = await runStep({
     config: {
       roles: { build: { adapter: 'x', model: 'y' } },
-      budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
       allowedPaths: ['src/'],
     },
     repoDir: dir, runId: 'r1',

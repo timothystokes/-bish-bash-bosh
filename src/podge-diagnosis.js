@@ -45,14 +45,6 @@ export function diagnose({ status, gates, transcript }) {
       `Resolve the ${bad.name} gate failure.`, `Add a test covering the ${bad.name} gate.`, `Tighten the prompt, spec or gate for ${bad.name}.`,
     ];
     base = { rootCause: `gate ${bad.name} failed`, evidence: bad.detail ?? `gate ${bad.name} reported failure`, fix, test, prevention };
-  } else if (status === 'over-budget') {
-    base = {
-      rootCause: 'wall-clock or iteration budget exhausted',
-      evidence: 'wall-clock seconds or iteration count reached the run budget',
-      fix: 'Raise the budget deliberately or split the plan item.',
-      test: 'Add a budget-gate case for the exhausted cap.',
-      prevention: 'Size wall-clock and iteration budgets for a live agent call and keep plan items small.',
-    };
   } else {
     base = {
       rootCause: 'agent call exited non-zero',

@@ -234,19 +234,18 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
   }
   const project = loadRunProject(label, err);
   if (!project) return 2;
-  const { config, repo } = project;
+  const { repo } = project;
   if (cmd === 'tui') {
     await runTui({
       source: createLocalStatusSource(repo),
       runId: parsed.runId,
-      budgets: config.budgets,
       controlFile: resolve(parsed.control),
       input: deps.input ?? process.stdin,
       output: { write: out },
     });
     return 0;
   }
-  const status = readRunStatus(createLocalStatusSource(repo), parsed.runId, config.budgets);
+  const status = readRunStatus(createLocalStatusSource(repo), parsed.runId);
   const control = parsed.control ? readControl(resolve(parsed.control)) : undefined;
   out(`${JSON.stringify(control ? { ...status, control } : status)}\n`);
   return 0;

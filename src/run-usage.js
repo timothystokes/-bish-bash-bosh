@@ -23,20 +23,3 @@ export function sumRunUsage(repoDir, runId) {
   }
   return totals;
 }
-
-// Refuse another step once a run-wide iteration or wall-clock cap is exhausted.
-export function checkBudgetGate(repoDir, runId, budgets) {
-  const totals = sumRunUsage(repoDir, runId);
-  const remaining = {
-    seconds: budgets.maxWallClockSeconds - totals.seconds,
-    iterations: budgets.maxIterations - totals.iterations,
-  };
-  const exhausted = remaining.iterations <= 0
-    ? 'iteration cap reached'
-    : remaining.seconds <= 0
-      ? 'wall-clock budget exhausted'
-      : null;
-  return exhausted
-    ? { ok: false, reason: `${exhausted} for run ${runId}`, totals, remaining }
-    : { ok: true, totals, remaining };
-}

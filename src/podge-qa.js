@@ -2,7 +2,6 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateDiagnosis } from './podge-diagnosis.js';
-import { checkBudgetGate } from './budget-gate.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { loadQaPrompt } from './prompts.js';
 import { buildContext } from './podge-step.js';
@@ -68,8 +67,7 @@ const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgs
 
 // One QA cycle: an independent evaluator (the `qa` role's adapter) checks the build against the specs. Read-only:
 // any change it makes is discarded and fails the cycle. Findings become unchecked plan items, committed.
-export async function runQaCycle({ config, repoDir, runId, adapter, identity }) {
-  const cfg = config;
+export async function runQaCycle({ repoDir, runId, adapter, identity }) {
   const cycle = qaCycles(repoDir, runId) + 1;
   const self = identity ?? harnessIdentity();
   const g = checkRepoGate(repoDir, self);
@@ -77,15 +75,13 @@ export async function runQaCycle({ config, repoDir, runId, adapter, identity }) 
   // `.hodgepodge/lock` is harness-internal; exclude it from the
   // dirty-working-tree check since it is harness-internal, never committed.
   if (git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') return { status: 'gated', cycle, reason: 'working tree is not clean' };
-  const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
-  if (!budget.ok) return { status: 'over-budget', cycle, reason: budget.reason };
 
   const prompt = [loadQaPrompt(), buildContext(repoDir)].join('\n\n');
   const started = Date.now();
   const result = await adapter.run({
     prompt,
     cwd: repoDir,
-    limits: { maxWallClockSeconds: Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds) },
+    limits: {},
   });
   const seconds = (Date.now() - started) / 1000;
 

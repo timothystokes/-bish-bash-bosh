@@ -3,7 +3,6 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateConfig } from './config.js';
-import { checkBudgetGate } from './budget-gate.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { lintSpecs } from './spec-lint.js';
 import { loadFormatSkill, loadModePrompt } from './prompts.js';
@@ -97,7 +96,6 @@ const git = (dir, ...args) =>
 export async function runInterview({ config, repoDir, runId, adapter, objective, round = 1, closing = false, inboxDir = undefined, note = '', identity = undefined }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
-  const cfg = config;
   const gated = (reason) => ({ status: 'gated', sha: null, reason });
 
   if (objective.trim() === '') return gated('objective is empty');
@@ -107,12 +105,10 @@ export async function runInterview({ config, repoDir, runId, adapter, objective,
   // `.hodgepodge/lock` is harness-internal; exclude it from the
   // dirty-working-tree check since it is harness-internal, never committed.
   if (git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') return gated('working tree is not clean');
-  const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
-  if (!budget.ok) return { status: 'over-budget', sha: null, reason: budget.reason };
 
   const moreQuestions = inboxDir ? readInbox(inboxDir, 'hodge') : '';
   const prompt = buildInterviewPrompt(repoDir, objective, closing, moreQuestions, note);
-  const limits = { maxWallClockSeconds: Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds) };
+  const limits = {};
   const started = Date.now();
   const result = await adapter.run({ prompt, cwd: repoDir, limits });
   const seconds = (Date.now() - started) / 1000;

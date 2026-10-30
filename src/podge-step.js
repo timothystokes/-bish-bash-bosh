@@ -4,7 +4,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateConfig } from './config.js';
 import { checkAntiStubGate, checkScopeGate, checkTypeGate } from './diff-gates.js';
-import { checkBudgetGate } from './budget-gate.js';
 import { checkTestPlanGate } from './podge-test-plan-gate.js';
 import { lintSpecs } from './spec-lint.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
@@ -117,12 +116,6 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
     return gated(checkHardeningGate(repoDir, undefined).reason ?? 'hardening gate failed');
   }
 
-  const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
-  if (!budget.ok) {
-    log(`budget gate: ${budget.reason}`);
-    return { sha: null, iteration: 0, status: 'over-budget', reason: budget.reason };
-  }
-
   const iteration = nextIteration(repoDir, runId);
   // The test plan is the first step's output: with specs but no tests/PLAN.md, this step writes it (red tests + plan.md).
   const planStep = requireTestPlan && (cfg.mode ?? 'forward') === 'forward' && !existsSync(join(repoDir, 'tests', 'PLAN.md'));
@@ -133,12 +126,11 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
   const baseline = runTests(testCommand, repoDir);
   const moreTodos = inboxDir ? readInbox(inboxDir, 'podge') : '';
   const prompt = planStep ? buildPlanPrompt(repoDir, steer, moreTodos) : buildPrompt(repoDir, cfg.mode, steer, moreTodos);
-  const maxWallClockSeconds = Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds);
   const started = Date.now();
   const result = await adapter.run({
     prompt,
     cwd: repoDir,
-    limits: { maxWallClockSeconds },
+    limits: {},
   });
   const seconds = (Date.now() - started) / 1000;
 
@@ -147,7 +139,7 @@ export async function runStep({ config, repoDir, runId, adapter, testCommand = [
 
   let status = 'ok';
   let test = { skipped: true, exitStatus: undefined, output: undefined, reason: undefined };
-  const gates = [{ name: 'repo', ok: true }, { name: 'budget', ok: true }];
+  const gates = [{ name: 'repo', ok: true }];
   if (requireTestPlan && !planStep) gates.push({ name: 'test-plan', ok: true });
   const preGates = gates.length;
   const record = (name, c) => {

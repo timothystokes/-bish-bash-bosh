@@ -10,7 +10,7 @@ import { rebuildPointers } from '../src/podge-pointers.js';
 /** @param {string} dir @param {string[]} args */
 const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { encoding: 'utf8' }).trim();
 
-/** @param {'ok'|'failed'|'gated'|'over-budget'} status */
+/** @param {'ok'|'failed'|'gated'} status */
 const rec = (status) => ({ status, usage: { seconds: 1 }, changedFiles: [], gates: [], prompt: 'p', transcript: 't', diff: '', test: {} });
 
 function makeRepo() {
@@ -44,7 +44,7 @@ test('a fully ticked plan reports done', () => {
   assert.equal(rebuildPointers(dir, 'r1', join(dir, 'control.json')).status, 'done');
 });
 
-test('a gated or over-budget last step is surfaced as is', () => {
+test('a gated last step is surfaced as is', () => {
   const dir = makeRepo();
   writeIterationRecord(dir, 'r1', 1, rec('gated'));
   assert.equal(rebuildPointers(dir, 'r1', join(dir, 'control.json')).status, 'gated');

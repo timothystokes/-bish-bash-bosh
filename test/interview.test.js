@@ -27,7 +27,6 @@ function makeRepo() {
 
 const config = (/** @type {Record<string, {adapter: string, model: string}>} */ roles = { interview: { adapter: 'f', model: 'm' } }) => ({
   roles: { build: { adapter: 'f', model: 'm' }, ...roles },
-  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],
 });
 

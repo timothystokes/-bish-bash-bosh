@@ -11,7 +11,6 @@ import { createFakeAdapter } from '../src/adapter.js';
 
 const baseConfig = () => ({
   roles: { build: { adapter: 'a', model: 'm' } },
-  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/**'],
 });
 

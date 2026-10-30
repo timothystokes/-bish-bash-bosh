@@ -6,7 +6,6 @@ import { HodgeStack } from '../infra/stack.js';
 
 const props = {
   env: { account: '111111111111', region: 'ap-southeast-2' },
-  budgets: { maxIterations: 100 },
   iterationsPerExecution: 20,
   pollSeconds: 30,
   secretNames: ['hodge/agent-key'],
@@ -57,8 +56,4 @@ test('state machine role may run tasks, invoke the lambda and stop executions', 
 
 test('synth is deterministic', () => {
   assert.deepEqual(synth().toJSON(), synth().toJSON());
-});
-
-test('rejects invalid budgets', () => {
-  assert.throws(() => new HodgeStack(new App(), 'Bad', { ...props, budgets: { maxIterations: 0 } }), /maxIterations/);
 });

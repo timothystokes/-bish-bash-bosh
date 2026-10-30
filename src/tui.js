@@ -34,13 +34,12 @@ export function renderDetails(d) {
 
 // Pure renderer for one TUI frame.
 export function renderFrame({ status, control, tail, prompt, message = undefined }) {
-  const { totals: t, budgets: b } = status;
-  const over = Object.values(status.remaining).some((v) => v < 0);
+  const { totals: t } = status;
   const state = !control.ok ? `STOPPED (${control.reason})` : control.stop ? 'STOPPED' : control.paused ? 'PAUSED' : 'RUNNING';
   return [
-    `run ${status.runId}  ${state}${over ? '  OVER BUDGET' : ''}  last: ${status.lastStatus ?? '-'}`,
-    `seconds     ${t.seconds} / ${b.maxWallClockSeconds}`,
-    `iterations  ${t.iterations} / ${b.maxIterations}`,
+    `run ${status.runId}  ${state}  last: ${status.lastStatus ?? '-'}`,
+    `seconds     ${t.seconds}`,
+    `iterations  ${t.iterations}`,
     ...renderDetails(status.details),
     ...(control.ok && control.steer ? [`pending steer: ${control.steer}`] : []),
     '--- log ---',
@@ -52,7 +51,7 @@ export function renderFrame({ status, control, tail, prompt, message = undefined
 }
 
 // Key-driven TUI state machine; no timers or terminal I/O so it is testable.
-export function createTui({ source, runId, budgets, controlFile, tailLines = 15 }) {
+export function createTui({ source, runId, controlFile, tailLines = 15 }) {
   let mode = 'normal';
   let note = '';
   let message = '';
@@ -61,7 +60,7 @@ export function createTui({ source, runId, budgets, controlFile, tailLines = 15 
     frame() {
       const prompt = mode === 'steer' ? `steer> ${note}` : mode === 'confirm' ? 'confirm stop? [y/n]' : null;
       return renderFrame({
-        status: readRunStatus(source, runId, budgets),
+        status: readRunStatus(source, runId),
         control: readControl(controlFile),
         tail: source.tail(runId, tailLines),
         prompt,
@@ -108,8 +107,8 @@ export function createTui({ source, runId, budgets, controlFile, tailLines = 15 
 }
 
 // Runs the TUI until the user quits. `input` may be a TTY (raw mode is enabled and restored).
-export function runTui({ input, output, intervalMs = 1000, source, runId, budgets, controlFile, tailLines = undefined }) {
-  const tui = createTui({ source, runId, budgets, controlFile, tailLines });
+export function runTui({ input, output, intervalMs = 1000, source, runId, controlFile, tailLines = undefined }) {
+  const tui = createTui({ source, runId, controlFile, tailLines });
   return new Promise((resolve) => {
     const draw = () => output.write(`\x1b[2J\x1b[H${tui.frame().replace(/\n/g, '\r\n')}\r\n`);
     input.setRawMode?.(true);

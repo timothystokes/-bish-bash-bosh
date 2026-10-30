@@ -27,9 +27,8 @@ function makeRepo(plan) {
   return dir;
 }
 
-const config = (maxIterations = 5) => ({
+const config = () => ({
   roles: { build: { adapter: 'f', model: 'm' } },
-  budgets: { maxWallClockSeconds: 60, maxIterations },
   allowedPaths: ['src/'],
 });
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
@@ -74,15 +73,6 @@ test('runLoop stops with done when the agent ticks the last plan item', async ()
   assert.equal(res.status, 'done');
   assert.equal(res.steps.length, 2);
   assert.deepEqual(res.steps.map((s) => s.iteration), [1, 2]);
-});
-
-test('runLoop stops over-budget when iterations are exhausted', async () => {
-  const dir = makeRepo('- [ ] one\n');
-  const adapter = createFakeAdapter({ exitStatus: 0, transcript: 't', writes: {} });
-  const res = await runLoop({ config: config(2), repoDir: dir, runId: 'r', adapter, testCommand: pass, identity });
-  assert.equal(res.status, 'over-budget');
-  assert.equal(res.steps.filter((s) => s.status === 'ok').length, 2);
-  assert.ok(res.reason);
 });
 
 test('runLoop stops on the first failed step without retrying', async () => {
@@ -134,11 +124,11 @@ test('config accepts optional requireTestPlan boolean', () => {
 
 test('podge prints loop JSON, exit 0 when done, 1 otherwise', async () => {
   const dir = makeRepo('- [ ] one\n');
-  commitProjectConfig(dir, config(2));
+  commitProjectConfig(dir, config());
   const out = /** @type {string[]} */ ([]);
   const code = await withCwd(dir, () =>
     main(['podge', '--run-id', 'r'], {
-      registry: { f: () => createFakeAdapter({ exitStatus: 0, transcript: 't', writes: {} }) },
+      registry: { f: () => createFakeAdapter({ exitStatus: 1, transcript: 'no', writes: {} }) },
       testCommand: pass,
       identity,
       stdout: (s) => { out.push(s); },
@@ -146,8 +136,8 @@ test('podge prints loop JSON, exit 0 when done, 1 otherwise', async () => {
     }));
   assert.equal(code, 1);
   const res = JSON.parse(out.join(''));
-  assert.equal(res.status, 'over-budget');
-  assert.equal(res.steps.length, 3);
+  assert.equal(res.status, 'failed');
+  assert.equal(res.steps.length, 1);
 });
 
 test('podge reports usage errors with exit 2', async () => {

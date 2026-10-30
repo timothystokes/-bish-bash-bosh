@@ -85,7 +85,6 @@ function makeRepo() {
 
 const config = {
   roles: { build: { adapter: 'x', model: 'y' } },
-  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],
 };
 const pass = ['node', '-e', 'process.exit(0)'];
@@ -126,7 +125,7 @@ test('runStep fails when the type gate fails, and records every gate', async () 
   });
   assert.equal(res.status, 'failed');
   const names = record(dir).gates.map((/** @type {{name: string}} */ g) => g.name);
-  assert.deepEqual(names, ['repo', 'budget', 'scope', 'anti-stub', 'tests', 'types']);
+  assert.deepEqual(names, ['repo', 'scope', 'anti-stub', 'tests', 'types']);
   assert.equal(record(dir).gates.find((/** @type {{name: string}} */ g) => g.name === 'types').ok, false);
 });
 

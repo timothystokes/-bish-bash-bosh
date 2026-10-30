@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { validateDiagnosis } from './podge-diagnosis.js';
 import { formatTranscript } from './adapter.js';
 
-const STATUSES = ['ok', 'failed', 'gated', 'over-budget'];
+const STATUSES = ['ok', 'failed', 'gated'];
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;

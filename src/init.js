@@ -4,9 +4,6 @@ import { stringify as stringifyYaml } from 'yaml';
 import { validateConfig } from './config.js';
 import { CONFIG_FILE } from './project-config.js';
 
-// Sensible defaults for a live agent: one conversation round plus several steps (same figures the
-// former sandbox scaffolding used), and the paths a build is allowed to touch.
-const DEFAULT_BUDGETS = { maxWallClockSeconds: 7200, maxIterations: 20 };
 const DEFAULT_ALLOWED_PATHS = ['src/', 'bin/', 'lib/', 'package.json'];
 
 // Suggested picks shown by `hodgepodge init`'s interactive prompt (src/hodgepodge.js). This is a
@@ -28,7 +25,7 @@ export const MODEL_CHOICES = {
 export const ROLE_NAMES = ['interview', 'reverse', 'build', 'qa'];
 
 // `hodgepodge init`: writes <dir>/.hodgepodge/config.yml (default dir: cwd) with every role (`interview`,
-// `reverse`, `build`, `qa`) the owner picked, plus default budgets and allowedPaths. Refuses if a
+// `reverse`, `build`, `qa`) the owner picked, plus default allowedPaths. Refuses if a
 // config already exists. There is no sandbox to scaffold: no target repo, no runtime copy, no
 // launcher scripts.
 export function initProject({ dir, roles }) {
@@ -40,7 +37,6 @@ export function initProject({ dir, roles }) {
   if (existsSync(configPath)) return { ok: false, reason: `${configPath} already exists` };
   const cfg = {
     roles: { interview: roles.interview, reverse: roles.reverse, build: roles.build, qa: roles.qa },
-    budgets: { ...DEFAULT_BUDGETS },
     allowedPaths: [...DEFAULT_ALLOWED_PATHS],
     requireTestPlan: true,
   };

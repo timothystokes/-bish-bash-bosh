@@ -75,7 +75,6 @@ test('red check is skipped once build iterations exist (green allowed)', () => {
 
 const config = (/** @type {string} */ _dir) => ({
   roles: { build: { adapter: 'fake', model: 'm' } },
-  budgets: { maxWallClockSeconds: 600, maxIterations: 10 },
   allowedPaths: ['src/'],
 });
 const identity = { remotes: [], root: '/nonexistent-harness' };

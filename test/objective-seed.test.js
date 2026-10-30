@@ -14,7 +14,6 @@ import { freshDir, seedObjectiveProject, withCwd, writeProjectConfig } from './s
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
 const buildConfig = {
   roles: { build: { adapter: 'agent-x', model: 'model-y' }, interview: { adapter: 'agent-x', model: 'model-y' }, reverse: { adapter: 'agent-x', model: 'model-y' } },
-  budgets: { maxWallClockSeconds: 7200, maxIterations: 20 },
   allowedPaths: ['src/', 'bin/', 'lib/', 'package.json'],
   requireTestPlan: true,
 };

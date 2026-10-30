@@ -7,7 +7,6 @@ const valid = () => ({
     build: { adapter: 'cli-agent', model: 'model-a' },
     review: { adapter: 'http-agent', model: 'model-b' },
   },
-  budgets: { maxWallClockSeconds: 600, maxIterations: 10 },
   allowedPaths: ['src/**', 'test/**'],
 });
 
@@ -17,8 +16,8 @@ test('accepts a valid config', () => {
   assert.deepEqual(r.errors, []);
 });
 
-test('requires roles, budgets, allowedPaths', () => {
-  for (const key of ['roles', 'budgets', 'allowedPaths']) {
+test('requires roles, allowedPaths', () => {
+  for (const key of ['roles', 'allowedPaths']) {
     const c = /** @type {Record<string, unknown>} */ (valid());
     delete c[key];
     const r = validateConfig(c);
@@ -39,21 +38,6 @@ test('role needs adapter and model', () => {
     delete (/** @type {any} */ (c.roles.build))[key];
     assert.equal(validateConfig(c).ok, false, key);
   }
-});
-
-test('budgets must be positive numbers and all present', () => {
-  const c = valid();
-  c.budgets.maxIterations = 0;
-  assert.equal(validateConfig(c).ok, false);
-  const d = valid();
-  delete (/** @type {any} */ (d.budgets)).maxWallClockSeconds;
-  assert.equal(validateConfig(d).ok, false);
-  const e = /** @type {any} */ (valid());
-  e.budgets.maxTokens = 1000;
-  assert.equal(validateConfig(e).ok, false, 'token and cost budgets are not harness config');
-  const f = /** @type {any} */ (valid());
-  f.budgets.maxCostUsd = 5;
-  assert.equal(validateConfig(f).ok, false);
 });
 
 test('allowedPaths must be a non-empty array of strings', () => {

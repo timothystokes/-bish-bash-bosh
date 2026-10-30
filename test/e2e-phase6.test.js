@@ -72,7 +72,6 @@ function makeTarget({ tests = TESTS, planMd = PLAN_MD } = {}) {
 
 const cfg = (extra = {}) => ({
   roles: { build: { adapter: 'builder', model: 'm' }, qa: { adapter: 'checker', model: 'm2' } },
-  budgets: { maxWallClockSeconds: 120, maxIterations: 4 },
   allowedPaths: ['src/', 'out/'],
   requireTestPlan: true,
   ...extra,
@@ -120,13 +119,14 @@ const tickAll = (/** @type {string} */ cwd) => put(cwd, { 'plan.md': readFileSyn
  * @param {string} dir
  * @param {object} config
  * @param {Record<string, any>} registry
+ * @param {string} [controlFile]
  */
-async function run(cmd, dir, config, registry) {
+async function run(cmd, dir, config, registry, controlFile) {
   /** @type {string[]} */
   const outs = [];
   commitProjectConfig(dir, config);
   const code = await withCwd(dir, () =>
-    main([cmd, '--run-id', 'p6'], {
+    main([cmd, '--run-id', 'p6', ...(controlFile ? ['--control', controlFile] : [])], {
       registry,
       identity: { root: '/nonexistent/hodgepodge', remotes: [] },
       stdout: (s) => outs.push(s),
@@ -221,10 +221,21 @@ test('phase 6 regression: a requirement with no passing test keeps a ticked plan
     },
   ]);
   const qa = scripted([() => findingsBlock([])]);
-  const { res } = await run('podge', dir, cfg({ budgets: { maxWallClockSeconds: 120, maxIterations: 2 } }), {
-    builder: () => build.adapter,
+  // The requirement stays unproven forever (the build keeps ticking the same plan), so bound the
+  // loop with a control-file stop instead of a (now-removed) run budget. The control file lives
+  // outside the project repo (specs/control-and-safety.md), so it is never an allowedPaths gate hit.
+  const controlFile = join(mkdtempSync(join(tmpdir(), 'hodge-p6-ctl-')), 'control.json');
+  const builder = {
+    async run(/** @type {{cwd: string}} */ req) {
+      const r = await build.adapter.run(req);
+      writeFileSync(controlFile, JSON.stringify({ stop: true }));
+      return r;
+    },
+  };
+  const { res } = await run('podge', dir, cfg(), {
+    builder: () => builder,
     checker: () => qa.adapter,
-  });
+  }, controlFile);
 
   assert.notEqual(res.status, 'done', JSON.stringify(res));
   assert.equal(qa.calls(), 0);

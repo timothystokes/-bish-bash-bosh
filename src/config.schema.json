@@ -3,7 +3,7 @@
   "$id": "hodgepodge-config",
   "type": "object",
   "additionalProperties": false,
-  "required": ["roles", "budgets", "allowedPaths"],
+  "required": ["roles", "allowedPaths"],
   "properties": {
     "roles": {
       "type": "object",
@@ -13,15 +13,6 @@
         "qa": { "$ref": "#/definitions/role" }
       },
       "additionalProperties": { "$ref": "#/definitions/role" }
-    },
-    "budgets": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["maxWallClockSeconds", "maxIterations"],
-      "properties": {
-        "maxWallClockSeconds": { "type": "number", "exclusiveMinimum": 0 },
-        "maxIterations": { "type": "integer", "minimum": 1 }
-      }
     },
     "mode": { "enum": ["interview", "forward", "reverse", "brownfield", "test-hardening", "clean-room"] },
     "requireTestPlan": { "type": "boolean" },

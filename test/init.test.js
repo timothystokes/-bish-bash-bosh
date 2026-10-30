@@ -12,7 +12,7 @@ import { freshDir, withCwd } from './support/project.js';
 const ROLE = { adapter: 'agent-x', model: 'model-y' };
 const ALL_ROLES = Object.fromEntries(ROLE_NAMES.map((name) => [name, ROLE]));
 
-test('writes .hodgepodge/config.yml with all four roles, default budgets and allowedPaths', () => {
+test('writes .hodgepodge/config.yml with all four roles and allowedPaths', () => {
   const dir = freshDir('init-');
   const res = initProject({ dir, roles: ALL_ROLES });
   assert.equal(res.ok, true, JSON.stringify(res));
@@ -24,15 +24,6 @@ test('writes .hodgepodge/config.yml with all four roles, default budgets and all
   assert.equal(cfg.requireTestPlan, true);
   assert.ok(!('targetRepo' in cfg), 'targetRepo is gone: there is no separate target dir');
   assert.ok(!('hodgepodge' in cfg), 'hodgepodge (runtime-copy path) is gone: there is no runtime copy');
-});
-
-test('default budgets fit a live agent: one conversation round plus several steps', () => {
-  const dir = freshDir('init-');
-  initProject({ dir, roles: ALL_ROLES });
-  const b = parseYaml(readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8')).budgets;
-  assert.deepEqual(Object.keys(b).sort(), ['maxIterations', 'maxWallClockSeconds']);
-  assert.ok(b.maxWallClockSeconds >= 3600);
-  assert.ok(b.maxIterations >= 10);
 });
 
 test('default allowedPaths let the build agent write bin/ and lib/ as well as src/', () => {

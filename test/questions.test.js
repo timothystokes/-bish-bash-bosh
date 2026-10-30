@@ -88,7 +88,7 @@ test('Q-6: code updates status from the response: resolved are specified with th
 test('Q-7: a round is driven by code: the agent gets only the answers by id, never the conversation or the store', async () => {
   const repo = freshDir('q-');
   seedObjectiveProject(repo);
-  const config = { roles: { build: { adapter: 'a', model: 'm' } }, budgets: { maxWallClockSeconds: 60, maxIterations: 5 }, allowedPaths: ['src/'] };
+  const config = { roles: { build: { adapter: 'a', model: 'm' } }, allowedPaths: ['src/'] };
   writeProjectConfig(repo, config);
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'seed');

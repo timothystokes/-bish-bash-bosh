@@ -10,8 +10,6 @@ import { createLocalStatusSource } from '../src/status.js';
 import { renderFrame, createTui, runTui } from '../src/tui.js';
 import { main } from '../src/cli.js';
 
-const budgets = { maxWallClockSeconds: 100, maxIterations: 5 };
-
 /** @param {string} transcript */
 const rec = (transcript) => ({
   status: /** @type {'ok'} */ ('ok'),
@@ -34,7 +32,7 @@ function makeRun() {
 function setup() {
   const dir = makeRun();
   const controlFile = join(dir, 'control.json');
-  const tui = createTui({ source: createLocalStatusSource(dir), runId: 'r1', budgets, controlFile, tailLines: 3 });
+  const tui = createTui({ source: createLocalStatusSource(dir), runId: 'r1', controlFile, tailLines: 3 });
   return { dir, controlFile, tui };
 }
 
@@ -44,22 +42,21 @@ test('local status source tails the latest transcript', () => {
   assert.deepEqual(src.tail('none', 2), []);
 });
 
-test('renderFrame shows seconds and iterations vs budget, control state, log tail and keys', () => {
+test('renderFrame shows seconds and iterations, control state, log tail and keys', () => {
   const { tui } = setup();
   const f = tui.frame();
   assert.match(f, /r1/);
-  assert.match(f, /seconds\s+20 \/ 100/);
+  assert.match(f, /seconds\s+20/);
   assert.doesNotMatch(f, /cost|tokens/);
-  assert.match(f, /iterations\s+2 \/ 5/);
+  assert.match(f, /iterations\s+2/);
   assert.match(f, /RUNNING/);
   assert.match(f, /l2\nl3\nl4/);
   assert.doesNotMatch(f, /l1/);
   assert.match(f, /\[p\]ause/);
 });
 
-test('renderFrame flags over-budget and bad control file', () => {
-  const status = { runId: 'r', iterations: 6, lastStatus: 'ok', totals: { seconds: 0, iterations: 6 }, budgets, remaining: { seconds: 100, iterations: -1 }, details: readRunDetails(makeRun(), 'r') };
-  assert.match(renderFrame({ status, control: { ok: true, paused: false, stop: false }, tail: [], prompt: null }), /OVER BUDGET/);
+test('renderFrame reports a bad control file', () => {
+  const status = { runId: 'r', iterations: 6, lastStatus: 'ok', totals: { seconds: 0, iterations: 6 }, details: readRunDetails(makeRun(), 'r') };
   assert.match(renderFrame({ status, control: { ok: false, reason: 'invalid control file: x' }, tail: [], prompt: null }), /STOPPED.*invalid control file/);
 });
 
@@ -99,7 +96,7 @@ test('steer prompt: empty note writes nothing, escape cancels; q and ctrl-c quit
   assert.throws(() => readFileSync(controlFile));
   tui.key('q');
   assert.equal(tui.done, true);
-  assert.equal(createTui({ source: createLocalStatusSource(makeRun()), runId: 'r1', budgets, controlFile, tailLines: 3 }).key('\x03'), 'quit');
+  assert.equal(createTui({ source: createLocalStatusSource(makeRun()), runId: 'r1', controlFile, tailLines: 3 }).key('\x03'), 'quit');
 });
 
 test('a malformed control file is reported, not cleared', () => {
@@ -115,7 +112,7 @@ test('runTui draws frames, handles input, and resolves on quit', async () => {
   const input = new PassThrough();
   let out = '';
   const output = { write: (/** @type {string} */ s) => ((out += s), true) };
-  const done = runTui({ source: createLocalStatusSource(dir), runId: 'r1', budgets, controlFile: join(dir, 'c.json'), input, output, intervalMs: 5 });
+  const done = runTui({ source: createLocalStatusSource(dir), runId: 'r1', controlFile: join(dir, 'c.json'), input, output, intervalMs: 5 });
   input.write('p');
   await new Promise((r) => setTimeout(r, 30));
   input.write('q');

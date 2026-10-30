@@ -29,7 +29,6 @@ function makeRepo() {
 const config = (/** @type {object} */ extra = {}) => ({
   mode: 'test-hardening',
   roles: { build: { adapter: 'f', model: 'm' } },
-  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/', 'tests/'],
   ...extra,
 });

@@ -1,7 +1,7 @@
 ```
-╷ ╷╭─╮╶┬╮╭─╴╭─╴╭─╮╭─╮╶┬╮╭─╴╭─╴
-├─┤│ │ │││╶╮├╴ ├─╯│ │ │││╶╮├╴ 
-╵ ╵╰─╯╶┴╯╰─╯╰─╴╵  ╰─╯╶┴╯╰─╯╰─╴
+╷ ╷╭─╮┌─╮╭─╴┌─╴┌─╮╭─╮┌─╮╭─╴┌─╴
+├─┤│ ││ ││╶╮├╴ ├─╯│ ││ ││╶╮├╴ 
+╵ ╵╰─╯└─╯╰─╯└─╴╵  ╰─╯└─╯╰─╯╰─╴
 ```
 
 A model-agnostic harness for delivering software with loop engineering (Ralph-style): one task per loop iteration, fresh agent context, specs and a plan file as state, and tests as gates.
@@ -24,7 +24,7 @@ cd your-project
 hodgepodge init   # interactive: asks which adapter/model to use, applied to every role (interview, reverse, build, qa)
 ```
 
-`init` writes `.hodgepodge/config.yml` in the current directory (config: roles, budgets, allowedPaths) with sensible default budgets and allowed paths; it refuses to run if `.hodgepodge/config.yml` already exists. It does no scaffolding: no target repo, no runtime copy, no launcher scripts. Then run the commands directly in your project; they take no config, repo or objective flags, and no `--dir`:
+`init` writes `.hodgepodge/config.yml` in the current directory (config: roles, allowedPaths) with sensible default allowed paths; it refuses to run if `.hodgepodge/config.yml` already exists. It does no scaffolding: no target repo, no runtime copy, no launcher scripts. Then run the commands directly in your project; they take no config, repo or objective flags, and no `--dir`:
 
 ```sh
 hodge            # requirements and specs: asks for the objective, then interviews you in topic-grouped question batches with defaults, picked and tracked by code (reply `y` for all defaults, or `2: x; 5: y` to override; `done` accepts the remaining defaults) until the specs are ready (or `hodge --reverse` to derive them from code)
@@ -40,7 +40,7 @@ While a loop runs, open a second terminal in the project and run `hodgepodge con
 
 `hodge`, `podge`, `step`, `status` and `tui` always operate on the current directory (`--run-id`, and `--control` for `podge`/`status`/`tui`, are the only other flags). `spec-lint`, `ready`, `sync` and `promote` default to the current directory too, or take `--repo <dir>` for a one-shot operation against a different repo.
 
-`podge` loops one iteration at a time until `plan.md` is fully checked, a step fails or is gated, or a budget runs out. A ticked plan is not enough when specs declare requirement IDs: the harness runs the suite and type check, requires every `R-<spec>-<n>` to be named by a passing test, and scans source for stubs. Gaps become unchecked `Verify:` items in `plan.md` and the loop continues. The harness (not the agent) derives each spec's `Implementation:` and `Evidence:`, and writes `.hodgepodge/runs/<run-id>/done.json` with per-requirement evidence. A step that fails or gates also writes `.hodgepodge/runs/<run-id>/iterations/NNN/diagnosis.json` (root cause, evidence, fix, test, prevention; the agent can override fields with a fenced `diagnosis` JSON block) and `reason` carries the root cause. With a `qa` role in config (normally a different adapter/model from `build`), a verified plan is done only after an independent, read-only QA cycle reports no findings. Findings (classified `violated-decision`, `unimplemented-requirement` or `decision-needing-replacement`, each with severity, spec, consequence and a root-cause/evidence/fix/test/prevention diagnosis) are appended to `plan.md` as unchecked `QA-<cycle>-<n>` items under `## QA findings`, the build agent fixes them, and QA re-checks, at most `maxQaCycles` (default 5) times; a QA reply without a `findings` block fails the loop. QA records go to `.hodgepodge/runs/<run-id>/qa-N/` and count toward the budgets. It prints JSON `{status, steps, reason?, qa?}` and exits 0 only when done.
+`podge` loops one iteration at a time until `plan.md` is fully checked, a step fails or is gated, or a `--control` stop is set (there is no run-wide budget: a stuck loop needs a stop, an agent/gate failure, or the QA cycle limit to end). A ticked plan is not enough when specs declare requirement IDs: the harness runs the suite and type check, requires every `R-<spec>-<n>` to be named by a passing test, and scans source for stubs. Gaps become unchecked `Verify:` items in `plan.md` and the loop continues. The harness (not the agent) derives each spec's `Implementation:` and `Evidence:`, and writes `.hodgepodge/runs/<run-id>/done.json` with per-requirement evidence. A step that fails or gates also writes `.hodgepodge/runs/<run-id>/iterations/NNN/diagnosis.json` (root cause, evidence, fix, test, prevention; the agent can override fields with a fenced `diagnosis` JSON block) and `reason` carries the root cause. With a `qa` role in config (normally a different adapter/model from `build`), a verified plan is done only after an independent, read-only QA cycle reports no findings. Findings (classified `violated-decision`, `unimplemented-requirement` or `decision-needing-replacement`, each with severity, spec, consequence and a root-cause/evidence/fix/test/prevention diagnosis) are appended to `plan.md` as unchecked `QA-<cycle>-<n>` items under `## QA findings`, the build agent fixes them, and QA re-checks, at most `maxQaCycles` (default 5) times; a QA reply without a `findings` block fails the loop. QA records go to `.hodgepodge/runs/<run-id>/qa-N/`. It prints JSON `{status, steps, reason?, qa?}` and exits 0 only when done.
 
 `hodge` self-bootstraps `.hodgepodge/interview.md` (the question-and-answer store) on first run. Run `hodgepodge --help` for every command.
 
@@ -55,7 +55,7 @@ When a spec declares a format, `hodge` adds that format's skill snippet (`prompt
 - `allowedPaths`: where the agent works and what it may write (`init` defaults to `src/`, `bin/`, `lib/` and `package.json`, since a CLI entry point and its `bin` mapping are not solution-specific).
 - `roles`: map roles (`interview`, `reverse`, `build`, `qa`) to an adapter and model. Models live in config only. `init` asks for a single adapter/model and applies it to all four roles; hand-edit `.hodgepodge/config.yml` to use different adapters/models per role.
 - `maxQaCycles`: optional, default 5; the most QA cycles `podge` runs when a `qa` role is configured.
-- `budgets`: `maxWallClockSeconds`, `maxIterations`. They are per run id and shared by `hodge` and `podge`. `init` defaults to 7200 s and 20 iterations. The harness does not track tokens or cost: watch real spend on the model backend. `usage.json` holds wall-clock `{seconds}` only.
+- `usage.json` holds wall-clock `{seconds}` per iteration, summed across a run for visibility (`hodgepodge status`/`tui`). The harness does not track tokens or cost, and there is no run-wide cap: watch real spend on the model backend.
 - `mode`: `forward` (default), `interview`, `reverse`, `brownfield`, `test-hardening`, `clean-room`.
 
 Adapters: `copilot`, `claude-code`, `codex`, `openai-http` (endpoint and key come from `HODGE_HTTP_BASE_URL` / `HODGE_HTTP_API_KEY`, never from config). To smoke-test an adapter live, call `runSmoke(adapter, {cwd, limits})` from `src/smoke.js` in an empty scratch directory (the agent writes and runs a FizzBuzz script; the harness re-checks it).
@@ -76,7 +76,7 @@ Brownfield and test-hardening loops are selected with config `mode` and run via 
 ## Watching and controlling a run
 
 ```sh
-hodgepodge status [--control <control.json>]                              # iterations and seconds vs budgets, formats, readiness, QA, done evidence
+hodgepodge status [--control <control.json>]                              # iterations and seconds elapsed, formats, readiness, QA, done evidence
 hodgepodge tui    --control <control.json>                                # live view (incl. formats, readiness, QA, done): p pause, r resume, s steer, x stop, q quit
 hodgepodge control --file <control.json> pause|resume|stop|steer <note>   # start `podge` with --control <control.json>
 hodgepodge kill --container <name> --control <control.json>              # stop the run container
@@ -96,7 +96,7 @@ Bind-mounted paths should live under your home directory. Model traffic can be r
 
 ## Safety
 
-Secret redaction on model traffic, per-run budgets, a kill switch, scope and test gates, and human approval before anything is promoted out of the project (`hodgepodge promote` opens a PR and never merges).
+Secret redaction on model traffic, a `--control` stop/kill switch, scope and test gates, and human approval before anything is promoted out of the project (`hodgepodge promote` opens a PR and never merges).
 
 ## Development
 

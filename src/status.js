@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sumRunUsage } from './budget-gate.js';
+import { sumRunUsage } from './run-usage.js';
 import { readRunDetails } from './run-details.js';
 
 function lastIteration(repoDir, runId) {
@@ -31,18 +31,13 @@ export function createLocalStatusSource(repoDir) {
   };
 }
 
-export function readRunStatus(source, runId, budgets) {
+export function readRunStatus(source, runId) {
   const totals = source.totals(runId);
   return {
     runId,
     iterations: totals.iterations,
     lastStatus: source.lastStatus(runId),
     totals,
-    budgets,
     details: source.details(runId),
-    remaining: {
-      seconds: budgets.maxWallClockSeconds - totals.seconds,
-      iterations: budgets.maxIterations - totals.iterations,
-    },
   };
 }

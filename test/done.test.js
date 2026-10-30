@@ -110,7 +110,6 @@ test('syncImplementation derives Implementation and Evidence from per-requiremen
 
 const config = {
   roles: { build: { adapter: 'x', model: 'y' } },
-  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/', 'plan.md', 'tests/', 'specs/'],
 };
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
@@ -118,8 +117,18 @@ const fake = (/** @type {Record<string, string>} */ writes) => createFakeAdapter
 
 test('runLoop: a fully ticked plan is not done while a requirement is unproven; plan gets unchecked gap items', async () => {
   const dir = makeRepo();
-  const res = await runLoop({ config, repoDir: dir, runId: 'r', adapter: fake({ 'src/b.js': 'export const b = 1;\n' }), testCommand: suite('✔ R-a-1 x').command, typeCommand: ok, identity });
-  assert.equal(res.status, 'over-budget');
+  const f = join(mkdtempSync(join(tmpdir(), 'hodge-ctl-')), 'control.json');
+  // Stop the loop after the first step; R-a-2 never gets proven, so the loop would otherwise run forever.
+  const inner = fake({ 'src/b.js': 'export const b = 1;\n' });
+  const adapter = {
+    async run(/** @type {any} */ req) {
+      const r = await inner.run(req);
+      writeFileSync(f, JSON.stringify({ stop: true }));
+      return r;
+    },
+  };
+  const res = await runLoop({ config, repoDir: dir, runId: 'r', adapter, testCommand: suite('✔ R-a-1 x').command, typeCommand: ok, identity, controlFile: f });
+  assert.equal(res.status, 'stopped');
   assert.match(readFileSync(join(dir, 'plan.md'), 'utf8'), /- \[ \] Verify: R-a-2: no passing test/);
   assert.equal(git(dir, 'status', '--porcelain'), '');
 });

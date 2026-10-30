@@ -6,7 +6,7 @@
   "required": ["iteration", "status", "changedFiles", "gates"],
   "properties": {
     "iteration": { "type": "integer", "minimum": 1 },
-    "status": { "enum": ["ok", "failed", "gated", "over-budget"] },
+    "status": { "enum": ["ok", "failed", "gated"] },
     "changedFiles": { "type": "array", "items": { "type": "string" } },
     "gates": {
       "type": "array",

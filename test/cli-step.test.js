@@ -27,7 +27,6 @@ function makeRepo() {
 
 const cfg = (/** @type {string} */ adapter) => ({
   roles: { build: { adapter, model: 'm' } },
-  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],
 });
 

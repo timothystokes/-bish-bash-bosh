@@ -8,8 +8,6 @@ import { createLocalStatusSource, readRunStatus } from '../src/status.js';
 import { main } from '../src/cli.js';
 import { writeProjectConfig, withCwd } from './support/project.js';
 
-const budgets = { maxWallClockSeconds: 100, maxIterations: 5 };
-
 /** @param {'ok'|'failed'} status @param {number} seconds */
 const rec = (status, seconds) => ({
   status,
@@ -29,24 +27,22 @@ function makeRun() {
   return dir;
 }
 
-test('readRunStatus totals seconds and iterations vs budget', () => {
-  const s = readRunStatus(createLocalStatusSource(makeRun()), 'r1', budgets);
+test('readRunStatus totals seconds and iterations', () => {
+  const s = readRunStatus(createLocalStatusSource(makeRun()), 'r1');
   assert.equal(s.iterations, 2);
   assert.equal(s.lastStatus, 'failed');
   assert.deepEqual(s.totals, { seconds: 30, iterations: 2 });
-  assert.deepEqual(s.remaining, { seconds: 70, iterations: 3 });
-  assert.equal(s.budgets.maxWallClockSeconds, 100);
 });
 
 test('readRunStatus on an unknown run is empty, not an error', () => {
-  const s = readRunStatus(createLocalStatusSource(mkdtempSync(join(tmpdir(), 'hodge-status-'))), 'none', budgets);
+  const s = readRunStatus(createLocalStatusSource(mkdtempSync(join(tmpdir(), 'hodge-status-'))), 'none');
   assert.equal(s.iterations, 0);
   assert.equal(s.lastStatus, null);
 });
 
 test('hodgepodge status prints JSON and includes control state', async () => {
   const dir = makeRun();
-  writeProjectConfig(dir, { roles: { build: { adapter: 'f', model: 'm' } }, budgets, allowedPaths: ['src/'] });
+  writeProjectConfig(dir, { roles: { build: { adapter: 'f', model: 'm' } }, allowedPaths: ['src/'] });
   const ctl = join(dir, 'control.json');
   writeFileSync(ctl, JSON.stringify({ paused: true }));
   let out = '';

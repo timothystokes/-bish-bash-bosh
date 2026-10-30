@@ -3,7 +3,6 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateConfig } from './config.js';
-import { checkBudgetGate } from './budget-gate.js';
 import { checkRepoGate, harnessIdentity } from './repo-gate.js';
 import { lintSpecs } from './spec-lint.js';
 import { loadModePrompt } from './prompts.js';
@@ -39,7 +38,6 @@ const git = (dir, ...args) =>
 export async function runReverse({ config, repoDir, runId, adapter, focus = undefined, testCommand = ['npm', 'test'], identity }) {
   const v = validateConfig(config);
   if (!v.ok) throw new Error(`invalid config: ${v.errors.join('; ')}`);
-  const cfg = config;
   const gated = (reason) => ({ status: 'gated', sha: null, reason });
 
   const self = identity ?? harnessIdentity();
@@ -48,11 +46,9 @@ export async function runReverse({ config, repoDir, runId, adapter, focus = unde
   // `.hodgepodge/lock` is harness-internal; exclude it from the
   // dirty-working-tree check since it is harness-internal, never committed.
   if (git(repoDir, 'status', '--porcelain', '--', '.', `:!${LOCK_FILE}`).trim() !== '') return gated('working tree is not clean');
-  const budget = checkBudgetGate(repoDir, runId, cfg.budgets);
-  if (!budget.ok) return { status: 'over-budget', sha: null, reason: budget.reason };
 
   const prompt = buildReversePrompt(repoDir, focus);
-  const limits = { maxWallClockSeconds: Math.min(cfg.budgets.maxWallClockSeconds, budget.remaining.seconds) };
+  const limits = {};
   const started = Date.now();
   const result = await adapter.run({ prompt, cwd: repoDir, limits });
   const seconds = (Date.now() - started) / 1000;

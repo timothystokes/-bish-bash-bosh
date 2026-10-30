@@ -26,7 +26,6 @@ function makeRepo() {
 
 const config = (/** @type {string} */ _targetRepo) => ({
   roles: { build: { adapter: 'x', model: 'y' } },
-  budgets: { maxWallClockSeconds: 60, maxIterations: 5 },
   allowedPaths: ['src/'],
 });
 
@@ -153,26 +152,7 @@ test('invalid config is rejected', async () => {
   );
 });
 
-test('step refuses and writes nothing once the run budget is exhausted', async () => {
-  const dir = makeRepo();
-  const cfg = config('git@example.com:o/target.git');
-  cfg.budgets.maxIterations = 1;
-  const first = await runStep({ config: cfg, repoDir: dir, runId: 'rb', adapter: adapter(), testCommand: pass, identity: self });
-  assert.equal(first.status, 'ok');
-  const head = git(dir, 'rev-parse', 'HEAD');
-  let called = false;
-  const second = await runStep({
-    config: cfg, repoDir: dir, runId: 'rb', testCommand: pass, identity: self,
-    adapter: { run: async () => { called = true; throw new Error('must not run'); } },
-  });
-  assert.equal(second.status, 'over-budget');
-  assert.equal(second.sha, null);
-  assert.match(String(second.reason), /iteration/);
-  assert.equal(called, false);
-  assert.equal(git(dir, 'rev-parse', 'HEAD'), head);
-});
-
-test('step caps adapter limits to the remaining run budget and records wall-clock seconds', async () => {
+test('step calls the adapter with no limits cap, and records wall-clock seconds', async () => {
   const dir = makeRepo();
   const cfg = config('git@example.com:o/target.git');
   await runStep({ config: cfg, repoDir: dir, runId: 'rc', adapter: adapter(), testCommand: pass, identity: self });
@@ -182,8 +162,7 @@ test('step caps adapter limits to the remaining run budget and records wall-cloc
     config: cfg, repoDir: dir, runId: 'rc', testCommand: pass, identity: self,
     adapter: { run: async (req) => { seen = req.limits; return { exitStatus: 0, transcript: '', changedFiles: [] }; } },
   });
-  assert.deepEqual(Object.keys(seen), ['maxWallClockSeconds']);
-  assert.ok(seen.maxWallClockSeconds <= 60);
+  assert.deepEqual(seen, {});
   const u = JSON.parse(readFileSync(join(dir, '.hodgepodge/runs/rc/iterations/001/usage.json'), 'utf8'));
   assert.equal(typeof u.seconds, 'number');
 });

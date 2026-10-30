@@ -16,7 +16,6 @@ const MOUNT = '/mnt/work';
 
 /**
  * @typedef {import('aws-cdk-lib').StackProps & {
- *   budgets: {maxIterations: number},
  *   iterationsPerExecution: number,
  *   pollSeconds: number,
  *   secretNames?: string[],
@@ -31,7 +30,7 @@ export class HodgeStack extends Stack {
    */
   constructor(scope, id, props) {
     super(scope, id, props);
-    const { budgets, iterationsPerExecution, pollSeconds, secretNames = [], ...stackProps } = props;
+    const { iterationsPerExecution, pollSeconds, secretNames = [], ...stackProps } = props;
     void stackProps;
 
     const vpc = new ec2.Vpc(this, 'Vpc', { maxAzs: 2, natGateways: 1 });
@@ -97,7 +96,6 @@ export class HodgeStack extends Stack {
       containerName: CONTAINER,
       readPointersFunctionArn: readPointers.functionArn,
       stateMachineArn,
-      budgets,
       iterationsPerExecution,
       pollSeconds,
     });

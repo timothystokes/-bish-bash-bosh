@@ -10,7 +10,6 @@ const config = {
   containerName: 'hodge',
   readPointersFunctionArn: 'arn:aws:lambda:ap-southeast-2:1:function:read-pointers',
   stateMachineArn: 'arn:aws:states:ap-southeast-2:1:stateMachine:hodge',
-  budgets: { maxIterations: 50 },
   iterationsPerExecution: 10,
   pollSeconds: 30,
 };
@@ -63,7 +62,7 @@ test('pointers come from a light lambda step and are the only execution context'
 /** @param {any} sm @param {string} next */
 const choiceTo = (sm, next) => state(sm, 'Decide').Choices.find((/** @type {any} */ c) => c.Next === next);
 
-test('stop flag halts, checked before pause and budget', () => {
+test('stop flag halts, checked before pause', () => {
   const sm = buildStateMachine(config);
   const d = state(sm, 'Decide');
   assert.equal(d.Choices[0].Variable, '$.pointers.stop');
@@ -80,18 +79,10 @@ test('pause flag waits then re-reads pointers', () => {
   assert.equal(w.Next, 'ReadPointers');
 });
 
-test('budget exhaustion on the iteration cap ends the run', () => {
-  const sm = buildStateMachine(config);
-  const c = choiceTo(sm, 'BudgetExhausted');
-  assert.equal(c.Variable, '$.pointers.iteration');
-  assert.equal(c.NumericGreaterThanEquals, 50);
-  assert.equal(state(sm, 'BudgetExhausted').Type, 'Succeed');
-});
-
-test('gated or over-budget last status ends the run as halted', () => {
+test('gated last status ends the run as halted', () => {
   const sm = buildStateMachine(config);
   const c = choiceTo(sm, 'Halted');
-  assert.deepEqual(c.Or.map((/** @type {any} */ x) => x.StringEquals).sort(), ['gated', 'over-budget']);
+  assert.equal(c.StringEquals, 'gated');
   assert.equal(state(sm, 'Halted').Type, 'Fail');
 });
 
@@ -126,5 +117,4 @@ test('the default path counts the iteration and runs another step', () => {
 test('invalid config is rejected', () => {
   assert.throws(() => buildStateMachine({ ...config, iterationsPerExecution: 0 }), /iterationsPerExecution/);
   assert.throws(() => buildStateMachine({ ...config, subnets: [] }), /subnets/);
-  assert.throws(() => buildStateMachine({ ...config, budgets: { maxIterations: -1 } }), /maxIterations/);
 });
