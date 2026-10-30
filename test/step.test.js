@@ -25,7 +25,7 @@ function makeRepo() {
 }
 
 const config = (/** @type {string} */ _targetRepo) => ({
-  roles: { build: { adapter: 'x', model: 'y' } },
+  adapter: 'x', model: 'y',
   allowedPaths: ['src/'],
 });
 

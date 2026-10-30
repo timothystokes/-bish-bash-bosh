@@ -54,7 +54,7 @@ test('hodge, podge and podge step refuse a project held by a live process, and r
   const dir = tmp();
   initGitRepo(dir);
   await withCwd(dir, async () => {
-    commitProjectConfig(dir, { roles: { build: { adapter: 'f', model: 'm' } }, allowedPaths: ['src/'] });
+    commitProjectConfig(dir, { adapter: 'f', model: 'm', allowedPaths: ['src/'] });
     writeFileSync(join(dir, LOCK_FILE), `${process.ppid}\n`);
     for (const args of [['hodge'], ['hodge', '--reverse'], ['podge'], ['podge', 'step']]) {
       const r = await run(args);

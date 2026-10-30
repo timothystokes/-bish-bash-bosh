@@ -3,9 +3,9 @@ import { resolve } from 'node:path';
 import { loadProjectConfig, CONFIG_FILE } from './project-config.js';
 
 export const LOGO = [
-  '╷ ╷╭─╮╶┬╮╭─╴╭─╴╭─╮╭─╮╶┬╮╭─╴╭─╴',
-  '├─┤│ │ │││╶╮├╴ ├─╯│ │ │││╶╮├╴ ',
-  '╵ ╵╰─╯╶┴╯╰─╯╰─╴╵  ╰─╯╶┴╯╰─╯╰─╴',
+  '╷ ╷╭─╮┌─╮╭─╴┌─╴┌─╮╭─╮┌─╮╭─╴┌─╴',
+  '├─┤│ ││ ││╶┐├╴ ├─╯│ ││ ││╶┐├╴ ',
+  '╵ ╵╰─╯└─╯╰─╯└─╴╵  ╰─╯└─╯╰─╯╰─╴'
 ].join('\n');
 
 export function helpText() {
@@ -17,15 +17,15 @@ export function helpText() {
     'Three programs, one flow: `hodgepodge init`, then `hodge` (requirements and specs), then `podge` (plan and implementation).',
     '',
     'Usage:',
-    '  hodgepodge init   (interactive: asks which adapter/model to use, applied to every role: interview, reverse, build, qa)',
+    '  hodgepodge init   (interactive: asks which adapter/model to use for everything)',
     '  hodge  [--run-id <id>] [--reverse] [--debug]',
-    '  podge  [--run-id <id>] [--control <control.json>] [--debug]   (with a `qa` role in .hodgepodge/config.yml, done also needs a clean independent QA report; findings return to the plan, up to maxQaCycles)',
+    '  podge  [--run-id <id>] [--control <control.json>] [--debug]   (with `maxQaCycles` in .hodgepodge/config.yml, done also needs a clean QA report; findings return to the plan, up to maxQaCycles)',
     '  podge step [--run-id <id>] [--debug]',
     '  --debug (or HODGEPODGE_DEBUG=1) on hodge/podge/podge step: log to stdout the agent prompt, the agent process raw stdout/stderr live, each call\'s exit status and parsed transcript, every gate result with its detail, test output on failure, and stack traces. The transcript is agent output, not the environment, but it may contain whatever the agent printed: do not share debug logs unreviewed.',
     '  hodgepodge <command> ...   (the commands below)',
     '  hodge, podge and podge step hold a single-run lock (.hodgepodge/lock, PID; stale locks are cleared) and refuse to start while another live run holds the project.',
     '  Every command operates on the current project (cwd); there is no sandbox dir and no `--dir` flag. `hodgepodge init` writes ./.hodgepodge/config.yml holding',
-    '  roles and allowedPaths, so after `cd` into your project just run `hodgepodge init` once, then `hodge`, then `podge`.',
+    '  adapter, model and allowedPaths, so after `cd` into your project just run `hodgepodge init` once, then `hodge`, then `podge`.',
     '  hodgepodge clean-room --source <dir> --repo <builder-dir>',
     '  hodgepodge status [--run-id <id>] [--control <control.json>]',
     '  hodgepodge tui --control <control.json> [--run-id <id>]',
@@ -41,12 +41,12 @@ export function helpText() {
     'Spec formats: a spec may declare `## Formats` bullets, checked by `ready` and the loop. Known formats: `gherkin`, `json-schema`, `openapi`.',
     '',
     'Commands:',
-    '  init   ask which adapter/model to use, applied to every role (interview, reverse, build, qa), then write ./.hodgepodge/config.yml with default allowedPaths; refuses if ./.hodgepodge/config.yml already exists; no scaffolding (no target repo, no runtime copy, no launcher scripts); prints JSON {ok, dir, config}; exit 0 only when ok',
+    '  init   ask which adapter/model to use for everything, then write ./.hodgepodge/config.yml with default allowedPaths; refuses if ./.hodgepodge/config.yml already exists; no scaffolding (no target repo, no runtime copy, no launcher scripts); prints JSON {ok, dir, config}; exit 0 only when ok',
     '  hodge  requirements gathering and spec definition: asks for a description of the objective (not a flag), then alternates agent rounds with your answers (broad first,',
     '         then fine-grained) until you answer `done` (or the agent has no question left) and `hodgepodge ready` passes; spec-lint and readiness run only then, and their gaps come back as questions or spec fixes; no tests are written here; the first run bootstraps the question store (`.hodgepodge/interview.md`) from the objective description; Ctrl-D or an empty answer pauses and a rerun resumes;',
-    '         with --reverse it instead runs the `reverse` role to write specs/ + characterization tests from existing code (commits only if only specs/tests changed,',
+    '         with --reverse it instead reverse-engineers specs/ + characterization tests from existing code (commits only if only specs/tests changed,',
     '         spec-lint passes and the test suite is green); prints JSON {status, ...}; exit 0 only when ok',
-    '  podge  planning and implementation: with specs but no tests/PLAN.md the first step writes the test plan, red tests and plan.md; then loops steps until the plan is done and verified (suite, types, every R-<spec>-<n> named by a passing test; writes .hodgepodge/runs/<id>/done.json) (plus a clean independent QA report when config has a `qa` role) or a step fails/gates (failed iterations write diagnosis.json: root cause, evidence, fix, test, prevention) (--control <file> honours control.json, the only way to bound an otherwise non-terminating loop);',
+    '  podge  planning and implementation: with specs but no tests/PLAN.md the first step writes the test plan, red tests and plan.md; then loops steps until the plan is done and verified (suite, types, every R-<spec>-<n> named by a passing test; writes .hodgepodge/runs/<id>/done.json) (plus a clean QA report when config has `maxQaCycles`) or a step fails/gates (failed iterations write diagnosis.json: root cause, evidence, fix, test, prevention) (--control <file> honours control.json, the only way to bound an otherwise non-terminating loop);',
     '         prints JSON {status, steps, reason?}; exit 0 only when done',
     '  podge step  run one loop iteration (the unit `podge` and the cloud driver repeat); prints JSON {sha, iteration, status}',
     '         (--run-id defaults to "default")',
@@ -73,7 +73,7 @@ export function usageText() {
   return helpText().replace(`${LOGO}\n\n`, '');
 }
 
-// Every command works on the current project directory: the config, repo and roles all live in
+// Every command works on the current project directory: the config and repo all live in
 // `./.hodgepodge/config.yml`. run/status/tui also take --control when opts.control is set.
 export function parseStepArgs(args, opts = {}) {
   const flags = ['--run-id', ...(opts.control ? ['--control'] : [])];
@@ -117,14 +117,14 @@ export function parseFlags(rest, allowed, label, err) {
 }
 
 // In debug mode, print to stdout the agent process raw stdout/stderr live, then each call's exit status, changed files and parsed transcript.
-export function debugAdapter(adapter, role, debug, out) {
+export function debugAdapter(adapter, label, debug, out) {
   if (!debug) return adapter;
   return {
     run: async (req) => {
-      out(`[debug] ${role}: agent start (cwd ${req.cwd}, limits ${JSON.stringify(req.limits)})\n[debug] ${role}: prompt begin\n${req.prompt}\n[debug] ${role}: prompt end\n`);
-      const res = await adapter.run({ ...req, onOutput: (stream, chunk) => out(stream === 'stdout' ? chunk : `[${role} stderr] ${chunk}`) });
-      out(`\n[debug] ${role}: exit ${res.exitStatus}, changed ${JSON.stringify(res.changedFiles)}\n`);
-      out(`[debug] ${role}: transcript begin\n${res.transcript}\n[debug] ${role}: transcript end\n`);
+      out(`[debug] ${label}: agent start (cwd ${req.cwd}, limits ${JSON.stringify(req.limits)})\n[debug] ${label}: prompt begin\n${req.prompt}\n[debug] ${label}: prompt end\n`);
+      const res = await adapter.run({ ...req, onOutput: (stream, chunk) => out(stream === 'stdout' ? chunk : `[${label} stderr] ${chunk}`) });
+      out(`\n[debug] ${label}: exit ${res.exitStatus}, changed ${JSON.stringify(res.changedFiles)}\n`);
+      out(`[debug] ${label}: transcript begin\n${res.transcript}\n[debug] ${label}: transcript end\n`);
       return res;
     },
   };
@@ -144,7 +144,7 @@ export function resetTty(input) {
   input.resume();
 }
 
-// A single question/answer reader shared by `hodge`'s interview and `hodgepodge init`'s role prompts.
+// A single question/answer reader shared by `hodge`'s interview and `hodgepodge init`'s adapter/model prompts.
 // Piped input must keep one reader (a second one would lose buffered lines); a tty gets a fresh reader
 // per question so tty state left by a child process (cooked mode, keyboard protocols) cannot break Enter.
 export function createAsker(input, out) {

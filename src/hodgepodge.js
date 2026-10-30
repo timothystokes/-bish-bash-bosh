@@ -4,7 +4,7 @@ import { createInterface } from 'node:readline';
 import { CONFIG_FILE } from './project-config.js';
 import { lintSpecs } from './spec-lint.js';
 import { checkReadiness } from './readiness.js';
-import { initProject, ADAPTER_CHOICES, MODEL_CHOICES, ROLE_NAMES } from './init.js';
+import { initProject, ADAPTER_CHOICES, MODEL_CHOICES } from './init.js';
 import { exportBundle } from './clean-room.js';
 import { createLocalStatusSource, readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
@@ -94,9 +94,7 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
         err('hodgepodge init: aborted (no model given)\n');
         return 2;
       }
-      const role = { adapter, model };
-      const roles = Object.fromEntries(ROLE_NAMES.map((name) => [name, { ...role }]));
-      const res = initProject({ dir, roles });
+      const res = initProject({ dir, adapter, model });
       out(`${JSON.stringify(res)}\n`);
       return res.ok ? 0 : 1;
     } finally {

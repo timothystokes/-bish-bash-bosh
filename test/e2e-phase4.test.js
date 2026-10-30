@@ -63,7 +63,7 @@ test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite pas
         "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { greet } from '../src/greet.js';\ntest('R-greet-1 greeting', () => assert.equal(greet('bob'), 'hello bob'));\n",
     },
   };
-  const srcCfg = makeConfig({ roles: { build: { adapter: 'reverser', model: 'm' }, reverse: { adapter: 'reverser', model: 'm' } } });
+  const srcCfg = makeConfig({ adapter: 'reverser', model: 'm' });
   commitProjectConfig(source, srcCfg);
   const rev = await withCwd(source, () => hodge(['hodge', '--reverse', '--run-id', 'p4r'], { reverser: scripted(reverseFixture) }));
   assert.equal(rev.res.status, 'ok', JSON.stringify(rev.res));
@@ -86,7 +86,7 @@ test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite pas
     transcript: 'implemented greet from the spec',
     writes: { 'plan.md': '- [x] implement greet\n', 'package.json': pkg, 'src/greet.js': 'export const greet = (name) => "hello " + name;\n' },
   };
-  const bCfg = makeConfig({ mode: 'clean-room', roles: { build: { adapter: 'builder', model: 'm' } } });
+  const bCfg = makeConfig({ mode: 'clean-room', adapter: 'builder', model: 'm' });
   commitProjectConfig(builder, bCfg);
   const run = await withCwd(builder, () => hodge(['podge', '--run-id', 'p4b'], { builder: scripted(buildFixture) }));
   assert.equal(run.res.status, 'done', JSON.stringify(run.res));

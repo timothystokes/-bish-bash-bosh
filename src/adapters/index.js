@@ -15,12 +15,9 @@ export const defaultRegistry = {
     }),
 };
 
-// Resolve a role's adapter id (opaque string from config) to an adapter instance.
-export function resolveAdapter(config, role, registry = undefined) {
+// Resolve config's single adapter id (an opaque string) to an adapter instance.
+export function resolveAdapter(config, registry = undefined) {
   const reg = registry ?? defaultRegistry;
-  const roles = config.roles;
-  const spec = roles[role];
-  if (!spec) throw new Error(`no role '${role}' in config`);
-  if (!Object.hasOwn(reg, spec.adapter)) throw new Error(`unknown adapter '${spec.adapter}'`);
-  return reg[spec.adapter]({ model: spec.model });
+  if (!Object.hasOwn(reg, config.adapter)) throw new Error(`unknown adapter '${config.adapter}'`);
+  return reg[config.adapter]({ model: config.model });
 }

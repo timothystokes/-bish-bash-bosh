@@ -42,7 +42,7 @@ test('readRunStatus on an unknown run is empty, not an error', () => {
 
 test('hodgepodge status prints JSON and includes control state', async () => {
   const dir = makeRun();
-  writeProjectConfig(dir, { roles: { build: { adapter: 'f', model: 'm' } }, allowedPaths: ['src/'] });
+  writeProjectConfig(dir, { adapter: 'f', model: 'm', allowedPaths: ['src/'] });
   const ctl = join(dir, 'control.json');
   writeFileSync(ctl, JSON.stringify({ paused: true }));
   let out = '';

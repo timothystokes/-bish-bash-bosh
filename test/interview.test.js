@@ -25,8 +25,10 @@ function makeRepo() {
   return dir;
 }
 
-const config = (/** @type {Record<string, {adapter: string, model: string}>} */ roles = { interview: { adapter: 'f', model: 'm' } }) => ({
-  roles: { build: { adapter: 'f', model: 'm' }, ...roles },
+const config = (/** @type {{adapter?: string, model?: string}} */ overrides = {}) => ({
+  adapter: 'f',
+  model: 'm',
+  ...overrides,
   allowedPaths: ['src/'],
 });
 
@@ -149,7 +151,7 @@ const gaps = (/** @type {number[]} */ resolved, /** @type {string} */ question) 
 
 test('hodge on a fresh repo self-bootstraps the interview store and keeps asking until ready', async () => {
   const dir = makeRepo();
-  commitProjectConfig(dir, config({ interview: { adapter: 'iv', model: 'm' } }));
+  commitProjectConfig(dir, config({ adapter: 'iv' }));
   const out = /** @type {string[]} */ ([]);
   /** @type {Record<string, string>[]} */
   const rounds = [
@@ -168,7 +170,7 @@ test('hodge on a fresh repo self-bootstraps the interview store and keeps asking
   };
   const code = await withCwd(dir, () =>
     main(['hodge'], {
-      registry: { iv: () => adapter, f: () => { throw new Error('build role must not be used'); } },
+      registry: { iv: () => adapter },
       identity,
       input: Readable.from(['Build a greeter\n', 'ok\n', 'ok\n', '']),
       stdout: (s) => { out.push(s); }, stderr: () => {},
@@ -190,10 +192,10 @@ test('hodge usage errors exit 2', async () => {
   assert.match(err.join(''), /config\.yml/);
 
   const norole = mkdtempSync(join(tmpdir(), 'hodge-int-norole-'));
-  writeProjectConfig(norole, config({}));
+  writeProjectConfig(norole, config({ adapter: 'missing' }));
   err.length = 0;
   assert.equal(await withCwd(norole, () => main(['hodge'], { registry: { f: () => agent({}).adapter }, stdout: () => {}, stderr: e })), 2);
-  assert.match(err.join(''), /no role 'interview'/);
+  assert.match(err.join(''), /unknown adapter 'missing'/);
 
   err.length = 0;
   assert.equal(await withCwd(norole, () => main(['podge', 'step', '--objective', 'x'], { stdout: () => {}, stderr: e })), 2);

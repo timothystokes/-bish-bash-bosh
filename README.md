@@ -1,6 +1,6 @@
 ```
 ╷ ╷╭─╮┌─╮╭─╴┌─╴┌─╮╭─╮┌─╮╭─╴┌─╴
-├─┤│ ││ ││╶╮├╴ ├─╯│ ││ ││╶╮├╴ 
+├─┤│ ││ ││╶┐├╴ ├─╯│ ││ ││╶┐├╴ 
 ╵ ╵╰─╯└─╯╰─╯└─╴╵  ╰─╯└─╯╰─╯╰─╴
 ```
 
@@ -21,10 +21,10 @@ Hodgepodge holds the harness only. It operates directly on your project (the cur
 npm install
 npm link          # puts hodgepodge, hodge and podge on your PATH (or use ./bin/hodgepodge)
 cd your-project
-hodgepodge init   # interactive: asks which adapter/model to use, applied to every role (interview, reverse, build, qa)
+hodgepodge init   # interactive: asks which adapter/model to use for every phase (interview, reverse, build, qa)
 ```
 
-`init` writes `.hodgepodge/config.yml` in the current directory (config: roles, allowedPaths) with sensible default allowed paths; it refuses to run if `.hodgepodge/config.yml` already exists. It does no scaffolding: no target repo, no runtime copy, no launcher scripts. Then run the commands directly in your project; they take no config, repo or objective flags, and no `--dir`:
+`init` writes `.hodgepodge/config.yml` in the current directory (config: adapter, model, allowedPaths) with sensible default allowed paths; it refuses to run if `.hodgepodge/config.yml` already exists. It does no scaffolding: no target repo, no runtime copy, no launcher scripts. Then run the commands directly in your project; they take no config, repo or objective flags, and no `--dir`:
 
 ```sh
 hodge            # requirements and specs: asks for the objective, then interviews you in topic-grouped question batches with defaults, picked and tracked by code (reply `y` for all defaults, or `2: x; 5: y` to override; `done` accepts the remaining defaults) until the specs are ready (or `hodge --reverse` to derive them from code)
@@ -40,7 +40,7 @@ While a loop runs, open a second terminal in the project and run `hodgepodge con
 
 `hodge`, `podge`, `step`, `status` and `tui` always operate on the current directory (`--run-id`, and `--control` for `podge`/`status`/`tui`, are the only other flags). `spec-lint`, `ready`, `sync` and `promote` default to the current directory too, or take `--repo <dir>` for a one-shot operation against a different repo.
 
-`podge` loops one iteration at a time until `plan.md` is fully checked, a step fails or is gated, or a `--control` stop is set (there is no run-wide budget: a stuck loop needs a stop, an agent/gate failure, or the QA cycle limit to end). A ticked plan is not enough when specs declare requirement IDs: the harness runs the suite and type check, requires every `R-<spec>-<n>` to be named by a passing test, and scans source for stubs. Gaps become unchecked `Verify:` items in `plan.md` and the loop continues. The harness (not the agent) derives each spec's `Implementation:` and `Evidence:`, and writes `.hodgepodge/runs/<run-id>/done.json` with per-requirement evidence. A step that fails or gates also writes `.hodgepodge/runs/<run-id>/iterations/NNN/diagnosis.json` (root cause, evidence, fix, test, prevention; the agent can override fields with a fenced `diagnosis` JSON block) and `reason` carries the root cause. With a `qa` role in config (normally a different adapter/model from `build`), a verified plan is done only after an independent, read-only QA cycle reports no findings. Findings (classified `violated-decision`, `unimplemented-requirement` or `decision-needing-replacement`, each with severity, spec, consequence and a root-cause/evidence/fix/test/prevention diagnosis) are appended to `plan.md` as unchecked `QA-<cycle>-<n>` items under `## QA findings`, the build agent fixes them, and QA re-checks, at most `maxQaCycles` (default 5) times; a QA reply without a `findings` block fails the loop. QA records go to `.hodgepodge/runs/<run-id>/qa-N/`. It prints JSON `{status, steps, reason?, qa?}` and exits 0 only when done.
+`podge` loops one iteration at a time until `plan.md` is fully checked, a step fails or is gated, or a `--control` stop is set (there is no run-wide budget: a stuck loop needs a stop, an agent/gate failure, or the QA cycle limit to end). A ticked plan is not enough when specs declare requirement IDs: the harness runs the suite and type check, requires every `R-<spec>-<n>` to be named by a passing test, and scans source for stubs. Gaps become unchecked `Verify:` items in `plan.md` and the loop continues. The harness (not the agent) derives each spec's `Implementation:` and `Evidence:`, and writes `.hodgepodge/runs/<run-id>/done.json` with per-requirement evidence. A step that fails or gates also writes `.hodgepodge/runs/<run-id>/iterations/NNN/diagnosis.json` (root cause, evidence, fix, test, prevention; the agent can override fields with a fenced `diagnosis` JSON block) and `reason` carries the root cause. With `maxQaCycles` set in config, a verified plan is done only after an independent, read-only QA cycle (the same configured adapter/model, run as a separate instance) reports no findings. Findings (classified `violated-decision`, `unimplemented-requirement` or `decision-needing-replacement`, each with severity, spec, consequence and a root-cause/evidence/fix/test/prevention diagnosis) are appended to `plan.md` as unchecked `QA-<cycle>-<n>` items under `## QA findings`, the build agent fixes them, and QA re-checks, at most `maxQaCycles` (default 5) times; a QA reply without a `findings` block fails the loop. QA records go to `.hodgepodge/runs/<run-id>/qa-N/`. It prints JSON `{status, steps, reason?, qa?}` and exits 0 only when done.
 
 `hodge` self-bootstraps `.hodgepodge/interview.md` (the question-and-answer store) on first run. Run `hodgepodge --help` for every command.
 
@@ -53,8 +53,8 @@ When a spec declares a format, `hodge` adds that format's skill snippet (`prompt
 `.hodgepodge/config.yml` (YAML, at the project root) is validated against `src/config.schema.json`. The key parts (run artifacts `record.json`, `usage.json`, `diagnosis.json` and `done.json` have schemas in `src/schemas/`):
 
 - `allowedPaths`: where the agent works and what it may write (`init` defaults to `src/`, `bin/`, `lib/` and `package.json`, since a CLI entry point and its `bin` mapping are not solution-specific).
-- `roles`: map roles (`interview`, `reverse`, `build`, `qa`) to an adapter and model. Models live in config only. `init` asks for a single adapter/model and applies it to all four roles; hand-edit `.hodgepodge/config.yml` to use different adapters/models per role.
-- `maxQaCycles`: optional, default 5; the most QA cycles `podge` runs when a `qa` role is configured.
+- `adapter`/`model`: a single adapter and model used for every phase (interview, reverse, build, qa). Models live in config only. `init` asks for them interactively; hand-edit `.hodgepodge/config.yml` to change them later.
+- `maxQaCycles`: optional, no default; set it to enable the QA cycle (the most cycles `podge` runs before giving up).
 - `usage.json` holds wall-clock `{seconds}` per iteration, summed across a run for visibility (`hodgepodge status`/`tui`). The harness does not track tokens or cost, and there is no run-wide cap: watch real spend on the model backend.
 - `mode`: `forward` (default), `interview`, `reverse`, `brownfield`, `test-hardening`, `clean-room`.
 

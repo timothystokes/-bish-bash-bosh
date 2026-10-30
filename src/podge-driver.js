@@ -19,7 +19,7 @@ export function isPlanDone(plan) {
 // Failures stop the loop (tune prompts/specs/gates; no blind retries).
 // With `controlFile`, `control.json` is read before every iteration: stop ends the loop,
 // paused waits (polling), a steer note goes into the next prompt only.
-// With `qaAdapter` (the `qa` role), a verified plan is done only after an independent QA cycle reports no findings; findings
+// With `qaAdapter` (enabled by config `maxQaCycles`), a verified plan is done only after a QA cycle reports no findings; findings
 // become plan items for the build agent and QA re-checks, up to config `maxQaCycles` (default 5).
 export async function runLoop(opts) {
   const { controlFile, qaAdapter, pollMs = 1000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), ...stepOpts } = opts;

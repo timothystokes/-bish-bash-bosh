@@ -17,7 +17,7 @@ export function loadModePrompt(mode) {
   return readFileSync(file, 'utf8').trimEnd();
 }
 
-/** Prompt for the `qa` role (not a mode: it runs between build cycles, never as the loop prompt). */
+/** Prompt for the QA cycle (not a mode: it runs between build cycles, never as the loop prompt). */
 export function loadQaPrompt() {
   return readFileSync(join(promptsDir, 'qa.md'), 'utf8').trimEnd();
 }

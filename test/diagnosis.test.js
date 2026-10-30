@@ -80,7 +80,7 @@ test('runStep: a gated failure records diagnosis.json and returns its root cause
   git('add', '-A'); git('commit', '-qm', 'init');
   const res = await runStep({
     config: {
-      roles: { build: { adapter: 'x', model: 'y' } },
+      adapter: 'x', model: 'y',
       allowedPaths: ['src/'],
     },
     repoDir: dir, runId: 'r1',

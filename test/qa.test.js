@@ -40,7 +40,8 @@ function makeRepo(plan = '- [x] one\n') {
 }
 
 const config = (extra = {}) => ({
-  roles: { build: { adapter: 'b', model: 'm' }, qa: { adapter: 'q', model: 'm2' } },
+  adapter: 'b',
+  model: 'm',
   allowedPaths: ['src/'],
   ...extra,
 });
@@ -91,7 +92,7 @@ test('qa prompt frames a skeptical independent evaluator that cannot modify the 
   assert.match(p, /read-only/i);
 });
 
-test('config accepts an optional qa role and maxQaCycles; rejects a non-positive maxQaCycles', () => {
+test('config accepts an optional maxQaCycles; rejects a non-positive value', () => {
   assert.equal(validateConfig(config({ maxQaCycles: 3 })).ok, true);
   assert.equal(validateConfig(config({ maxQaCycles: 0 })).ok, false);
 });
@@ -185,15 +186,19 @@ test('runLoop propagates a failed QA run as a failed loop', async () => {
   assert.match(res.reason ?? '', /qa/i);
 });
 
-test('podge uses the configured qa role adapter, distinct from build', async () => {
+test('podge enables a QA cycle using the same configured adapter when maxQaCycles is set', async () => {
   const dir = makeRepo('- [x] one\n');
   /** @type {string[]} */
   const used = [];
+  let calls = 0;
   const registry = {
-    b: () => ({ async run() { used.push('build'); return { exitStatus: 0, transcript: '', changedFiles: [] }; } }),
-    q: () => ({ async run() { used.push('qa'); return { exitStatus: 0, transcript: block([]), changedFiles: [] }; } }),
+    // the adapter id resolves twice: build first, then qa (podge.js resolves build before qa)
+    b: () => {
+      const label = (calls += 1) === 1 ? 'build' : 'qa';
+      return { async run() { used.push(label); return { exitStatus: 0, transcript: label === 'qa' ? block([]) : '', changedFiles: [] }; } };
+    },
   };
-  commitProjectConfig(dir, config());
+  commitProjectConfig(dir, config({ maxQaCycles: 5 }));
   let out = '';
   const code = await withCwd(dir, () => main(['podge'], { registry, testCommand: pass, identity, stdout: (s) => { out += s; }, stderr: () => {} }));
   assert.equal(code, 0, out);

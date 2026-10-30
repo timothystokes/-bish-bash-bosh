@@ -65,7 +65,7 @@ export function qaCycles(repoDir, runId) {
 
 const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' });
 
-// One QA cycle: an independent evaluator (the `qa` role's adapter) checks the build against the specs. Read-only:
+// One QA cycle: an evaluator checks the build against the specs. Read-only:
 // any change it makes is discarded and fails the cycle. Findings become unchecked plan items, committed.
 export async function runQaCycle({ repoDir, runId, adapter, identity }) {
   const cycle = qaCycles(repoDir, runId) + 1;
@@ -95,7 +95,7 @@ export async function runQaCycle({ repoDir, runId, adapter, identity }) {
   if (result.exitStatus !== 0) {
     res = { status: 'failed', cycle, reason: 'qa agent call exited non-zero' };
   } else if (touched) {
-    res = { status: 'failed', cycle, reason: 'qa modified the workspace (read-only role); changes discarded' };
+    res = { status: 'failed', cycle, reason: 'qa modified the workspace (QA is read-only); changes discarded' };
   } else if (!parsed.ok) {
     res = { status: 'failed', cycle, reason: parsed.error };
   } else {

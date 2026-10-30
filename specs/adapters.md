@@ -1,7 +1,7 @@
 # Spec: Agent/model adapters
 - Adapters v1: Copilot CLI, Claude Code, Codex, generic OpenAI-compatible HTTP.
 - Common interface: take a prompt + working dir + limits (`{maxWallClockSeconds?}` only); return `{exitStatus, transcript, changedFiles}`. Adapters do not parse or report tokens or cost.
-- Models and agents are chosen by config **roles** (e.g. `build`, `interview`, `reverse`, `qa`) mapping to adapter + model. Harness runtime logic never names a model or vendor. Exception: `hodgepodge init`'s interactive prompt (`src/init.js` `ADAPTER_CHOICES`/`MODEL_CHOICES`) hardcodes a numbered pick-list of known adapters and suggested current models, purely as a UX convenience; it is not enforced (any typed adapter/model string still works) and goes stale as vendors release models, so update it by hand when that happens.
+- A single configured **`adapter`/`model`** pair is used for every phase (interview, reverse, build, qa). Harness runtime logic never names a model or vendor. Exception: `hodgepodge init`'s interactive prompt (`src/init.js` `ADAPTER_CHOICES`/`MODEL_CHOICES`) hardcodes a numbered pick-list of known adapters and suggested current models, purely as a UX convenience; it is not enforced (any typed adapter/model string still works) and goes stale as vendors release models, so update it by hand when that happens.
 - Swapping agent or model is a config-only change.
 - Every adapter passes the same contract test suite (fake agent fixtures; no network in unit tests).
 - Cheapest start: CLI agents under existing subscriptions locally; pay-per-token small model for routine loops in cloud. Check vendor terms before unattended/cloud use of subscription-backed agents.

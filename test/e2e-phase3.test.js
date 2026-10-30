@@ -45,7 +45,7 @@ test('phase 3 exit: pause, steer and stop via hodgepodge control drive podge', a
   const tmp = mkdtempSync(join(tmpdir(), 'hodge-cfg-'));
   const ctl = join(tmp, 'control.json');
   const config = {
-    roles: { build: { adapter: 'scripted', model: 'm' } },
+    adapter: 'scripted', model: 'm',
     allowedPaths: ['src/'],
   };
 

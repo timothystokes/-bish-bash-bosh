@@ -26,7 +26,8 @@ function makeRepo() {
 }
 
 const cfg = (/** @type {string} */ adapter) => ({
-  roles: { build: { adapter, model: 'm' } },
+  adapter,
+  model: 'm',
   allowedPaths: ['src/'],
 });
 
@@ -43,22 +44,21 @@ test('parseStepArgs rejects missing values and unknown flags', () => {
   assert.equal(parseStepArgs(['--run-id', 'x', '--bogus']).ok, false);
 });
 
-test('resolveAdapter maps role adapter id through the registry', () => {
+test('resolveAdapter maps the configured adapter id through the registry', () => {
   const fake = createFakeAdapter({ exitStatus: 0, transcript: '', writes: {} });
-  const a = resolveAdapter(cfg('f'), 'build', { f: () => fake });
+  const a = resolveAdapter(cfg('f'), { f: () => fake });
   assert.equal(a, fake);
 });
 
-test('resolveAdapter passes the role model to the factory', () => {
+test('resolveAdapter passes the configured model to the factory', () => {
   /** @type {string | undefined} */
   let seen;
-  resolveAdapter(cfg('f'), 'build', { f: ({ model }) => { seen = model; return /** @type {any} */ ({}); } });
+  resolveAdapter(cfg('f'), { f: ({ model }) => { seen = model; return /** @type {any} */ ({}); } });
   assert.equal(seen, 'm');
 });
 
-test('resolveAdapter throws on unknown adapter id or missing role', () => {
-  assert.throws(() => resolveAdapter(cfg('nope'), 'build', {}), /unknown adapter 'nope'/);
-  assert.throws(() => resolveAdapter(cfg('f'), 'review', { f: () => /** @type {any} */ ({}) }), /no role 'review'/);
+test('resolveAdapter throws on an unknown adapter id', () => {
+  assert.throws(() => resolveAdapter(cfg('nope'), {}), /unknown adapter 'nope'/);
 });
 
 test('podge step prints JSON {sha, iteration, status} and exits 0', async () => {

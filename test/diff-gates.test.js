@@ -84,7 +84,7 @@ function makeRepo() {
 }
 
 const config = {
-  roles: { build: { adapter: 'x', model: 'y' } },
+  adapter: 'x', model: 'y',
   allowedPaths: ['src/'],
 };
 const pass = ['node', '-e', 'process.exit(0)'];

@@ -10,7 +10,7 @@ import { validateConfig } from '../src/config.js';
 import { createFakeAdapter } from '../src/adapter.js';
 
 const baseConfig = () => ({
-  roles: { build: { adapter: 'a', model: 'm' } },
+  adapter: 'a', model: 'm',
   allowedPaths: ['src/**'],
 });
 

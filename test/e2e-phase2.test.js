@@ -50,7 +50,8 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
   git(dir, 'commit', '-qm', 'empty target');
 
   const config = {
-    roles: { interview: { adapter: 'interviewer', model: 'm' }, build: { adapter: 'builder', model: 'm' } },
+    adapter: 'agent',
+    model: 'm',
     allowedPaths: ['src/'],
     requireTestPlan: true,
   };
@@ -79,9 +80,10 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
   };
   const build = scripted(buildFixture)();
   const plan = scripted({ ...buildFixture, transcript: 'planned', writes: planWrites })();
-  // the first podge step is the plan step (its prompt says so); later steps build
-  const builder = { run: (req) => (req.prompt.startsWith('You are the plan step') ? plan : build).run(req) };
-  const registry = { interviewer: scripted(interviewFixture), builder: () => builder };
+  const interview = scripted(interviewFixture)();
+  // a single adapter instance that dispatches by prompt: interview, then plan step, then build
+  const agent = { run: (req) => (req.prompt.includes('## Objective') ? interview : req.prompt.startsWith('You are the plan step') ? plan : build).run(req) };
+  const registry = { agent: () => agent };
 
   // 1. interview: specs only (no tests, no test plan); structure lint passes
   commitProjectConfig(dir, config);

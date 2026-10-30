@@ -25,8 +25,10 @@ function makeRepo() {
   return dir;
 }
 
-const config = (/** @type {Record<string, {adapter: string, model: string}>} */ roles = { reverse: { adapter: 'f', model: 'm' } }) => ({
-  roles: { build: { adapter: 'f', model: 'm' }, ...roles },
+const config = (/** @type {{adapter?: string, model?: string}} */ overrides = {}) => ({
+  adapter: 'f',
+  model: 'm',
+  ...overrides,
   allowedPaths: ['src/'],
 });
 
@@ -129,11 +131,11 @@ test('gates: dirty tree and harness repo make no agent call', async () => {
   assert.equal(a.prompts.length, 0);
 });
 
-test('hodge --reverse uses the reverse role; usage errors exit 2', async () => {
+test('hodge --reverse uses the configured adapter; usage errors exit 2', async () => {
   const dir = makeRepo();
-  commitProjectConfig(dir, config({ reverse: { adapter: 'rv', model: 'm' } }));
+  commitProjectConfig(dir, config({ adapter: 'rv' }));
   const out = /** @type {string[]} */ ([]);
-  const registry = { rv: () => agent(goodWrites).adapter, f: () => { throw new Error('build role must not be used'); } };
+  const registry = { rv: () => agent(goodWrites).adapter };
   const code = await withCwd(dir, () =>
     main(['hodge', '--reverse'], {
       registry, identity, testCommand: pass, stdout: (s) => { out.push(s); }, stderr: () => {},
@@ -142,7 +144,7 @@ test('hodge --reverse uses the reverse role; usage errors exit 2', async () => {
   assert.equal(JSON.parse(out.join('')).status, 'ok');
 
   const dir2 = makeRepo();
-  commitProjectConfig(dir2, config({ reverse: { adapter: 'rv', model: 'm' } }));
+  commitProjectConfig(dir2, config({ adapter: 'rv' }));
   const bad = await withCwd(dir2, () =>
     main(['hodge', '--reverse'], {
       registry, identity, testCommand: fail, stdout: () => {}, stderr: () => {},
@@ -151,7 +153,7 @@ test('hodge --reverse uses the reverse role; usage errors exit 2', async () => {
 
   const err = /** @type {string[]} */ ([]);
   const noRoleDir = mkdtempSync(join(tmpdir(), 'hodge-rev-norole-'));
-  writeProjectConfig(noRoleDir, config({}));
+  writeProjectConfig(noRoleDir, config({ adapter: 'missing' }));
   assert.equal(await withCwd(noRoleDir, () => main(['hodge', '--reverse'], { registry, stdout: () => {}, stderr: (s) => { err.push(s); } })), 2);
-  assert.match(err.join(''), /no role 'reverse'/);
+  assert.match(err.join(''), /unknown adapter 'missing'/);
 });

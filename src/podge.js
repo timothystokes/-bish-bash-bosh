@@ -22,7 +22,7 @@ export async function runPodge(cmd, argv, deps, out, err) {
     return 2;
   }
   try {
-    const adapter = debugAdapter(resolveAdapter(config, 'build', deps.registry ?? defaultRegistry), 'build', debug, out);
+    const adapter = debugAdapter(resolveAdapter(config, deps.registry ?? defaultRegistry), 'build', debug, out);
     const run = cmd === 'podge' ? runLoop : runStep;
     const res = await run({
       config,
@@ -33,7 +33,7 @@ export async function runPodge(cmd, argv, deps, out, err) {
       identity: deps.identity,
       inboxDir: project.dir,
       ...(cmd === 'podge' && parsed.control ? { controlFile: resolve(parsed.control) } : {}),
-      ...(cmd === 'podge' && config.roles['qa'] ? { qaAdapter: debugAdapter(resolveAdapter(config, 'qa', deps.registry ?? defaultRegistry), 'qa', debug, out) } : {}),
+      ...(cmd === 'podge' && config.maxQaCycles !== undefined ? { qaAdapter: debugAdapter(resolveAdapter(config, deps.registry ?? defaultRegistry), 'qa', debug, out) } : {}),
       requireTestPlan: config.requireTestPlan === true,
       ...(debug ? { log: (m) => out(`[debug] ${m}\n`) } : {}),
     });

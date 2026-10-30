@@ -22,8 +22,8 @@ export async function runHodge(argv, deps, out, err) {
     return 2;
   }
   try {
-    const role = reverse ? 'reverse' : 'interview';
-    const adapter = debugAdapter(resolveAdapter(config, role, deps.registry ?? defaultRegistry), role, debug, out);
+    const label = reverse ? 'reverse' : 'interview';
+    const adapter = debugAdapter(resolveAdapter(config, deps.registry ?? defaultRegistry), label, debug, out);
     if (!reverse) {
       // The agent runs silently for minutes; say so, or a submitted answer looks like a dead prompt.
       const inner = adapter;

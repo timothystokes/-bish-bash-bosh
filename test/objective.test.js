@@ -11,7 +11,7 @@ import { freshDir, initGitRepo, seedObjectiveProject, withCwd, writeProjectConfi
 
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
-const buildConfig = { roles: { build: { adapter: 'a', model: 'm' } }, allowedPaths: ['src/', 'bin/', 'lib/', 'package.json'], requireTestPlan: true };
+const buildConfig = { adapter: 'a', model: 'm', allowedPaths: ['src/', 'bin/', 'lib/', 'package.json'], requireTestPlan: true };
 
 const goodSpec = `# Spec: Greeter
 Implementation: none
@@ -268,7 +268,7 @@ test('a resumed conversation reaches ready without saying "done" again, once no 
 test('hodge drives the conversation from stdin, operating on cwd', async () => {
   const dir = freshDir('obj-');
   seedObjectiveProject(dir);
-  writeProjectConfig(dir, { ...buildConfig, roles: { build: buildConfig.roles.build, interview: { adapter: 'a', model: 'm' } } });
+  writeProjectConfig(dir, buildConfig);
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', 'seed');
   const a = scripted(fullRounds);

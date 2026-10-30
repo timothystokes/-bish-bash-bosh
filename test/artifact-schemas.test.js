@@ -28,14 +28,16 @@ test('every artifact schema compiles in strict mode and has an $id', () => {
   for (const n of SCHEMAS) assert.ok(load(n).$id, n);
 });
 
-test('config schema accepts the qa role and maxQaCycles', () => {
+test('config schema accepts a single adapter/model and maxQaCycles', () => {
   const cfg = {
-    roles: { build: { adapter: 'a', model: 'm' }, qa: { adapter: 'b', model: 'n' } },
+    adapter: 'a',
+    model: 'm',
     allowedPaths: ['src/**'],
     maxQaCycles: 3,
   };
   assert.equal(check('config', cfg).ok, true);
-  assert.equal(check('config', { ...cfg, roles: { ...cfg.roles, qa: { adapter: 'b' } } }).ok, false);
+  const { model, ...noModel } = cfg;
+  assert.equal(check('config', noModel).ok, false);
 });
 
 test('files written by writeIterationRecord conform (with and without diagnosis)', () => {

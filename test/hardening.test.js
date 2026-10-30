@@ -28,7 +28,7 @@ function makeRepo() {
 
 const config = (/** @type {object} */ extra = {}) => ({
   mode: 'test-hardening',
-  roles: { build: { adapter: 'f', model: 'm' } },
+  adapter: 'f', model: 'm',
   allowedPaths: ['src/', 'tests/'],
   ...extra,
 });

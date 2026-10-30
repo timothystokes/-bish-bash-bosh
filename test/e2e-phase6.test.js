@@ -71,9 +71,11 @@ function makeTarget({ tests = TESTS, planMd = PLAN_MD } = {}) {
 }
 
 const cfg = (extra = {}) => ({
-  roles: { build: { adapter: 'builder', model: 'm' }, qa: { adapter: 'checker', model: 'm2' } },
+  adapter: 'agent',
+  model: 'm',
   allowedPaths: ['src/', 'out/'],
   requireTestPlan: true,
+  maxQaCycles: 5,
   ...extra,
 });
 
@@ -115,6 +117,15 @@ function put(cwd, files) {
 const tickAll = (/** @type {string} */ cwd) => put(cwd, { 'plan.md': readFileSync(join(cwd, 'plan.md'), 'utf8').replaceAll('[ ]', '[x]') });
 
 /**
+ * A single adapter id resolves twice per podge run: build first, then qa (if configured).
+ * @param {object} buildAdapter @param {object} [qaAdapter]
+ */
+function agentRegistry(buildAdapter, qaAdapter) {
+  let calls = 0;
+  return { agent: () => (calls++ === 0 ? buildAdapter : qaAdapter) };
+}
+
+/**
  * @param {string} cmd
  * @param {string} dir
  * @param {object} config
@@ -150,7 +161,7 @@ test('phase 6 regression: lint, formats, scripted build, derived done, QA cycle,
     },
   ]);
   const qa = scripted([() => findingsBlock([FINDING]), () => findingsBlock([])]);
-  const { code, res } = await run('podge', dir, cfg(), { builder: () => build.adapter, checker: () => qa.adapter });
+  const { code, res } = await run('podge', dir, cfg(), agentRegistry(build.adapter, qa.adapter));
 
   assert.equal(res.status, 'done', JSON.stringify(res));
   assert.equal(code, 0);
@@ -192,7 +203,7 @@ test('phase 6 regression: an output that does not conform to the declared schema
     },
   ]);
   const qa = scripted([() => findingsBlock([])]);
-  const { code, res } = await run('podge', dir, cfg(), { builder: () => build.adapter, checker: () => qa.adapter });
+  const { code, res } = await run('podge', dir, cfg(), agentRegistry(build.adapter, qa.adapter));
 
   assert.equal(res.status, 'failed', JSON.stringify(res));
   assert.match(res.reason, /gate formats failed/);
@@ -232,10 +243,7 @@ test('phase 6 regression: a requirement with no passing test keeps a ticked plan
       return r;
     },
   };
-  const { res } = await run('podge', dir, cfg(), {
-    builder: () => builder,
-    checker: () => qa.adapter,
-  }, controlFile);
+  const { res } = await run('podge', dir, cfg(), agentRegistry(builder, qa.adapter), controlFile);
 
   assert.notEqual(res.status, 'done', JSON.stringify(res));
   assert.equal(qa.calls(), 0);
@@ -247,7 +255,7 @@ test('phase 6 regression: a requirement with no passing test keeps a ticked plan
 test('phase 6 regression: spec-lint stops podge before any agent call when a requirement has no mapped test', async () => {
   const dir = makeTarget({ planMd: '# Test plan\n- specs/greet.md -> tests/greet.test.js: greeting behaviour\n' });
   const build = scripted([() => 'should not run']);
-  const { code, res } = await run('podge', dir, cfg(), { builder: () => build.adapter, checker: () => scripted([() => findingsBlock([])]).adapter });
+  const { code, res } = await run('podge', dir, cfg(), agentRegistry(build.adapter, scripted([() => findingsBlock([])]).adapter));
   assert.equal(res.status, 'gated', JSON.stringify(res));
   assert.equal(code, 1);
   assert.match(res.reason, /spec-lint failed.*R-greet-1/);
@@ -263,7 +271,7 @@ test('phase 6 regression: a second run in the same sandbox is refused while the 
   const errs = [];
   const code = await withCwd(dir, () =>
     main(['podge', '--run-id', 'p6'], {
-      registry: { builder: () => scripted([() => 'x']).adapter, checker: () => scripted([() => findingsBlock([])]).adapter },
+      registry: agentRegistry(scripted([() => 'x']).adapter, scripted([() => findingsBlock([])]).adapter),
       identity: { root: '/nonexistent/hodgepodge', remotes: [] },
       stdout: () => {},
       stderr: (s) => errs.push(s),

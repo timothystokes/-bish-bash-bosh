@@ -109,7 +109,7 @@ test('syncImplementation derives Implementation and Evidence from per-requiremen
 });
 
 const config = {
-  roles: { build: { adapter: 'x', model: 'y' } },
+  adapter: 'x', model: 'y',
   allowedPaths: ['src/', 'plan.md', 'tests/', 'specs/'],
 };
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };

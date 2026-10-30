@@ -18,25 +18,17 @@ export const MODEL_CHOICES = {
   // openai-http hits an arbitrary /chat/completions endpoint: no catalog, type the model directly.
 };
 
-// The four roles hodge and podge use, hardcoded (not a user choice): hodge needs `interview`
-// (and `reverse` for `hodge --reverse`), podge needs `build` (and `qa` when a plan calls for it).
-// `hodgepodge init` asks for a single adapter/model and applies it to all four; hand-edit
-// .hodgepodge/config.yml afterward to use a different adapter/model for a specific role.
-export const ROLE_NAMES = ['interview', 'reverse', 'build', 'qa'];
-
-// `hodgepodge init`: writes <dir>/.hodgepodge/config.yml (default dir: cwd) with every role (`interview`,
-// `reverse`, `build`, `qa`) the owner picked, plus default allowedPaths. Refuses if a
-// config already exists. There is no sandbox to scaffold: no target repo, no runtime copy, no
-// launcher scripts.
-export function initProject({ dir, roles }) {
-  for (const name of ROLE_NAMES) {
-    if (!roles?.[name]?.adapter || !roles[name]?.model) return { ok: false, reason: `${name} adapter and model are required` };
-  }
+// `hodgepodge init`: writes <dir>/.hodgepodge/config.yml (default dir: cwd) with the single
+// adapter/model the owner picked, plus default allowedPaths. Refuses if a config already exists.
+// There is no sandbox to scaffold: no target repo, no runtime copy, no launcher scripts.
+export function initProject({ dir, adapter, model }) {
+  if (!adapter || !model) return { ok: false, reason: 'adapter and model are required' };
   const projectDir = resolve(dir ?? '.');
   const configPath = join(projectDir, CONFIG_FILE);
   if (existsSync(configPath)) return { ok: false, reason: `${configPath} already exists` };
   const cfg = {
-    roles: { interview: roles.interview, reverse: roles.reverse, build: roles.build, qa: roles.qa },
+    adapter,
+    model,
     allowedPaths: [...DEFAULT_ALLOWED_PATHS],
     requireTestPlan: true,
   };

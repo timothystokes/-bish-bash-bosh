@@ -28,7 +28,7 @@ function makeRepo(plan) {
 }
 
 const config = () => ({
-  roles: { build: { adapter: 'f', model: 'm' } },
+  adapter: 'f', model: 'm',
   allowedPaths: ['src/'],
 });
 const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
