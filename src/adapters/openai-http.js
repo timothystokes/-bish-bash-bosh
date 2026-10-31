@@ -31,7 +31,14 @@ export function createOpenAiHttpAdapter(opts = {}) {
   const baseUrl = (opts.baseUrl ?? 'https://api.openai.com/v1').replace(/\/+$/, '');
   const env = opts.env ?? process.env;
   return {
-    async run({ prompt, cwd, limits }) {
+    async run(req) {
+      const { prompt, cwd, limits } = req;
+      // Session tracking is opt-in: a caller that never passes `session` gets the old stateless
+      // behaviour unchanged (one user turn, no `session` in the result). A caller that passes
+      // `session` gets this endpoint's native equivalent of a resumed conversation: the prior
+      // turns are resent as `messages` history (there is no server-side session id to reuse).
+      const tracking = Object.hasOwn(req, 'session');
+      const history = Array.isArray(req.session) ? req.session : [];
       const fail = (exitStatus, transcript) => ({
         exitStatus,
         transcript,
@@ -42,6 +49,7 @@ export function createOpenAiHttpAdapter(opts = {}) {
         model: opts.model,
         messages: [
           { role: 'system', content: FILE_PROTOCOL },
+          ...history,
           { role: 'user', content: prompt },
         ],
       });
@@ -80,7 +88,8 @@ export function createOpenAiHttpAdapter(opts = {}) {
         changedFiles.push(r.split('\\').join('/'));
       }
       const note = rejected.length ? `\n[rejected paths outside repo: ${rejected.join(', ')}]` : '';
-      return { exitStatus: rejected.length ? 1 : 0, transcript: transcript + note, changedFiles };
+      const session = [...history, { role: 'user', content: prompt }, { role: 'assistant', content }];
+      return { exitStatus: rejected.length ? 1 : 0, transcript: transcript + note, changedFiles, ...(tracking ? { session } : {}) };
     },
   };
 }

@@ -1,9 +1,15 @@
+import { randomUUID } from 'node:crypto';
 import { runProcessAgent } from './process.js';
 
-// Arguments for a non-interactive Copilot CLI run.
-export function buildCopilotArgs({ prompt, model }) {
+// Arguments for a non-interactive Copilot CLI run. `sessionId` (set by the caller once it opts
+// into session tracking, see createCopilotAdapter below) both starts and resumes a conversation:
+// `--session-id` creates a new session the first time it is used, and continues it on every later
+// call with the same id.
+/** @param {{ prompt: string, model?: string, sessionId?: string }} args */
+export function buildCopilotArgs({ prompt, model, sessionId }) {
   const args = ['-p', prompt, '--output-format', 'json', '--allow-all', '--no-ask-user'];
   if (model) args.push('--model', model);
+  if (sessionId) args.push('--session-id', sessionId);
   return args;
 }
 
@@ -54,13 +60,19 @@ export function dropEphemeralEvents(sink) {
   };
 }
 
-// Adapter driving the Copilot CLI in non-interactive mode.
+// Adapter driving the Copilot CLI in non-interactive mode. Session tracking is opt-in: a caller
+// that never passes `session` gets the old stateless behaviour unchanged (no `--session-id` flag
+// at all). A caller that passes `session` (undefined on its first call, then whatever this run
+// returned) gets a real, resumed Copilot CLI conversation across calls.
 export function createCopilotAdapter(opts = {}) {
   const command = opts.command ?? 'copilot';
   const prefix = opts.prefixArgs ?? [];
   return {
-    async run({ prompt, cwd, limits, onOutput = undefined }) {
-      const args = [...prefix, ...buildCopilotArgs({ prompt, model: opts.model })];
+    async run(req) {
+      const { prompt, cwd, limits, onOutput = undefined } = req;
+      const tracking = Object.hasOwn(req, 'session');
+      const sessionId = tracking ? req.session || randomUUID() : undefined;
+      const args = [...prefix, ...buildCopilotArgs({ prompt, model: opts.model, sessionId })];
       const live = dropEphemeralEvents(onOutput);
       const { code, stdout, stderr, timedOut, changedFiles } = await runProcessAgent({
         command,
@@ -74,7 +86,7 @@ export function createCopilotAdapter(opts = {}) {
       const parsed = parseCopilotOutput(stdout);
       const exitStatus = timedOut ? 124 : code;
       const transcript = stderr ? `${parsed.transcript}\n[stderr]\n${stderr}` : parsed.transcript;
-      return { exitStatus, transcript, changedFiles };
+      return { exitStatus, transcript, changedFiles, ...(tracking ? { session: sessionId } : {}) };
     },
   };
 }

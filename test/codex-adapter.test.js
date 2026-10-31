@@ -29,6 +29,12 @@ test('buildCodexArgs is non-interactive exec with JSONL, model and prompt last',
   assert.equal(a.at(-1), 'do it');
 });
 
+test('buildCodexArgs resumes a session instead of starting a new one, when given a resumeId', () => {
+  const a = buildCodexArgs({ prompt: 'do it', resumeId: 't1' });
+  assert.deepEqual(a.slice(0, 3), ['exec', 'resume', 't1']);
+  assert.equal(a.at(-1), 'do it');
+});
+
 test('parseCodexOutput joins agent messages and ignores turn usage', () => {
   const out = [
     { type: 'thread.started', thread_id: 't' },
@@ -45,6 +51,36 @@ test('parseCodexOutput joins agent messages and ignores turn usage', () => {
 
 test('parseCodexOutput tolerates junk lines', () => {
   assert.equal(parseCodexOutput('not json').transcript, 'not json');
+});
+
+test('parseCodexOutput extracts the session id a later call can resume with', () => {
+  const out = [{ type: 'thread.started', thread_id: 'abc' }, { type: 'item.completed', item: { type: 'agent_message', text: 'hi' } }]
+    .map((e) => JSON.stringify(e))
+    .join('\n');
+  assert.equal(parseCodexOutput(out).threadId, 'abc');
+});
+
+test('a caller that never passes session gets no session back (unchanged behaviour)', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cx-'));
+  try {
+    const r = await make({ exitStatus: 0, transcript: 'ok', writes: {} }).run({ prompt: 'p', cwd, limits: {} });
+    assert.equal('session' in r, false);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('a caller opting into session tracking gets the thread id codex assigned, then resumes it', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cx-'));
+  try {
+    const adapter = make({ exitStatus: 0, transcript: 'ok', writes: {} });
+    const first = await adapter.run({ prompt: 'p', cwd, limits: {}, session: undefined });
+    assert.equal(first.session, 't1'); // fake-codex.js always emits thread_id "t1"
+    const second = await adapter.run({ prompt: 'p2', cwd, limits: {}, session: first.session });
+    assert.equal(second.session, 't1');
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
 });
 
 

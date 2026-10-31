@@ -180,7 +180,7 @@ test('hodgepodge ready reports gaps then ready', async () => {
   assert.equal(ok.out, 'ready: yes\n');
 });
 
-test('hodge on a fresh project seeds interview.md, then the no-agent Interview Loop asks its first question from stdin', async () => {
+test('hodge on a fresh project seeds interview.md, then the Interview Loop asks its first question from stdin and hands the round to the agent', async () => {
   const { repo } = sandbox();
   // first run only seeds .hodgepodge/interview.md from the template
   let seed = '';
@@ -190,9 +190,11 @@ test('hodge on a fresh project seeds interview.md, then the no-agent Interview L
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'seed interview store');
   let out = '';
+  /** @type {string[]} */
+  const prompts = [];
   const code = await withCwd(repo, () =>
     main(['hodge'], {
-      registry: { 'agent-x': () => ({ run: async () => { throw new Error('the Interview Loop must never call an agent'); } }) },
+      registry: { 'agent-x': () => ({ run: async (req) => { prompts.push(req.prompt); return { exitStatus: 0, transcript: '', changedFiles: [] }; } }) },
       input: Readable.from(['\n']),
       stdout: (s) => (out += s),
       stderr: () => {},
@@ -201,8 +203,10 @@ test('hodge on a fresh project seeds interview.md, then the no-agent Interview L
   assert.equal(code, 0, out);
   assert.match(out, /Describe the objective in a sentence\./);
   assert.match(out, /Interview complete: 1 question answered this run\./);
+  assert.equal(prompts.length, 1, 'the one question answered this run was handed to the agent');
   const afterLoop = readFileSync(join(repo, '.hodgepodge', 'interview.md'), 'utf8');
   assert.match(afterLoop, /\[x\] A: *$/m, 'Enter alone accepted the empty default and marked the A box');
+  assert.match(afterLoop, /\[x\] Q: /m, 'ticked once handed to the agent');
 });
 
 test('objective seed package.json has a test script so the tests gate can run', () => {

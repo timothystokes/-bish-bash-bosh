@@ -70,6 +70,39 @@ test('registered in defaultRegistry as claude-code', () => {
   assert.equal(typeof defaultRegistry['claude-code'], 'function');
 });
 
+test('buildClaudeArgs starts a new session with --session-id, and resumes one with --resume', () => {
+  const started = buildClaudeArgs({ prompt: 'p', sessionId: 's1' });
+  assert.equal(started[started.indexOf('--session-id') + 1], 's1');
+  assert.ok(!started.includes('--resume'));
+  const resumed = buildClaudeArgs({ prompt: 'p', sessionId: 's1', resume: true });
+  assert.equal(resumed[resumed.indexOf('--resume') + 1], 's1');
+  assert.ok(!resumed.includes('--session-id'));
+});
+
+test('a caller that never passes session gets no session flag and no session back (unchanged behaviour)', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cc-'));
+  try {
+    const adapter = make({ exitStatus: 0, transcript: 'ok', writes: {} });
+    const r = await adapter.run({ prompt: 'p', cwd, limits: {} });
+    assert.equal('session' in r, false);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('a caller opting into session tracking gets a generated session id back, then resumes it', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cc-'));
+  try {
+    const adapter = make({ exitStatus: 0, transcript: 'ok', writes: {} });
+    const first = await adapter.run({ prompt: 'p', cwd, limits: {}, session: undefined });
+    assert.match(first.session, /^[0-9a-f-]{36}$/);
+    const second = await adapter.run({ prompt: 'p2', cwd, limits: {}, session: first.session });
+    assert.equal(second.session, first.session);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test('parses real claude 2.1.310 error result (not logged in): transcript kept', () => {
   const real = JSON.stringify({ type: 'result', subtype: 'success', is_error: true, result: 'Not logged in · Please run /login', total_cost_usd: 0, usage: { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } });
   assert.deepEqual(parseClaudeOutput(real), { transcript: 'Not logged in · Please run /login' });

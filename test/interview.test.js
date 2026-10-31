@@ -145,9 +145,11 @@ test('gates: empty objective, dirty tree, harness repo, missing role make no age
   assert.equal(a.prompts.length, 0);
 });
 
-test('hodge on a fresh repo first seeds the interview store from its template; once committed, the no-agent Interview Loop asks each unanswered question until it pauses or completes', async () => {
+test('hodge on a fresh repo first seeds the interview store from its template; once committed, the Interview Loop asks each unanswered question, hands each round to the agent, and ticks both checkboxes until it pauses or completes', async () => {
   const dir = makeRepo();
   commitProjectConfig(dir, config({ adapter: 'iv' }));
+  const a = agent({});
+  const registry = { iv: () => a.adapter };
   const out = /** @type {string[]} */ ([]);
   // the very first run only seeds the store from the template: no agent call, no run folder
   const seedCode = await withCwd(dir, () =>
@@ -174,21 +176,26 @@ test('hodge on a fresh repo first seeds the interview store from its template; o
   git(dir, 'commit', '-qm', 'seed interview store');
   out.length = 0;
   const paused = await withCwd(dir, () =>
-    main(['hodge'], { registry: {}, identity, input: Readable.from(['Build a greeter\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
+    main(['hodge'], { registry, identity, input: Readable.from(['Build a greeter\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
   assert.equal(paused, 1, 'paused at EOF, not ok');
   assert.match(out.join(''), /Describe the objective in a sentence\./);
   assert.match(out.join(''), /Paused after 1 question: 1 question left\. Run `hodge` again to continue\./);
+  assert.equal(a.prompts.length, 1, 'one agent round for the one question answered before EOF');
+  assert.match(a.prompts[0], /## Question\n\nDescribe the objective in a sentence\.\n\n## Answer\n\nBuild a greeter/);
   const afterFirst = readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8');
+  assert.match(afterFirst, /\[x\] Q: Describe the objective in a sentence\./, 'ticked once handed to the agent');
   assert.match(afterFirst, /\[x\] A: Build a greeter/);
   assert.match(afterFirst, /\[ \] A: Developers/, 'the second question is untouched, not yet asked');
   out.length = 0;
   const done = await withCwd(dir, () =>
-    main(['hodge'], { registry: {}, identity, input: Readable.from(['\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
+    main(['hodge'], { registry, identity, input: Readable.from(['\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
   assert.equal(done, 0);
   assert.match(out.join(''), /Who uses the greeter\?/);
   assert.match(out.join(''), /Interview complete: 1 question answered this run\./);
+  assert.equal(a.prompts.length, 2, 'the second run handed its round to the agent too');
   const afterSecond = readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8');
   assert.match(afterSecond, /\[x\] A: Developers/, 'Enter alone accepted the pre-filled default');
+  assert.match(afterSecond, /\[x\] Q: Who uses the greeter\?/, 'ticked once handed to the agent');
   assert.equal(readFileSync(join(dir, 'README.md'), 'utf8'), '# target\n');
 });
 

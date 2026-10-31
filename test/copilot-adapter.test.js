@@ -27,6 +27,35 @@ test('buildCopilotArgs is non-interactive and passes model', () => {
   assert.ok(a.includes('--no-ask-user'));
 });
 
+test('buildCopilotArgs passes --session-id only when given one', () => {
+  assert.ok(!buildCopilotArgs({ prompt: 'p' }).includes('--session-id'));
+  const a = buildCopilotArgs({ prompt: 'p', sessionId: 's1' });
+  assert.equal(a[a.indexOf('--session-id') + 1], 's1');
+});
+
+test('a caller that never passes session gets no session flag and no session back (unchanged behaviour)', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cop-'));
+  try {
+    const r = await make({ exitStatus: 0, transcript: 'ok', writes: {} }).run({ prompt: 'p', cwd, limits: {} });
+    assert.equal('session' in r, false);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('a caller opting into session tracking gets a generated session id back, then resumes it', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cop-'));
+  try {
+    const adapter = make({ exitStatus: 0, transcript: 'ok', writes: {} });
+    const first = await adapter.run({ prompt: 'p', cwd, limits: {}, session: undefined });
+    assert.match(first.session, /^[0-9a-f-]{36}$/);
+    const second = await adapter.run({ prompt: 'p2', cwd, limits: {}, session: first.session });
+    assert.equal(second.session, first.session);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test('parseCopilotOutput joins assistant messages, keeps junk lines and ignores usage events', () => {
   const out = [
     'not json',

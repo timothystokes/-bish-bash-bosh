@@ -132,3 +132,48 @@ test('unreachable server yields exit 127, not a throw', async () => {
 test('registered in defaultRegistry as openai-http', () => {
   assert.equal(typeof defaultRegistry['openai-http'], 'function');
 });
+
+test('a caller that never passes session gets a single user turn and no session back (unchanged behaviour)', async () => {
+  /** @type {any} */
+  let seen;
+  const s = await startServer((r) => {
+    seen = r;
+    return { json: completion('ok') };
+  });
+  const cwd = mkdtempSync(join(tmpdir(), 'hodge-http-'));
+  try {
+    const r = await createOpenAiHttpAdapter({ model: 'm', baseUrl: s.baseUrl }).run({ prompt: 'hi', cwd, limits: {} });
+    assert.equal('session' in r, false);
+    assert.deepEqual(seen.body.messages.slice(1), [{ role: 'user', content: 'hi' }]);
+  } finally {
+    s.close();
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('a caller opting into session tracking gets prior turns resent as message history', async () => {
+  /** @type {any} */
+  let seen;
+  const s = await startServer((r) => {
+    seen = r;
+    return { json: completion('second reply') };
+  });
+  const cwd = mkdtempSync(join(tmpdir(), 'hodge-http-'));
+  try {
+    const adapter = createOpenAiHttpAdapter({ model: 'm', baseUrl: s.baseUrl });
+    const first = await adapter.run({ prompt: 'first', cwd, limits: {}, session: undefined });
+    assert.deepEqual(first.session, [
+      { role: 'user', content: 'first' },
+      { role: 'assistant', content: 'second reply' },
+    ]);
+    await adapter.run({ prompt: 'second', cwd, limits: {}, session: first.session });
+    assert.deepEqual(seen.body.messages.slice(1), [
+      { role: 'user', content: 'first' },
+      { role: 'assistant', content: 'second reply' },
+      { role: 'user', content: 'second' },
+    ]);
+  } finally {
+    s.close();
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});

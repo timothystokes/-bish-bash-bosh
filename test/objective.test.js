@@ -265,7 +265,7 @@ test('a resumed conversation reaches ready without saying "done" again, once no 
   assert.doesNotMatch(a.prompts[2], /## Readiness gaps/, 'closing is not remembered across the resume, only re-derived once no question is left');
 });
 
-test('hodge drives the no-agent Interview Loop from stdin, operating on cwd', async () => {
+test('hodge drives the Interview Loop from stdin, operating on cwd, and hands each answered round to the agent', async () => {
   const dir = freshDir('obj-');
   seedObjectiveProject(dir);
   writeProjectConfig(dir, buildConfig);
@@ -284,12 +284,14 @@ test('hodge drives the no-agent Interview Loop from stdin, operating on cwd', as
   git(dir, 'commit', '-q', '-m', 'seed interview store');
   /** @type {string[]} */
   const outs = [];
+  /** @type {string[]} */
+  const prompts = [];
   const code = await withCwd(dir, () =>
     main(['hodge'], {
       stdout: (s) => outs.push(s),
       stderr: (s) => outs.push(s),
       input: Readable.from(['A greeter\n', 'Developers\n']),
-      registry: { a: () => ({ run: async () => { throw new Error('the Interview Loop must never call an agent'); } }) },
+      registry: { a: () => ({ run: async (req) => { prompts.push(req.prompt); return { exitStatus: 0, transcript: '', changedFiles: [] }; } }) },
       identity,
     }),
   );
@@ -298,6 +300,9 @@ test('hodge drives the no-agent Interview Loop from stdin, operating on cwd', as
   assert.match(text, /Describe the objective in a sentence\./);
   assert.match(text, /Who uses the greeter\?/);
   assert.match(text, /Interview complete: 2 questions answered this run\./);
+  assert.equal(prompts.length, 2, 'both answered rounds were handed to the agent');
+  const afterLoop = readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8');
+  assert.match(afterLoop, /\[x\] Q: Who uses the greeter\?/, 'both rounds ticked once handed to the agent');
 });
 
 test('code owns the store: agent edits to .hodgepodge/interview.md are discarded', async () => {
