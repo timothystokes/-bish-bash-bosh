@@ -205,7 +205,7 @@ test('hodge on a fresh project seeds interview.md, then the Interview Loop asks 
   assert.match(out, /Interview complete: 1 question answered this run\./);
   assert.equal(prompts.length, 1, 'the one question answered this run was handed to the agent');
   const afterLoop = readFileSync(join(repo, '.hodgepodge', 'interview.md'), 'utf8');
-  assert.match(afterLoop, /1\. \[x\] Q: What is the objective\? A: Default answer\./m, 'Enter alone accepted the pre-filled default, and the line is checked once handed to and processed by the agent');
+  assert.match(afterLoop, /1\. \[x\] Q: What is the objective\? A: Unknown\./m, 'Enter alone accepted the pre-filled default, and the line is checked once handed to and processed by the agent');
 });
 
 test('objective seed package.json has a test script so the tests gate can run', () => {

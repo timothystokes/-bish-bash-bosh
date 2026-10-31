@@ -38,7 +38,7 @@ export function nextQuestion(questions) {
 }
 
 // The agent's prompt for one round: prompts/interview-loop.md's instructions, prefaced onto this
-// round's question and answer. The agent is expected to update .hodgepodge/spec.md and, if it
+// round's question and answer. The agent is expected to update .hodgepodge/specification.md and, if it
 // judges the spec still incomplete, append further question lines to interview.md itself.
 export function buildInterviewLoopPrompt(question, answer) {
   return [loadModePrompt('interview'), '## Question', question, '## Answer', answer].join('\n\n');

@@ -160,11 +160,11 @@ test('hodge on a fresh repo first seeds the interview store from its template; o
     readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8'),
     readFileSync(join(process.cwd(), 'templates', 'interview-template.md'), 'utf8'),
   );
-  assert.match(out.join(''), /Wrote \.hodgepodge\/interview\.md and \.hodgepodge\/spec\.md from their templates/);
-  assert.ok(existsSync(join(dir, '.hodgepodge', 'spec.md')), 'spec seeded from the template');
+  assert.match(out.join(''), /Wrote \.hodgepodge\/interview\.md and \.hodgepodge\/specification\.md from their templates/);
+  assert.ok(existsSync(join(dir, '.hodgepodge', 'specification.md')), 'spec seeded from the template');
   assert.equal(
-    readFileSync(join(dir, '.hodgepodge', 'spec.md'), 'utf8'),
-    readFileSync(join(process.cwd(), 'templates', 'spec-template.md'), 'utf8'),
+    readFileSync(join(dir, '.hodgepodge', 'specification.md'), 'utf8'),
+    readFileSync(join(process.cwd(), 'templates', 'specification-template.md'), 'utf8'),
   );
   assert.ok(!existsSync(join(dir, '.hodgepodge', 'runs')), 'no run folder on the seed-only run');
   // a second, custom question with a pre-filled default so the loop's resume/default behaviour can be exercised
