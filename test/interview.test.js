@@ -145,10 +145,7 @@ test('gates: empty objective, dirty tree, harness repo, missing role make no age
   assert.equal(a.prompts.length, 0);
 });
 
-const gaps = (/** @type {number[]} */ resolved, /** @type {string} */ question) =>
-  JSON.stringify({ resolved: resolved.map((id) => ({ id, spec: 'specs/greet.md' })), gaps: [{ topic: 'Greeter', question, default: 'Yes' }] });
-
-test('hodge on a fresh repo first seeds the interview store from its template; once committed, it keeps asking until ready', async () => {
+test('hodge on a fresh repo first seeds the interview store from its template; once committed, the no-agent Interview Loop asks each unanswered question until it pauses or completes', async () => {
   const dir = makeRepo();
   commitProjectConfig(dir, config({ adapter: 'iv' }));
   const out = /** @type {string[]} */ ([]);
@@ -168,36 +165,30 @@ test('hodge on a fresh repo first seeds the interview store from its template; o
     readFileSync(join(process.cwd(), 'templates', 'spec-template.md'), 'utf8'),
   );
   assert.ok(!existsSync(join(dir, '.hodgepodge', 'runs')), 'no run folder on the seed-only run');
+  // a second, custom question with a pre-filled default so the loop's resume/default behaviour can be exercised
+  writeFileSync(
+    join(dir, '.hodgepodge', 'interview.md'),
+    `${readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8')}\n# 2\n[ ] Q: Who uses the greeter?\n[ ] A: Developers\n`,
+  );
   git(dir, 'add', '-A');
   git(dir, 'commit', '-qm', 'seed interview store');
   out.length = 0;
-  /** @type {Record<string, string>[]} */
-  const rounds = [
-    { '.hodgepodge/response.json': gaps([], 'Who uses the greeter?') },
-    { '.hodgepodge/response.json': gaps([2], 'Should names be trimmed?'), '.hodgepodge/notes.md': 'n\n' },
-    { '.hodgepodge/response.json': gaps([3], 'Anything out of scope?'), '.hodgepodge/notes.md': 'm\n' },
-  ];
-  const prompts = /** @type {string[]} */ ([]);
-  let n = 0;
-  const adapter = {
-    async run(req) {
-      prompts.push(req.prompt);
-      const { createFakeAdapter } = await import('../src/adapter.js');
-      return createFakeAdapter({ exitStatus: 0, transcript: 't', writes: rounds[n++] ?? {} }).run(req);
-    },
-  };
-  const code = await withCwd(dir, () =>
-    main(['hodge'], {
-      registry: { iv: () => adapter },
-      identity,
-      input: Readable.from(['Build a greeter\n', 'ok\n', 'ok\n', '']),
-      stdout: (s) => { out.push(s); }, stderr: () => {},
-    }));
-  assert.equal(code, 1, 'paused at EOF, not ok');
-  assert.ok(n >= 3, `agent ran once per answer, ran ${n} times`);
-  assert.match(out.join(''), /Who uses the greeter\?[\s\S]*Should names be trimmed\?[\s\S]*Anything out of scope\?/);
-  assert.match(prompts[1], /Q2 \[Greeter\] Who uses the greeter\?: Yes/);
-  assert.equal(git(dir, 'status', '--porcelain', '--', '.', ':!.hodgepodge/lock'), '');
+  const paused = await withCwd(dir, () =>
+    main(['hodge'], { registry: {}, identity, input: Readable.from(['Build a greeter\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
+  assert.equal(paused, 1, 'paused at EOF, not ok');
+  assert.match(out.join(''), /Describe the objective in a sentence\./);
+  assert.match(out.join(''), /Paused after 1 question: 1 question left\. Run `hodge` again to continue\./);
+  const afterFirst = readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8');
+  assert.match(afterFirst, /\[x\] A: Build a greeter/);
+  assert.match(afterFirst, /\[ \] A: Developers/, 'the second question is untouched, not yet asked');
+  out.length = 0;
+  const done = await withCwd(dir, () =>
+    main(['hodge'], { registry: {}, identity, input: Readable.from(['\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
+  assert.equal(done, 0);
+  assert.match(out.join(''), /Who uses the greeter\?/);
+  assert.match(out.join(''), /Interview complete: 1 question answered this run\./);
+  const afterSecond = readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8');
+  assert.match(afterSecond, /\[x\] A: Developers/, 'Enter alone accepted the pre-filled default');
   assert.equal(readFileSync(join(dir, 'README.md'), 'utf8'), '# target\n');
 });
 
@@ -213,7 +204,8 @@ test('hodge usage errors exit 2', async () => {
   mkdirSync(join(norole, '.hodgepodge'), { recursive: true });
   writeFileSync(join(norole, '.hodgepodge', 'interview.md'), '# Interview\n');
   err.length = 0;
-  assert.equal(await withCwd(norole, () => main(['hodge'], { registry: { f: () => agent({}).adapter }, stdout: () => {}, stderr: e })), 2);
+  // the Interview Loop itself never resolves an adapter; only --reverse still does
+  assert.equal(await withCwd(norole, () => main(['hodge', '--reverse'], { registry: { f: () => agent({}).adapter }, stdout: () => {}, stderr: e })), 2);
   assert.match(err.join(''), /unknown adapter 'missing'/);
 
   err.length = 0;

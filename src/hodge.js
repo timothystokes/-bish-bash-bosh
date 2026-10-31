@@ -3,10 +3,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveAdapter, defaultRegistry } from './adapters/index.js';
 import { acquireRunLock } from './run-lock.js';
-import { runObjective } from './hodge-objective.js';
+import { runInterviewLoop } from './hodge-interview-loop.js';
 import { runReverse } from './hodge-reverse.js';
 import { debugAdapter, createAsker, parseRunArgs, loadRunProject } from './cli-lib.js';
-import { formatObjectiveResult, formatReverseResult } from './cli-format.js';
+import { formatInterviewLoopResult, formatReverseResult } from './cli-format.js';
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 const INTERVIEW_FILE = '.hodgepodge/interview.md';
@@ -32,6 +32,11 @@ export async function runHodge(argv, deps, out, err) {
     out(`Wrote ${INTERVIEW_FILE} and ${SPEC_FILE} from their templates.\nRun \`hodge\` again to start the interview.\n`);
     return 0;
   }
+  // A restart after the first run: both files should already exist; self-heal spec.md alone if it
+  // was somehow lost, rather than failing a run the owner can otherwise just continue.
+  if (!reverse && !existsSync(join(repo, SPEC_FILE))) {
+    writeFileSync(join(repo, SPEC_FILE), readFileSync(join(templatesDir, 'spec-template.md'), 'utf8'));
+  }
   const lock = acquireRunLock(project.dir);
   if (!lock.ok) {
     err(`${label}: ${lock.error}\n`);
@@ -39,37 +44,25 @@ export async function runHodge(argv, deps, out, err) {
   }
   try {
     const label = reverse ? 'reverse' : 'interview';
-    const adapter = debugAdapter(resolveAdapter(config, deps.registry ?? defaultRegistry), label, debug, out);
     if (!reverse) {
-      // The agent runs silently for minutes; say so, or a submitted answer looks like a dead prompt.
-      const inner = adapter;
-      const announced = {
-        run: async (req) => {
-          err('\nThinking...\n');
-          const res = await inner.run(req);
-          err('Agent finished; checking its work.\n');
-          return res;
-        },
-      };
+      // The Interview Loop is pure code: no agent, no adapter, just a checkbox walk over interview.md.
       const input = deps.input ?? process.stdin;
       const { ask, close } = createAsker(input, out);
       try {
-        const res = await runObjective({
-          config,
-          repoDir: repo,
-          runId: parsed.runId,
-          adapter: announced,
+        const res = await runInterviewLoop({
+          interviewPath: join(repo, INTERVIEW_FILE),
+          readFile: (p) => readFileSync(p, 'utf8'),
+          writeFile: (p, s) => writeFileSync(p, s),
           ask,
           say: out,
-          inboxDir: project.dir,
-          identity: deps.identity,
         });
-        out(formatObjectiveResult(res));
+        out(formatInterviewLoopResult(res));
         return res.status === 'ok' ? 0 : 1;
       } finally {
         close();
       }
     }
+    const adapter = debugAdapter(resolveAdapter(config, deps.registry ?? defaultRegistry), label, debug, out);
     const res = await runReverse({
       config,
       repoDir: repo,

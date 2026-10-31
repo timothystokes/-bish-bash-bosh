@@ -265,7 +265,7 @@ test('a resumed conversation reaches ready without saying "done" again, once no 
   assert.doesNotMatch(a.prompts[2], /## Readiness gaps/, 'closing is not remembered across the resume, only re-derived once no question is left');
 });
 
-test('hodge drives the conversation from stdin, operating on cwd', async () => {
+test('hodge drives the no-agent Interview Loop from stdin, operating on cwd', async () => {
   const dir = freshDir('obj-');
   seedObjectiveProject(dir);
   writeProjectConfig(dir, buildConfig);
@@ -276,25 +276,28 @@ test('hodge drives the conversation from stdin, operating on cwd', async () => {
   const seedCode = await withCwd(dir, () =>
     main(['hodge'], { stdout: (s) => seedOuts.push(s), stderr: (s) => seedOuts.push(s), registry: {}, identity }));
   assert.equal(seedCode, 0, seedOuts.join(''));
+  writeFileSync(
+    join(dir, '.hodgepodge', 'interview.md'),
+    `${readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8')}\n# 2\n[ ] Q: Who uses the greeter?\n[ ] A:\n`,
+  );
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', 'seed interview store');
-  const a = scripted(fullRounds);
   /** @type {string[]} */
   const outs = [];
   const code = await withCwd(dir, () =>
     main(['hodge'], {
       stdout: (s) => outs.push(s),
       stderr: (s) => outs.push(s),
-      input: Readable.from(['A greeter\n2: Developers\nok\n3: Yes\nok\n']),
-      registry: { a: () => a.adapter },
+      input: Readable.from(['A greeter\n', 'Developers\n']),
+      registry: { a: () => ({ run: async () => { throw new Error('the Interview Loop must never call an agent'); } }) },
       identity,
     }),
   );
   const text = outs.join('');
   assert.equal(code, 0, text);
-  assert.match(text, /Describe the objective/);
+  assert.match(text, /Describe the objective in a sentence\./);
   assert.match(text, /Who uses the greeter\?/);
-  assert.match(text, /Interview complete/);
+  assert.match(text, /Interview complete: 2 questions answered this run\./);
 });
 
 test('code owns the store: agent edits to .hodgepodge/interview.md are discarded', async () => {

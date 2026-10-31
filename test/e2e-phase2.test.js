@@ -77,21 +77,24 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
   };
   const build = scripted(buildFixture)();
   const plan = scripted({ ...buildFixture, transcript: 'planned', writes: planWrites })();
-  const interview = scripted(interviewFixture)();
-  // a single adapter instance that dispatches by prompt: interview, then plan step, then build
-  const agent = { run: (req) => (req.prompt.includes('## Objective') ? interview : req.prompt.startsWith('You are the plan step') ? plan : build).run(req) };
+  // a single adapter instance that dispatches by prompt: plan step, then build (no agent runs the interview any more)
+  const agent = { run: (req) => (req.prompt.startsWith('You are the plan step') ? plan : build).run(req) };
   const registry = { agent: () => agent };
 
-  // 1. interview: specs only (no tests, no test plan); structure lint passes
+  // 1. interview: seed interview.md, commit, then the no-agent Interview Loop answers the one question. The
+  // spec itself comes from writing it directly here, standing in for a not-yet-built spec-drafting step.
   commitProjectConfig(dir, config);
-  // first run only seeds .hodgepodge/interview.md from the template; commit it, then run for real
   const seed = await withCwd(dir, () => hodge(['hodge', '--run-id', 'p2'], {}));
   assert.equal(seed.code, 0, seed.text);
   git(dir, 'add', '-A');
   git(dir, 'commit', '-qm', 'seed interview store');
-  const iv = await withCwd(dir, () => hodge(['hodge', '--run-id', 'p2'], registry, Readable.from(['add two numbers\n'])));
+  const iv = await withCwd(dir, () => hodge(['hodge', '--run-id', 'p2'], {}, Readable.from(['add two numbers\n'])));
   assert.match(iv.text, /Interview complete/, iv.text);
   assert.equal(iv.code, 0);
+  mkdirSync(join(dir, 'specs'), { recursive: true });
+  writeFileSync(join(dir, 'specs', 'add.md'), interviewFixture.writes['specs/add.md']);
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-qm', 'spec');
   assert.ok(existsSync(join(dir, 'specs', 'add.md')));
   assert.equal(existsSync(join(dir, 'tests')), false, 'tests come from the plan step');
   assert.equal(git(dir, 'status', '--porcelain'), '');

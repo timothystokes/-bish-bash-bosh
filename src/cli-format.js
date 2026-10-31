@@ -7,11 +7,11 @@ const short = (sha) => (sha ? sha.slice(0, 7) : sha);
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const bullets = (items) => items.map((i) => `  - ${i}`).join('\n');
 
-// `hodge`'s interview (runObjective): {status, rounds, reason?}.
-export function formatObjectiveResult(res) {
-  const { status, rounds, reason } = res;
-  if (status === 'ok') return `Interview complete after ${plural(rounds, 'round')}.\n`;
-  return `Interview ${status} after ${plural(rounds, 'round')}${reason ? `: ${reason}` : ''}.\n`;
+// `hodge`'s Interview Loop (runInterviewLoop): {status, answered, remaining?}.
+export function formatInterviewLoopResult(res) {
+  const { status, answered } = res;
+  if (status === 'ok') return `Interview complete: ${plural(answered, 'question')} answered this run.\n`;
+  return `Paused after ${plural(answered, 'question')}: ${plural(res.remaining, 'question')} left. Run \`hodge\` again to continue.\n`;
 }
 
 // `hodge --reverse` (runReverse): {status, sha, reason?}.
