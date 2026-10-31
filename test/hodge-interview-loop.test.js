@@ -25,6 +25,13 @@ test('parseQuestions reads each numbered `N. [ ] Q: ... A: ...` line, including 
   assert.equal(qs[2].checked, true);
 });
 
+test('parseQuestions tolerates a parenthetical remark before the `A:` label (e.g. an agent writing "A (default):" instead of "A:")', () => {
+  const qs = parseQuestions('4. [ ] Q: What is in scope? A (default): Unknown; clarify before implementation.');
+  assert.equal(qs.length, 1, 'the line is still recognised as a question, not silently dropped');
+  assert.equal(qs[0].question, 'What is in scope?');
+  assert.equal(qs[0].answer, 'Unknown; clarify before implementation.');
+});
+
 test('nextQuestion is the first line not yet checked, skipping already-processed ones', () => {
   assert.equal(nextQuestion(parseQuestions(sample))?.id, 1);
   assert.equal(nextQuestion(parseQuestions(sample.replace('1. [ ] Q: Describe the objective in a sentence. A: ', '1. [x] Q: Describe the objective in a sentence. A: x'))).id, 2);
@@ -112,9 +119,9 @@ test('the question and the prompt are shown in color, distinguishing Q from A, w
   const ask = async (p, d) => { prompts.push(p); defaults.push(d); return 'x'; };
   await runInterviewLoop({ interviewPath, ...io(), ask, say: (s) => said.push(s), adapter: fakeAdapter(), repoDir: dir, ...sessionStore() });
   assert.match(said[0], /\x1b\[1;36mQ: Describe the objective in a sentence\.\x1b\[0m/);
-  assert.match(prompts[0], /^\x1b\[33mA: $/, 'no trailing reset: the prompt stays "active" so a pre-filled default and anything typed after it inherit the same color');
+  assert.match(prompts[0], /^\x1b\[33mA:  $/, 'no trailing reset: the prompt stays "active" so a pre-filled default and anything typed after it inherit the same color; two trailing spaces so the cursor/answer sits one column clear of the colon, not immediately after it');
   assert.equal(defaults[0], '', 'no existing default for the first question');
-  assert.match(prompts[1], /^\x1b\[33mA: $/);
+  assert.match(prompts[1], /^\x1b\[33mA:  $/);
   assert.equal(defaults[1], 'pre-filled default', 'the second question\'s existing default is handed to ask, not baked into the prompt text');
   assert.equal(said[1], '\x1b[0m', 'color is reset right after each answer, so later output is not left yellow');
   assert.match(said[2], /^\x1b\[90mThinking\.\.\.\x1b\[0m\n$/, 'a "Thinking..." line, shown dim/grey, on its own line, right before the agent is called');

@@ -10,11 +10,14 @@ const YELLOW = '\x1b[33m';
 const GREY = '\x1b[90m';
 const RESET = '\x1b[0m';
 
-const LINE = /^(\d+)\.\s*\[([ x])\]\s*Q:\s*(.*?)\s*A:\s*(.*)$/;
+const LINE = /^(\d+)\.\s*\[([ x])\]\s*Q:\s*(.*?)\s*A\s*(?:\([^)]*\))?:\s*(.*)$/;
 
 // Parses the numbered question lines out of an interview.md's text. Returns one entry per
 // well-formed `<n>. [ ] Q: <question> A: <answer>` line, with its line index so the loop can
-// rewrite it in place.
+// rewrite it in place. Tolerates a parenthetical remark between `A` and `:` (e.g. an agent
+// writing `A (default):` instead of the canonical `A:`), so a line is never silently dropped
+// over a label the agent phrased slightly differently; it's rewritten to the canonical form
+// (see renderLine) the next time that line is written back.
 export function parseQuestions(text) {
   const lines = text.split('\n');
   const out = [];
@@ -103,7 +106,7 @@ export async function runInterviewLoop({
     const next = nextQuestion(questions);
     if (!next) return { status: 'ok', answered };
     say(`\n${CYAN}Q: ${next.question}${RESET}\n`);
-    const reply = await ask(`${YELLOW}A: `, next.answer);
+    const reply = await ask(`${YELLOW}A:  `, next.answer);
     say(RESET);
     if (reply === null) {
       const remaining = parseQuestions(readFile(interviewPath)).filter((q) => !q.checked).length;
