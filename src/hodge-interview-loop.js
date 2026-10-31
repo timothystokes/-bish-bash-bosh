@@ -62,9 +62,9 @@ function markAsked(interviewPath, readFile, writeFile, id) {
 }
 
 // Runs the loop against `interview.md` in `repoDir`: finds the next unanswered question, shows it
-// in color, awaits an answer on stdin (a real terminal pre-fills the existing default right onto
-// the `A: ` line, editable like anything typed; Enter alone accepts it as-is, and Backspace/Delete
-// erase it character by character, leaving `A: ` ready for a fresh answer), writes the answer back
+// in color, awaits an answer on stdin (a real terminal shows the existing default in grey, ahead of
+// the cursor; Enter alone accepts it as-is, any other key clears the whole thing in one go and starts
+// a fresh answer in the same yellow as the `A:` label — see `createAsker`), writes the answer back
 // with its checkbox marked, then hands the question and answer to
 // the agent (one call per round, prompts/interview-loop.md's job) before ticking the `Q` checkbox
 // too. `loadSession`/`saveSession` thread one continuing agent session through every round, and
@@ -102,7 +102,8 @@ export async function runInterviewLoop({
     const next = nextQuestion(questions);
     if (!next) return { status: 'ok', answered };
     say(`\n${CYAN}Q: ${next.question}${RESET}\n`);
-    const reply = await ask(`${YELLOW}A: ${RESET}`, next.answer);
+    const reply = await ask(`${YELLOW}A: `, next.answer);
+    say(RESET);
     if (reply === null) {
       const remaining = parseQuestions(readFile(interviewPath)).filter((q) => !q.qChecked && !q.aChecked).length;
       return { status: 'paused', answered, remaining };

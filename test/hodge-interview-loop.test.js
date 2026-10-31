@@ -112,7 +112,7 @@ test('EOF (null from ask) pauses without marking the current question or calling
   assert.equal(adapter.calls.length, 0);
 });
 
-test('the question and the prompt are shown in color, distinguishing Q from A, with any existing default passed to ask separately (for a real terminal to pre-fill, not printed as bracketed text)', async () => {
+test('the question and the prompt are shown in color, distinguishing Q from A, with any existing default passed to ask separately (for a real terminal to pre-fill in grey, not printed as bracketed text); color is reset once the answer is in', async () => {
   const { path: interviewPath, dir } = makeFile();
   /** @type {string[]} */
   const said = [];
@@ -123,10 +123,11 @@ test('the question and the prompt are shown in color, distinguishing Q from A, w
   const ask = async (p, d) => { prompts.push(p); defaults.push(d); return 'x'; };
   await runInterviewLoop({ interviewPath, ...io(), ask, say: (s) => said.push(s), adapter: fakeAdapter(), repoDir: dir, ...sessionStore() });
   assert.match(said[0], /\x1b\[1;36mQ: Describe the objective in a sentence\.\x1b\[0m/);
-  assert.match(prompts[0], /\x1b\[33mA: \x1b\[0m/);
+  assert.match(prompts[0], /^\x1b\[33mA: $/, 'no trailing reset: the prompt stays "active" so a pre-filled default and anything typed after it inherit the same color');
   assert.equal(defaults[0], '', 'no existing default for the first question');
-  assert.match(prompts[1], /\x1b\[33mA: \x1b\[0m/);
+  assert.match(prompts[1], /^\x1b\[33mA: $/);
   assert.equal(defaults[1], 'pre-filled default', 'the second question\'s existing default is handed to ask, not baked into the prompt text');
+  assert.equal(said[1], '\x1b[0m', 'color is reset right after each answer, so later output is not left yellow');
 });
 
 test('once every question is answered, a further call reports ok with nothing left to ask or hand to the agent', async () => {

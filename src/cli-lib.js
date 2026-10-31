@@ -131,9 +131,15 @@ export function debugAdapter(adapter, label, debug, out) {
 }
 
 // On a real terminal, readline must own the tty (raw mode, \r as Enter); otherwise a previous child
-// process can leave the tty in a state where Enter never submits the line.
-export function readlineOptions(input) {
-  return input.isTTY ? { input, output: process.stdout, terminal: true } : { input };
+// process can leave the tty in a state where Enter never submits the line. `output` defaults to
+// process.stdout but is overridable (tests inject a capturing stream to assert the exact bytes a
+// real terminal would receive).
+/**
+ * @param {NodeJS.ReadableStream & { isTTY?: boolean }} input
+ * @param {NodeJS.WritableStream} [output]
+ */
+export function readlineOptions(input, output = process.stdout) {
+  return input.isTTY ? { input, output, terminal: true } : { input };
 }
 
 // Undo terminal modes a child process may have left on: kitty keyboard protocol, modifyOtherKeys, bracketed paste;
@@ -144,30 +150,67 @@ export function resetTty(input) {
   input.resume();
 }
 
+const GREY = '\x1b[90m';
+
+// The last SGR (color) escape sequence appearing anywhere in `prompt` — i.e. whatever color is
+// still active once the prompt's own text has been printed, so the grey default and the owner's
+// own typing can both be returned to it.
+function lastColor(prompt) {
+  const matches = [...prompt.matchAll(/\x1b\[[0-9;]*m/g)];
+  return matches.length ? matches[matches.length - 1][0] : '';
+}
+
 // A single question/answer reader shared by `hodge`'s interview and `hodgepodge init`'s adapter/model prompts.
 // Piped input must keep one reader (a second one would lose buffered lines); a tty gets a fresh reader
 // per question so tty state left by a child process (cooked mode, keyboard protocols) cannot break Enter.
-// `defaultValue`, if given, is only pre-filled into a real terminal's editable line (`rl.write`, so it
-// behaves exactly as if the owner had typed it: Backspace/Delete erase it character by character, leaving
-// `A: ` ready for a fresh answer); piped input has no such line to edit, so it is ignored there and the
-// existing "Enter alone accepts the default" fallback (in `runInterviewLoop`) is what applies instead.
-export function createAsker(input, out) {
+// On a real terminal, `defaultValue` is shown in grey as a suggestion ahead of the cursor, in the
+// prompt's own color otherwise (so typed text matches it) — not actually in the editable line, since an
+// owner must be able to erase the whole thing in a single Backspace/Delete, not character by character.
+// The first keypress other than Enter clears that suggestion and marks the line "touched"; Enter with
+// no other keypress first submits the suggestion verbatim, exactly as if the owner had typed it. Piped
+// input has no such line to edit, so `defaultValue` is ignored there — the "Enter alone accepts the
+// default" fallback piped callers rely on lives in `runInterviewLoop` instead.
+/**
+ * @param {NodeJS.ReadableStream & { isTTY?: boolean }} input
+ * @param {(s: string) => void} out
+ * @param {NodeJS.WritableStream} [output]
+ */
+export function createAsker(input, out, output = process.stdout) {
   const tty = input.isTTY === true;
   const shared = tty ? undefined : createInterface(readlineOptions(input));
   const sharedLines = shared?.[Symbol.asyncIterator]();
   const ask = async (prompt, defaultValue) => {
-    out(prompt);
     if (sharedLines) {
+      out(prompt);
       const next = await sharedLines.next();
       return next.done ? null : next.value;
     }
     resetTty(input);
-    const rl = createInterface(readlineOptions(input));
-    if (defaultValue) rl.write(defaultValue);
+    const rl = createInterface(readlineOptions(input, output));
+    rl.setPrompt(prompt);
+    rl.prompt();
+    if (!defaultValue) {
+      try {
+        for await (const line of rl) return line;
+        return null;
+      } finally {
+        rl.close();
+      }
+    }
+    let touched = false;
+    output.write(`${GREY}${defaultValue}${lastColor(prompt)}`);
+    output.write(`\x1b[${defaultValue.length}D`);
+    const onKeypress = (_ch, key) => {
+      if (touched || (key && (key.name === 'return' || key.name === 'enter'))) return;
+      touched = true;
+      output.write('\x1b[0K');
+    };
+    input.prependListener('keypress', onKeypress);
     try {
-      for await (const line of rl) return line;
+      for await (const line of rl) return touched ? line : (line === '' ? defaultValue : line);
       return null;
     } finally {
+      input.removeListener('keypress', onKeypress);
       rl.close();
     }
   };

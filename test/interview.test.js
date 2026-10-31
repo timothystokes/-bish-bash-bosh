@@ -1,4 +1,4 @@
-import { Readable } from 'node:stream';
+import { Readable, Writable } from 'node:stream';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -256,40 +256,67 @@ test('readlineOptions: a TTY input gets terminal mode so Enter submits; piped in
   assert.equal(readlineOptions(Readable.from([])).terminal, undefined);
 });
 
-test("createAsker: on a real terminal, a pre-filled default is editable like anything typed — Backspace/Delete erase it, leaving the line ready for a fresh answer", async () => {
+test("createAsker: on a real terminal, a question's existing default is shown as a grey suggestion ahead of the cursor; any key but Enter clears all of it in one go, and typing afterward inherits the prompt's own color", async () => {
   const { createAsker } = await import('../src/cli-lib.js');
+  /** @type {string[]} */
+  let chunks;
+  const freshOutput = () => Object.assign(new Writable({ write(chunk, _enc, cb) { chunks.push(String(chunk)); cb(); } }), { isTTY: true, columns: 80 });
 
-  // Enter alone, default untouched: submits the default verbatim.
+  // Enter alone, default untouched: submits the default verbatim, rendered in grey ahead of the cursor.
   {
+    chunks = [];
     const input = Object.assign(new Readable({ read() {} }), { isTTY: true });
-    const { ask } = createAsker(input, () => {});
-    const reply = ask('A: ', 'Developers');
+    const { ask } = createAsker(input, () => {}, freshOutput());
+    const reply = ask('\x1b[33mA: ', 'Developers');
     await new Promise((r) => setTimeout(r, 20));
+    assert.ok(chunks.some((c) => c.includes('\x1b[90mDevelopers')), 'the default is shown in grey');
+    assert.ok(chunks.some((c) => c.includes('\x1b[10D')), 'the cursor is moved back before the grey suggestion, not left after it');
     input.push('\r');
     assert.equal(await reply, 'Developers');
   }
 
-  // Backspace once per character of the default clears it down to an empty, still-open line.
+  // A single Backspace clears the whole default at once (not character by character), and the "A: "
+  // label's own color is what the (now empty) line is left in, ready for a fresh answer.
   {
+    chunks = [];
     const input = Object.assign(new Readable({ read() {} }), { isTTY: true });
-    const { ask } = createAsker(input, () => {});
-    const reply = ask('A: ', 'Developers');
+    const { ask } = createAsker(input, () => {}, freshOutput());
+    const reply = ask('\x1b[33mA: ', 'Developers');
     await new Promise((r) => setTimeout(r, 20));
-    for (let i = 0; i < 'Developers'.length; i++) input.push('\x7f');
+    chunks = [];
+    input.push('\x7f');
+    await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual(chunks, ['\x1b[0K'], 'one Backspace erases the entire suggestion in a single write, not one character at a time');
     input.push('\r');
-    assert.equal(await reply, '', 'the default is fully erased, not just hidden');
+    assert.equal(await reply, '', 'the default is fully gone, not merely hidden');
   }
 
   // Clearing the default and typing something else submits the new text, not the old default.
   {
+    chunks = [];
     const input = Object.assign(new Readable({ read() {} }), { isTTY: true });
-    const { ask } = createAsker(input, () => {});
-    const reply = ask('A: ', 'Developers');
+    const { ask } = createAsker(input, () => {}, freshOutput());
+    const reply = ask('\x1b[33mA: ', 'Developers');
     await new Promise((r) => setTimeout(r, 20));
-    for (let i = 0; i < 'Developers'.length; i++) input.push('\x7f');
+    input.push('\x7f');
     input.push('Admins');
     input.push('\r');
     assert.equal(await reply, 'Admins');
+  }
+
+  // A key other than Delete/Backspace (e.g. typing straight over the suggestion) clears it the same way.
+  {
+    chunks = [];
+    const input = Object.assign(new Readable({ read() {} }), { isTTY: true });
+    const { ask } = createAsker(input, () => {}, freshOutput());
+    const reply = ask('\x1b[33mA: ', 'Developers');
+    await new Promise((r) => setTimeout(r, 20));
+    chunks = [];
+    input.push('Q');
+    await new Promise((r) => setTimeout(r, 20));
+    assert.ok(chunks.includes('\x1b[0K'), 'the first keypress, even a plain character, clears the suggestion before it is typed over');
+    input.push('\r');
+    assert.equal(await reply, 'Q');
   }
 });
 
