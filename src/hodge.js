@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stringify as stringifyYaml } from 'yaml';
 import { resolveAdapter, defaultRegistry } from './adapters/index.js';
 import { acquireRunLock } from './run-lock.js';
 import { runInterviewLoop } from './hodge-interview-loop.js';
@@ -11,7 +12,6 @@ import { formatInterviewLoopResult, formatReverseResult } from './cli-format.js'
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 const INTERVIEW_FILE = '.hodgepodge/interview.md';
 const SPEC_FILE = '.hodgepodge/spec.md';
-const SESSION_FILE = '.hodgepodge/interview-session.json';
 
 // `hodge`: the interview flow that gathers requirements and writes specs, or (with --reverse)
 // the reverse-engineering flow that writes specs + characterization tests from existing code.
@@ -49,9 +49,8 @@ export async function runHodge(argv, deps, out, err) {
     if (!reverse) {
       // Each round's answer is captured by the deterministic checkbox walk below; the agent only
       // sees one question/answer at a time (prompts/interview-loop.md), with the same session
-      // (persisted to SESSION_FILE) carrying the rest of the conversation's context across rounds
-      // and across separate `hodge` invocations.
-      const sessionPath = join(repo, SESSION_FILE);
+      // (persisted to config.yml's `session` field) carrying the rest of the conversation's
+      // context across rounds and across separate `hodge` invocations.
       const input = deps.input ?? process.stdin;
       const { ask, close } = createAsker(input, out);
       try {
@@ -63,8 +62,11 @@ export async function runHodge(argv, deps, out, err) {
           say: out,
           adapter,
           repoDir: repo,
-          loadSession: () => (existsSync(sessionPath) ? JSON.parse(readFileSync(sessionPath, 'utf8')).session : undefined),
-          saveSession: (session) => writeFileSync(sessionPath, `${JSON.stringify({ session })}\n`),
+          loadSession: () => config.session,
+          saveSession: (session) => {
+            config.session = session;
+            writeFileSync(project.configPath, stringifyYaml(config));
+          },
         });
         out(formatInterviewLoopResult(res));
         return res.status === 'ok' ? 0 : 1;

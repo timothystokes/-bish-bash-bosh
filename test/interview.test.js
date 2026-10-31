@@ -199,6 +199,35 @@ test('hodge on a fresh repo first seeds the interview store from its template; o
   assert.equal(readFileSync(join(dir, 'README.md'), 'utf8'), '# target\n');
 });
 
+test('the agent session is persisted in .hodgepodge/config.yml, not a separate file, and carries across hodge invocations', async () => {
+  const dir = makeRepo();
+  commitProjectConfig(dir, config({ adapter: 'sess' }));
+  writeFileSync(
+    join(dir, '.hodgepodge', 'interview.md'),
+    `${readFileSync(join(process.cwd(), 'templates', 'interview-template.md'), 'utf8')}\n# 2\n[ ] Q: Who uses the greeter?\n[ ] A: Developers\n`,
+  );
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-qm', 'seed interview store');
+  /** @type {object[]} */
+  const seen = [];
+  const sessioned = {
+    run: async (/** @type {any} */ req) => {
+      seen.push(req.session);
+      return { exitStatus: 0, transcript: '', changedFiles: [], session: `s${seen.length}` };
+    },
+  };
+  const registry = { sess: () => sessioned };
+  await withCwd(dir, () => main(['hodge'], { registry, identity, input: Readable.from(['Build a greeter\n']), stdout: () => {}, stderr: () => {} }));
+  assert.equal(seen[0], undefined, 'no session yet on the very first round');
+  let cfg = readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8');
+  assert.match(cfg, /session: s1/);
+  assert.ok(!existsSync(join(dir, '.hodgepodge', 'interview-session.json')), 'no separate session file is written');
+  await withCwd(dir, () => main(['hodge'], { registry, identity, input: Readable.from(['\n']), stdout: () => {}, stderr: () => {} }));
+  assert.equal(seen[1], 's1', 'the second round resumes the session the first round returned');
+  cfg = readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8');
+  assert.match(cfg, /session: s2/);
+});
+
 test('hodge usage errors exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
   const e = (/** @type {string} */ s) => { err.push(s); };
