@@ -10,6 +10,7 @@ import { formatObjectiveResult, formatReverseResult } from './cli-format.js';
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 const INTERVIEW_FILE = '.hodgepodge/interview.md';
+const SPEC_FILE = '.hodgepodge/spec.md';
 
 // `hodge`: the interview flow that gathers requirements and writes specs, or (with --reverse)
 // the reverse-engineering flow that writes specs + characterization tests from existing code.
@@ -23,11 +24,12 @@ export async function runHodge(argv, deps, out, err) {
   const project = loadRunProject(label, err);
   if (!project) return 2;
   const { config, repo } = project;
-  // The very first `hodge` run in a project just seeds the interview store from its template:
-  // no agent call, no lock, no run folder. Later runs (store already present) proceed as usual.
+  // The very first `hodge` run in a project just seeds the interview store and spec file from
+  // their templates: no agent call, no lock, no run folder. Later runs proceed as usual.
   if (!reverse && !existsSync(join(repo, INTERVIEW_FILE))) {
     writeFileSync(join(repo, INTERVIEW_FILE), readFileSync(join(templatesDir, 'interview-template.md'), 'utf8'));
-    out(`Wrote ${INTERVIEW_FILE} from the interview template.\nRun \`hodge\` again to start the interview.\n`);
+    writeFileSync(join(repo, SPEC_FILE), readFileSync(join(templatesDir, 'spec-template.md'), 'utf8'));
+    out(`Wrote ${INTERVIEW_FILE} and ${SPEC_FILE} from their templates.\nRun \`hodge\` again to start the interview.\n`);
     return 0;
   }
   const lock = acquireRunLock(project.dir);
