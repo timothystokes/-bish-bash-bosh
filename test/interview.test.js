@@ -262,7 +262,8 @@ test("createAsker: on a real terminal, a question's existing default is shown as
   let chunks;
   const freshOutput = () => Object.assign(new Writable({ write(chunk, _enc, cb) { chunks.push(String(chunk)); cb(); } }), { isTTY: true, columns: 80 });
 
-  // Enter alone, default untouched: submits the default verbatim, rendered in grey ahead of the cursor.
+  // Enter alone, default untouched: submits the default verbatim, rendered in grey ahead of the cursor,
+  // then recolored to the prompt's own color as it is accepted (so it no longer reads as a suggestion).
   {
     chunks = [];
     const input = Object.assign(new Readable({ read() {} }), { isTTY: true });
@@ -271,7 +272,10 @@ test("createAsker: on a real terminal, a question's existing default is shown as
     await new Promise((r) => setTimeout(r, 20));
     assert.ok(chunks.some((c) => c.includes('\x1b[90mDevelopers')), 'the default is shown in grey');
     assert.ok(chunks.some((c) => c.includes('\x1b[10D')), 'the cursor is moved back before the grey suggestion, not left after it');
+    chunks = [];
     input.push('\r');
+    await new Promise((r) => setTimeout(r, 20));
+    assert.ok(chunks.includes('\x1b[33mDevelopers'), 'accepting via Enter recolors the suggestion to the prompt\'s own color, not left grey');
     assert.equal(await reply, 'Developers');
   }
 

@@ -7,6 +7,7 @@ import { loadModePrompt } from './prompts.js';
 
 const CYAN = '\x1b[1;36m';
 const YELLOW = '\x1b[33m';
+const GREY = '\x1b[90m';
 const RESET = '\x1b[0m';
 
 const BLOCK = /^# (\d+)\s*$/;
@@ -63,9 +64,10 @@ function markAsked(interviewPath, readFile, writeFile, id) {
 
 // Runs the loop against `interview.md` in `repoDir`: finds the next unanswered question, shows it
 // in color, awaits an answer on stdin (a real terminal shows the existing default in grey, ahead of
-// the cursor; Enter alone accepts it as-is, any other key clears the whole thing in one go and starts
-// a fresh answer in the same yellow as the `A:` label — see `createAsker`), writes the answer back
-// with its checkbox marked, then hands the question and answer to
+// the cursor; Enter alone accepts it as-is — turning it yellow to match the `A:` label as it's
+// accepted — any other key clears the whole thing in one go and starts a fresh answer in the same
+// yellow — see `createAsker`), writes the answer back with its checkbox marked, prints a "Thinking..."
+// line, then hands the question and answer to
 // the agent (one call per round, prompts/interview-loop.md's job) before ticking the `Q` checkbox
 // too. `loadSession`/`saveSession` thread one continuing agent session through every round, and
 // across separate `hodge` invocations (the caller persists it, e.g. to a file), so the agent keeps
@@ -113,6 +115,7 @@ export async function runInterviewLoop({
     lines[next.aLineIndex] = `[x] A: ${answer}`;
     writeFile(interviewPath, lines.join('\n'));
 
+    say(`${GREY}Thinking...${RESET}\n`);
     const prompt = buildInterviewLoopPrompt(next.question, answer);
     const result = await adapter.run({ prompt, cwd: repoDir, limits: {}, session: loadSession() });
     saveSession(result.session);

@@ -167,9 +167,10 @@ function lastColor(prompt) {
 // prompt's own color otherwise (so typed text matches it) — not actually in the editable line, since an
 // owner must be able to erase the whole thing in a single Backspace/Delete, not character by character.
 // The first keypress other than Enter clears that suggestion and marks the line "touched"; Enter with
-// no other keypress first submits the suggestion verbatim, exactly as if the owner had typed it. Piped
-// input has no such line to edit, so `defaultValue` is ignored there — the "Enter alone accepts the
-// default" fallback piped callers rely on lives in `runInterviewLoop` instead.
+// no other keypress first submits the suggestion verbatim, exactly as if the owner had typed it —
+// recoloring the grey suggestion to the prompt's own color as it is accepted, so it no longer reads as
+// a mere suggestion. Piped input has no such line to edit, so `defaultValue` is ignored there — the
+// "Enter alone accepts the default" fallback piped callers rely on lives in `runInterviewLoop` instead.
 /**
  * @param {NodeJS.ReadableStream & { isTTY?: boolean }} input
  * @param {(s: string) => void} out
@@ -198,10 +199,19 @@ export function createAsker(input, out, output = process.stdout) {
       }
     }
     let touched = false;
+    let settled = false;
     output.write(`${GREY}${defaultValue}${lastColor(prompt)}`);
     output.write(`\x1b[${defaultValue.length}D`);
     const onKeypress = (_ch, key) => {
-      if (touched || (key && (key.name === 'return' || key.name === 'enter'))) return;
+      if (touched || settled) return;
+      if (key && (key.name === 'return' || key.name === 'enter')) {
+        // Accepting the grey suggestion as-is: recolor it to match the prompt's own color (the
+        // cursor is still sitting in front of it, unmoved since it was first drawn), so it reads
+        // exactly as if it had been typed, rather than staying visibly grey once accepted.
+        settled = true;
+        output.write(`${lastColor(prompt)}${defaultValue}`);
+        return;
+      }
       touched = true;
       output.write('\x1b[0K');
     };
