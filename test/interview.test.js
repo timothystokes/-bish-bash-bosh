@@ -2,7 +2,7 @@ import { Readable } from 'node:stream';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runInterview, buildInterviewPrompt } from '../src/hodge-interview.js';
@@ -148,10 +148,24 @@ test('gates: empty objective, dirty tree, harness repo, missing role make no age
 const gaps = (/** @type {number[]} */ resolved, /** @type {string} */ question) =>
   JSON.stringify({ resolved: resolved.map((id) => ({ id, spec: 'specs/greet.md' })), gaps: [{ topic: 'Greeter', question, default: 'Yes' }] });
 
-test('hodge on a fresh repo self-bootstraps the interview store and keeps asking until ready', async () => {
+test('hodge on a fresh repo first seeds the interview store from its template; once committed, it keeps asking until ready', async () => {
   const dir = makeRepo();
   commitProjectConfig(dir, config({ adapter: 'iv' }));
   const out = /** @type {string[]} */ ([]);
+  // the very first run only seeds the store from the template: no agent call, no run folder
+  const seedCode = await withCwd(dir, () =>
+    main(['hodge'], { registry: {}, identity, stdout: (s) => { out.push(s); }, stderr: () => {} }));
+  assert.equal(seedCode, 0);
+  assert.ok(existsSync(join(dir, '.hodgepodge', 'interview.md')), 'store seeded from the template');
+  assert.equal(
+    readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8'),
+    readFileSync(join(process.cwd(), 'templates', 'interview-template.md'), 'utf8'),
+  );
+  assert.match(out.join(''), /Wrote \.hodgepodge\/interview\.md from the interview template/);
+  assert.ok(!existsSync(join(dir, '.hodgepodge', 'runs')), 'no run folder on the seed-only run');
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-qm', 'seed interview store');
+  out.length = 0;
   /** @type {Record<string, string>[]} */
   const rounds = [
     { '.hodgepodge/response.json': gaps([], 'Who uses the greeter?') },
@@ -174,7 +188,6 @@ test('hodge on a fresh repo self-bootstraps the interview store and keeps asking
       input: Readable.from(['Build a greeter\n', 'ok\n', 'ok\n', '']),
       stdout: (s) => { out.push(s); }, stderr: () => {},
     }));
-  assert.ok(existsSync(join(dir, '.hodgepodge', 'interview.md')), 'store self-bootstrapped');
   assert.equal(code, 1, 'paused at EOF, not ok');
   assert.ok(n >= 3, `agent ran once per answer, ran ${n} times`);
   assert.match(out.join(''), /Who uses the greeter\?[\s\S]*Should names be trimmed\?[\s\S]*Anything out of scope\?/);
@@ -192,6 +205,8 @@ test('hodge usage errors exit 2', async () => {
 
   const norole = mkdtempSync(join(tmpdir(), 'hodge-int-norole-'));
   writeProjectConfig(norole, config({ adapter: 'missing' }));
+  mkdirSync(join(norole, '.hodgepodge'), { recursive: true });
+  writeFileSync(join(norole, '.hodgepodge', 'interview.md'), '# Interview\n');
   err.length = 0;
   assert.equal(await withCwd(norole, () => main(['hodge'], { registry: { f: () => agent({}).adapter }, stdout: () => {}, stderr: e })), 2);
   assert.match(err.join(''), /unknown adapter 'missing'/);

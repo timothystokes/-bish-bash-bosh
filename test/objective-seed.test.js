@@ -182,6 +182,13 @@ test('hodgepodge ready reports gaps then ready', async () => {
 
 test('hodge on a fresh project asks for the objective and is gated without one', async () => {
   const { repo } = sandbox();
+  // first run only seeds .hodgepodge/interview.md from the template
+  let seed = '';
+  const seedCode = await withCwd(repo, () =>
+    main(['hodge'], { registry: {}, input: Readable.from(['']), stdout: (s) => (seed += s), stderr: () => {} }));
+  assert.equal(seedCode, 0, seed);
+  git(repo, 'add', '-A');
+  git(repo, 'commit', '-q', '-m', 'seed interview store');
   let out = '';
   const code = await withCwd(repo, () =>
     main(['hodge'], {

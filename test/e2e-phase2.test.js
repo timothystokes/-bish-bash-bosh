@@ -84,6 +84,11 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
 
   // 1. interview: specs only (no tests, no test plan); structure lint passes
   commitProjectConfig(dir, config);
+  // first run only seeds .hodgepodge/interview.md from the template; commit it, then run for real
+  const seed = await withCwd(dir, () => hodge(['hodge', '--run-id', 'p2'], {}));
+  assert.equal(seed.code, 0, seed.text);
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-qm', 'seed interview store');
   const iv = await withCwd(dir, () => hodge(['hodge', '--run-id', 'p2'], registry, Readable.from(['add two numbers\n'])));
   assert.match(iv.text, /Interview complete/, iv.text);
   assert.equal(iv.code, 0);

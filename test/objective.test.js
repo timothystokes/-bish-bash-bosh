@@ -271,6 +271,13 @@ test('hodge drives the conversation from stdin, operating on cwd', async () => {
   writeProjectConfig(dir, buildConfig);
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', 'seed');
+  // first run only seeds .hodgepodge/interview.md from the template; commit it so the next run isn't gated
+  const seedOuts = /** @type {string[]} */ ([]);
+  const seedCode = await withCwd(dir, () =>
+    main(['hodge'], { stdout: (s) => seedOuts.push(s), stderr: (s) => seedOuts.push(s), registry: {}, identity }));
+  assert.equal(seedCode, 0, seedOuts.join(''));
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-q', '-m', 'seed interview store');
   const a = scripted(fullRounds);
   /** @type {string[]} */
   const outs = [];
