@@ -49,8 +49,9 @@ export async function runHodge(argv, deps, out, err) {
     if (!reverse) {
       // Each round's answer is captured by the deterministic checkbox walk below; the agent only
       // sees one question/answer at a time (prompts/interview-loop.md), with the same session
-      // (persisted to config.yml's `session` field) carrying the rest of the conversation's
-      // context across rounds and across separate `hodge` invocations.
+      // (persisted to config.yml's `interviewSession` field, distinct from other phases, which
+      // never use it) carrying the rest of the conversation's context across rounds and across
+      // separate `hodge` invocations.
       const input = deps.input ?? process.stdin;
       const { ask, close } = createAsker(input, out);
       try {
@@ -62,9 +63,9 @@ export async function runHodge(argv, deps, out, err) {
           say: out,
           adapter,
           repoDir: repo,
-          loadSession: () => config.session,
+          loadSession: () => config.interviewSession,
           saveSession: (session) => {
-            config.session = session;
+            config.interviewSession = session;
             writeFileSync(project.configPath, stringifyYaml(config));
           },
         });

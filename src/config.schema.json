@@ -10,6 +10,6 @@
     "mode": { "enum": ["interview", "forward", "reverse", "brownfield", "test-hardening", "clean-room"] },
     "maxQaCycles": { "type": "integer", "minimum": 1 },
     "hardenCommand": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
-    "session": { "description": "Opaque continuation token for the Interview Loop's agent session; shape is adapter-defined (see specs/adapters.md)." }
+    "interviewSession": { "description": "Opaque continuation token for the Interview Loop's one continuing agent session; shape is adapter-defined (see specs/adapters.md). Named distinctly from other phases since only the Interview Loop uses it." }
   }
 }
