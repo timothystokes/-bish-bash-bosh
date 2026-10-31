@@ -15,6 +15,10 @@ import { createSecretProxy } from './secret-proxy.js';
 import { syncArtifacts, requestPromotion } from './artifacts.js';
 import { createAwsCliS3Client, createGhPrOpener, defaultRun } from './cloud-clients.js';
 import { repoFor, parseFlags, parseRunArgs, loadRunProject, createAsker, askChoice } from './cli-lib.js';
+import {
+  formatSpecLint, formatReadiness, formatSync, formatPromote, formatCleanRoom,
+  formatProxyListening, formatKill, formatControlWrite, formatStatus,
+} from './cli-format.js';
 
 // Every top-level command other than `hodge` and `podge`/`podge step`: project init, run observability
 // (status, tui, console), cloud sync/promotion, spec/readiness checks, the pause/resume/stop control
@@ -24,7 +28,7 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
     const v = parseFlags(argv.slice(1), ['--repo'], `hodgepodge ${cmd}`, err);
     if (!v) return 2;
     const res = cmd === 'spec-lint' ? lintSpecs(repoFor(v['--repo'])) : checkReadiness(repoFor(v['--repo']));
-    out(`${JSON.stringify(res)}\n`);
+    out(cmd === 'spec-lint' ? formatSpecLint(res) : formatReadiness(res));
     return (cmd === 'spec-lint' ? res.ok : res.ready) ? 0 : 1;
   }
   if (cmd === 'sync' || cmd === 'promote') {
@@ -42,7 +46,7 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
     try {
       if (cmd === 'sync') {
         const res = await syncArtifacts({ client: createAwsCliS3Client({ run }), bucket: v['--bucket'] ?? '', repoDir, runId: v['--run-id'] ?? '' });
-        out(`${JSON.stringify(res)}\n`);
+        out(formatSync(res));
         return 0;
       }
       let sha = v['--sha'];
@@ -59,7 +63,7 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
         artifactsUri: `s3://${v['--bucket']}/runs/${v['--run-id']}/`,
         sha,
       });
-      out(`${JSON.stringify(res)}\n`);
+      out(formatPromote(res));
       return 0;
     } catch (e) {
       err(`hodgepodge ${cmd}: ${e.message}\n`);
@@ -95,8 +99,16 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
         return 2;
       }
       const res = initProject({ dir, adapter, model });
-      out(`${JSON.stringify(res)}\n`);
-      return res.ok ? 0 : 1;
+      if (!res.ok) {
+        err(`hodgepodge init: ${res.reason}\n`);
+        return 1;
+      }
+      if (res.committed) {
+        out(`Wrote and committed ${CONFIG_FILE} (adapter: ${adapter}, model: ${model}).\nRun \`hodge\` to start the interview.\n`);
+      } else {
+        out(`Wrote ${CONFIG_FILE} (adapter: ${adapter}, model: ${model}).\nCommit it before running hodge/podge (a clean working tree is required to start a run):\n  git add ${CONFIG_FILE} && git commit -m "hodgepodge init"\nThen run \`hodge\` to start the interview.\n`);
+      }
+      return 0;
     } finally {
       close();
     }
@@ -109,7 +121,7 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
       return 2;
     }
     const res = exportBundle({ sourceDir: v['--source'], builderDir: v['--repo'] });
-    out(`${JSON.stringify(res)}\n`);
+    out(formatCleanRoom(res));
     return res.ok ? 0 : 1;
   }
   if (cmd === 'proxy') {
@@ -142,7 +154,7 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
       }
     });
     try {
-      out(`${JSON.stringify({ port: await proxy.listen(port) })}\n`);
+      out(formatProxyListening({ port: await proxy.listen(port) }));
     } catch (e) {
       err(`hodgepodge proxy: ${e.message}\n`);
       return 2;
@@ -168,7 +180,7 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
       if (v['--control']) stopOpts.controlFile = resolve(v['--control']);
       if (v['--grace'] !== undefined) stopOpts.graceSec = Number(v['--grace']);
       const res = await stopContainer(stopOpts);
-      out(`${JSON.stringify(res)}\n`);
+      out(formatKill(res));
       return 0;
     } catch (e) {
       err(`hodgepodge kill: ${e.message}\n`);
@@ -190,7 +202,7 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
       return 2;
     }
     const res = writeControl(resolve(rest[1]), update);
-    out(`${JSON.stringify(res)}\n`);
+    out(formatControlWrite(res));
     return res.ok ? 0 : 1;
   }
   if (cmd === 'console') {
@@ -245,6 +257,6 @@ export async function runHodgepodge(cmd, argv, deps, out, err) {
   }
   const status = readRunStatus(createLocalStatusSource(repo), parsed.runId);
   const control = parsed.control ? readControl(resolve(parsed.control)) : undefined;
-  out(`${JSON.stringify(control ? { ...status, control } : status)}\n`);
+  out(formatStatus(status, control));
   return 0;
 }

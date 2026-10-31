@@ -128,13 +128,13 @@ test('runStep in clean-room mode is gated, with no agent call, on a leaky builde
   assert.equal(calls, 0);
 });
 
-test('hodgepodge clean-room CLI exports the bundle and prints JSON', async () => {
+test('hodgepodge clean-room CLI exports the bundle and prints a summary', async () => {
   const src = makeSource();
   const dest = builderDir();
   let out = '';
   const code = await main(['clean-room', '--source', src, '--repo', dest], { stdout: (/** @type {string} */ s) => { out += s; } });
   assert.equal(code, 0);
-  assert.equal(JSON.parse(out).ok, true);
+  assert.match(out, /clean-room: exported \d+ files? \(commit [0-9a-f]+\)/);
   assert.equal(existsSync(join(dest, 'specs', 'greet.md')), true);
   assert.equal(await main(['clean-room', '--repo', dest], { stderr: () => {} }), 2);
 });

@@ -41,7 +41,7 @@ export function helpText() {
     'Spec formats: a spec may declare `## Formats` bullets, checked by `ready` and the loop. Known formats: `gherkin`, `json-schema`, `openapi`.',
     '',
     'Commands:',
-    '  init   ask which adapter/model to use for everything, then write ./.hodgepodge/config.yml; refuses if ./.hodgepodge/config.yml already exists; no scaffolding (no target repo, no runtime copy, no launcher scripts); prints JSON {ok, dir, config}; exit 0 only when ok',
+    '  init   ask which adapter/model to use for everything, then write ./.hodgepodge/config.yml; refuses if ./.hodgepodge/config.yml already exists; no scaffolding (no target repo, no runtime copy, no launcher scripts); prints a short confirmation message; exit 0 only when ok',
     '  hodge  requirements gathering and spec definition: asks for a description of the objective (not a flag), then alternates agent rounds with your answers (broad first,',
     '         then fine-grained) until you answer `done` (or the agent has no question left) and `hodgepodge ready` passes; spec-lint and readiness run only then, and their gaps come back as questions or spec fixes; no tests are written here; the first run bootstraps the question store (`.hodgepodge/interview.md`) from the objective description; Ctrl-D or an empty answer pauses and a rerun resumes;',
     '         with --reverse it instead reverse-engineers specs/ + characterization tests from existing code (commits only if only specs/tests changed,',
@@ -121,9 +121,10 @@ export function debugAdapter(adapter, label, debug, out) {
   if (!debug) return adapter;
   return {
     run: async (req) => {
-      out(`[debug] ${label}: agent start (cwd ${req.cwd}, limits ${JSON.stringify(req.limits)})\n[debug] ${label}: prompt begin\n${req.prompt}\n[debug] ${label}: prompt end\n`);
+      const limitsText = Object.entries(req.limits ?? {}).filter(([, v]) => v !== undefined).map(([k, v]) => `${k}=${v}`).join(', ');
+      out(`[debug] ${label}: agent start (cwd ${req.cwd}${limitsText ? `, ${limitsText}` : ''})\n[debug] ${label}: prompt begin\n${req.prompt}\n[debug] ${label}: prompt end\n`);
       const res = await adapter.run({ ...req, onOutput: (stream, chunk) => out(stream === 'stdout' ? chunk : `[${label} stderr] ${chunk}`) });
-      out(`\n[debug] ${label}: exit ${res.exitStatus}, changed ${JSON.stringify(res.changedFiles)}\n`);
+      out(`\n[debug] ${label}: exit ${res.exitStatus}, changed: ${res.changedFiles.length === 0 ? 'none' : res.changedFiles.join(', ')}\n`);
       out(`[debug] ${label}: transcript begin\n${res.transcript}\n[debug] ${label}: transcript end\n`);
       return res;
     },

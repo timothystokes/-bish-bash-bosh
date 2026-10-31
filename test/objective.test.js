@@ -287,7 +287,7 @@ test('hodge drives the conversation from stdin, operating on cwd', async () => {
   assert.equal(code, 0, text);
   assert.match(text, /Describe the objective/);
   assert.match(text, /Who uses the greeter\?/);
-  assert.match(text, /"status":"ok"/);
+  assert.match(text, /Interview complete/);
 });
 
 test('code owns the store: agent edits to .hodgepodge/interview.md are discarded', async () => {

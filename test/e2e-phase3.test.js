@@ -30,7 +30,7 @@ async function hodge(argv, registry, extra = {}) {
     stderr: () => {},
     ...extra,
   });
-  return { code, res: JSON.parse(outs.join('')) };
+  return { code, text: outs.join('') };
 }
 
 test('phase 3 exit: pause, steer and stop via hodgepodge control drive podge', async () => {
@@ -70,8 +70,8 @@ test('phase 3 exit: pause, steer and stop via hodgepodge control drive podge', a
   };
 
   // pause first, then steer: the run must not start an iteration while paused
-  assert.equal((await hodge(['control', '--file', ctl, 'pause'])).res.ok, true);
-  assert.equal((await hodge(['control', '--file', ctl, 'steer', 'prefer small functions'])).res.ok, true);
+  assert.equal((await hodge(['control', '--file', ctl, 'pause'])).text, 'control updated\n');
+  assert.equal((await hodge(['control', '--file', ctl, 'steer', 'prefer small functions'])).text, 'control updated\n');
   commitProjectConfig(dir, config);
   // Red until the first iteration's file lands, then green: satisfies the test-plan gate's
   // "red before the first build iteration" rule without needing a real test framework.
@@ -82,12 +82,11 @@ test('phase 3 exit: pause, steer and stop via hodgepodge control drive podge', a
   assert.equal(prompts.length, 0, 'no iteration while paused');
   assert.equal(existsSync(join(dir, 'runs', 'p3')), false);
 
-  assert.equal((await hodge(['control', '--file', ctl, 'resume'])).res.ok, true);
+  assert.equal((await hodge(['control', '--file', ctl, 'resume'])).text, 'control updated\n');
   const run = await running;
 
-  assert.equal(run.res.status, 'stopped', JSON.stringify(run.res));
+  assert.match(run.text, /^Stopped after 2 steps/, run.text);
   assert.equal(run.code, 1);
-  assert.equal(run.res.steps.length, 2);
   assert.match(prompts[0], /prefer small functions/);
   assert.doesNotMatch(prompts[1], /prefer small functions/, 'steer is used for one iteration only');
   assert.equal(JSON.parse(readFileSync(ctl, 'utf8')).steer, undefined);
@@ -122,9 +121,8 @@ test('phase 3 exit: hodgepodge proxy (subprocess) redacts secrets, audits withou
       child.on('exit', (c) => reject(new Error(`proxy exited early (${c})`)));
       child.stdout.on('data', (d) => {
         buf += d;
-        try {
-          resolve(JSON.parse(buf).port);
-        } catch {}
+        const m = buf.match(/listening on port (\d+)/);
+        if (m) resolve(Number(m[1]));
       });
     });
 

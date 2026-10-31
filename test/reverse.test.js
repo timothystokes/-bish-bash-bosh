@@ -140,7 +140,7 @@ test('hodge --reverse uses the configured adapter; usage errors exit 2', async (
       registry, identity, testCommand: pass, stdout: (s) => { out.push(s); }, stderr: () => {},
     }));
   assert.equal(code, 0);
-  assert.equal(JSON.parse(out.join('')).status, 'ok');
+  assert.match(out.join(''), /^Reverse-engineered specs and tests/);
 
   const dir2 = makeRepo();
   commitProjectConfig(dir2, config({ adapter: 'rv' }));

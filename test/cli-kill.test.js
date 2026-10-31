@@ -21,7 +21,7 @@ test('help lists kill', () => {
   assert.match(helpText(), /hodgepodge kill --container/);
 });
 
-test('kill writes control stop then docker stop, prints JSON', async () => {
+test('kill writes control stop then docker stop, prints a confirmation', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'kill-'));
   const control = join(dir, 'control.json');
   /** @type {string[][]} */
@@ -32,14 +32,14 @@ test('kill writes control stop then docker stop, prints JSON', async () => {
     return { code: 0, stdout: '', stderr: '' };
   });
   assert.equal(r.code, 0);
-  assert.deepEqual(JSON.parse(r.out), { stopped: true, name: 'run1' });
+  assert.equal(r.out, 'stopped run1\n');
   assert.deepEqual(calls, [['stop', '--time', '3', 'run1']]);
 });
 
 test('kill of a vanished container exits 0 with stopped:false', async () => {
   const r = await run(['kill', '--container', 'gone'], async () => ({ code: 1, stdout: '', stderr: 'Error: No such container: gone' }));
   assert.equal(r.code, 0);
-  assert.equal(JSON.parse(r.out).stopped, false);
+  assert.match(r.out, /not stopped gone: container does not exist/);
 });
 
 test('kill surfaces docker failure with exit 1', async () => {

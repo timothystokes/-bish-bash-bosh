@@ -60,7 +60,7 @@ test('resolveAdapter throws on an unknown adapter id', () => {
   assert.throws(() => resolveAdapter(cfg('nope'), {}), /unknown adapter 'nope'/);
 });
 
-test('podge step prints JSON {sha, iteration, status} and exits 0', async () => {
+test('podge step prints a plain summary and exits 0', async () => {
   // With no tests/PLAN.md yet, iteration 1 is the plan step: the agent must write the
   // test plan (mapped, with the mapped tests present) and leave the suite red.
   const dir = makeRepo();
@@ -81,11 +81,9 @@ test('podge step prints JSON {sha, iteration, status} and exits 0', async () => 
       stderr: () => {},
     }));
   assert.equal(code, 0);
-  const res = JSON.parse(out.join(''));
-  assert.equal(res.status, 'ok');
-  assert.equal(res.iteration, 1);
-  assert.deepEqual(Object.keys(res).sort(), ['iteration', 'sha', 'status']);
-  assert.equal(res.sha, git(dir, 'rev-parse', 'HEAD'));
+  const text = out.join('');
+  assert.match(text, /^Step 1 ok \(commit [0-9a-f]+\)\.\n$/);
+  assert.equal(text.match(/\(commit ([0-9a-f]+)\)/)[1], git(dir, 'rev-parse', 'HEAD').slice(0, 7));
 });
 
 test('podge step exits non-zero when the step fails or is gated', async () => {
@@ -101,7 +99,7 @@ test('podge step exits non-zero when the step fails or is gated', async () => {
       stderr: () => {},
     }));
   assert.equal(code, 1);
-  assert.equal(JSON.parse(out.join('')).status, 'failed');
+  assert.match(out.join(''), /^Step 1 failed/);
 });
 
 test('podge step reports config problems on stderr with exit 2', async () => {
@@ -148,7 +146,7 @@ test('hodgepodge control writes pause/resume/steer/stop to the control file', as
   const s = await run('stop');
   assert.equal(s.code, 0);
   assert.equal(JSON.parse(readFileSync(f, 'utf8')).stop, true);
-  assert.deepEqual(JSON.parse(s.o), { ok: true });
+  assert.equal(s.o, 'control updated\n');
 });
 
 test('hodgepodge control rejects bad usage', async () => {
@@ -172,7 +170,7 @@ test('podge --control passes the control file so a stop is honoured', async () =
       stderr: capture([]),
     }));
   assert.equal(code, 1);
-  assert.equal(JSON.parse(o.join('')).status, 'stopped');
+  assert.match(o.join(''), /^Stopped after 0 steps: stop requested via control file\.\n$/);
 });
 
 test('--debug logs the agent transcript and gate results to stdout; off by default', async () => {

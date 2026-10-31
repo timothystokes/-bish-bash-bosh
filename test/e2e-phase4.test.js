@@ -33,7 +33,7 @@ async function hodge(argv, registry) {
     stdout: (s) => outs.push(s),
     stderr: () => {},
   });
-  return { code, res: JSON.parse(outs.join('')) };
+  return { code, text: outs.join('') };
 }
 
 /** @param {Record<string, unknown>} extra */
@@ -66,14 +66,14 @@ test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite pas
   const srcCfg = makeConfig({ adapter: 'reverser', model: 'm' });
   commitProjectConfig(source, srcCfg);
   const rev = await withCwd(source, () => hodge(['hodge', '--reverse', '--run-id', 'p4r'], { reverser: scripted(reverseFixture) }));
-  assert.equal(rev.res.status, 'ok', JSON.stringify(rev.res));
+  assert.match(rev.text, /^Reverse-engineered specs and tests/, rev.text);
   assert.equal(rev.code, 0);
   assert.equal(git(source, 'status', '--porcelain'), '');
 
   // 2. clean-room export: builder repo holds specs + tests only
   const builder = join(mkdtempSync(join(tmpdir(), 'hodge-p4-b-')), 'builder');
   const exp = await hodge(['clean-room', '--source', source, '--repo', builder], {});
-  assert.equal(exp.res.ok, true, JSON.stringify(exp.res));
+  assert.match(exp.text, /^clean-room: exported/, exp.text);
   assert.equal(exp.code, 0);
   assert.deepEqual(git(builder, 'ls-files').split('\n').sort(), ['specs/greet.md', 'tests/PLAN.md', 'tests/greet.test.js']);
   assert.equal(existsSync(join(builder, 'src')), false);
@@ -89,7 +89,7 @@ test('phase 4 exit: code -> specs -> clean-room rebuild -> conformance suite pas
   const bCfg = makeConfig({ mode: 'clean-room', adapter: 'builder', model: 'm' });
   commitProjectConfig(builder, bCfg);
   const run = await withCwd(builder, () => hodge(['podge', '--run-id', 'p4b'], { builder: scripted(buildFixture) }));
-  assert.equal(run.res.status, 'done', JSON.stringify(run.res));
+  assert.match(run.text, /^Done after/, run.text);
   assert.equal(run.code, 0);
 
   // the conformance suite (the exported tests, unchanged) passes against the rebuild

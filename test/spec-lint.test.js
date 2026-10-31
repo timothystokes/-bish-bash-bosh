@@ -136,18 +136,18 @@ test('a PLAN.md requirement ID that no spec declares is a problem', () => {
   assert.match(r.problems.join('\n'), /R-z-9.*no spec/);
 });
 
-test('hodgepodge spec-lint: exit 0 and JSON when clean', async () => {
+test('hodgepodge spec-lint: exit 0 and ok message when clean', async () => {
   let out = '';
   const code = await main(['spec-lint', '--repo', target(GOOD)], { stdout: (s) => (out += s) });
   assert.equal(code, 0);
-  assert.deepEqual(JSON.parse(out), { ok: true, problems: [] });
+  assert.equal(out, 'spec-lint: ok\n');
 });
 
 test('hodgepodge spec-lint: exit 1 and problems when dirty', async () => {
   let out = '';
   const code = await main(['spec-lint', '--repo', target({ ...GOOD, 'specs/b.md': '' })], { stdout: (s) => (out += s) });
   assert.equal(code, 1);
-  assert.equal(JSON.parse(out).ok, false);
+  assert.match(out, /^spec-lint: \d+ problems?\n/);
 });
 
 test('hodgepodge spec-lint: --repo defaults to cwd and bad args exit 2', async () => {

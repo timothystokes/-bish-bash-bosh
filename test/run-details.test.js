@@ -135,16 +135,15 @@ test('renderFrame says so when nothing is declared, no QA ran and there is no do
   assert.match(frame, /done\s+no report/);
 });
 
-test('hodgepodge status prints formats, readiness, qa and done in the JSON', async () => {
+test('hodgepodge status prints formats, readiness, qa and done in plain text', async () => {
   const repo = makeRepo();
   const cfg = { adapter: 'f', model: 'm' };
   writeProjectConfig(repo, cfg);
   let out = '';
   const code = await withCwd(repo, () => main(['status', '--run-id', 'r1'], { stdout: (/** @type {string} */ s) => (out += s), stderr: () => {} }));
   assert.equal(code, 0);
-  const j = JSON.parse(out);
-  assert.equal(j.details.formats.length, 2);
-  assert.equal(j.details.readiness.ready, false);
-  assert.equal(j.details.qa[0].findings[0].classification, 'violated-decision');
-  assert.equal(j.details.done.requirements[0].id, 'R-a-1');
+  assert.match(out, /formats: 2 declared formats/);
+  assert.match(out, /readiness: not ready/);
+  assert.match(out, /qa: cycle 1 findings \(1 finding\), cycle 2 clean/);
+  assert.match(out, /done: no \(1\/1 requirement passing\)/);
 });

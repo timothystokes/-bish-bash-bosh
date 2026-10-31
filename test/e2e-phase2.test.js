@@ -36,8 +36,7 @@ async function hodge(argv, registry, input) {
     stdout: (s) => outs.push(s),
     stderr: () => {},
   });
-  // the interview prompts for the objective before printing its JSON result (on the same line)
-  return { code, res: JSON.parse(outs.join('').slice(outs.join('').indexOf('{'))) };
+  return { code, text: outs.join('') };
 }
 
 test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, red tests, plan.md) -> forward loop -> green', async () => {
@@ -86,7 +85,7 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
   // 1. interview: specs only (no tests, no test plan); structure lint passes
   commitProjectConfig(dir, config);
   const iv = await withCwd(dir, () => hodge(['hodge', '--run-id', 'p2'], registry, Readable.from(['add two numbers\n'])));
-  assert.equal(iv.res.status, 'ok', JSON.stringify(iv.res));
+  assert.match(iv.text, /Interview complete/, iv.text);
   assert.equal(iv.code, 0);
   assert.ok(existsSync(join(dir, 'specs', 'add.md')));
   assert.equal(existsSync(join(dir, 'tests')), false, 'tests come from the plan step');
@@ -94,11 +93,10 @@ test('phase 2 exit: objective goes interview -> specs -> plan step (test plan, r
 
   // 2. podge: plan step (test plan + red tests + plan.md), then the build step turns them green
   const run = await withCwd(dir, () => hodge(['podge', '--run-id', 'p2'], registry));
-  assert.equal(run.res.status, 'done', JSON.stringify(run.res));
+  assert.match(run.text, /^Done after 2 steps\./, run.text);
   assert.equal(run.code, 0);
-  assert.equal(run.res.steps.length, 2);
   const lint = await hodge(['spec-lint', '--repo', dir], registry);
-  assert.equal(lint.res.ok, true, 'the full lint (with the test mapping) passes after the plan step');
+  assert.match(lint.text, /^spec-lint: ok/, 'the full lint (with the test mapping) passes after the plan step');
 
   execFileSync('npm', ['test', '--silent'], { cwd: dir, stdio: 'pipe' });
   assert.equal(git(dir, 'status', '--porcelain'), '');

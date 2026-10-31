@@ -40,7 +40,7 @@ test('readRunStatus on an unknown run is empty, not an error', () => {
   assert.equal(s.lastStatus, null);
 });
 
-test('hodgepodge status prints JSON and includes control state', async () => {
+test('hodgepodge status prints a plain summary and includes control state', async () => {
   const dir = makeRun();
   writeProjectConfig(dir, { adapter: 'f', model: 'm' });
   const ctl = join(dir, 'control.json');
@@ -49,9 +49,8 @@ test('hodgepodge status prints JSON and includes control state', async () => {
   const code = await withCwd(dir, () =>
     main(['status', '--run-id', 'r1', '--control', ctl], { stdout: (/** @type {string} */ s) => (out += s), stderr: () => {} }));
   assert.equal(code, 0);
-  const j = JSON.parse(out);
-  assert.equal(j.iterations, 2);
-  assert.equal(j.control.paused, true);
+  assert.match(out, /\(2 iterations/);
+  assert.match(out, /control: paused/);
 });
 
 test('hodgepodge status needs a project config (.hodgepodge/config.yml)', async () => {

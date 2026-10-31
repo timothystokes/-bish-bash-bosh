@@ -172,12 +172,12 @@ test('hodgepodge ready reports gaps then ready', async () => {
   };
   const notReady = await run(['ready']);
   assert.equal(notReady.code, 1);
-  assert.equal(JSON.parse(notReady.out).ready, false);
+  assert.match(notReady.out, /^ready: no/);
   mkdirSync(join(repo, 'specs'));
   writeFileSync(join(repo, 'specs', 'greet.md'), goodSpec);
   const ok = await run(['ready']);
   assert.equal(ok.code, 0, ok.out);
-  assert.deepEqual(JSON.parse(ok.out), { ready: true, gaps: [] });
+  assert.equal(ok.out, 'ready: yes\n');
 });
 
 test('hodge on a fresh project asks for the objective and is gated without one', async () => {

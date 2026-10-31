@@ -85,9 +85,9 @@ test('hodgepodge sync uploads run records, then skips them on a repeat', async (
   const outs = [];
   const args = ['sync', '--bucket', 'bkt', '--run-id', 'r1', '--repo', repo];
   assert.equal(await main(args, { stdout: (s) => outs.push(s), exec: exec.run }), 0);
-  assert.deepEqual(JSON.parse(outs[0]).uploaded, ['runs/r1/a.json']);
+  assert.match(outs[0], /synced: 1 file uploaded, 0 files already up to date/);
   assert.equal(await main(args, { stdout: (s) => outs.push(s), exec: exec.run }), 0);
-  assert.deepEqual(JSON.parse(outs[1]).skipped, ['runs/r1/a.json']);
+  assert.match(outs[1], /synced: 0 files uploaded, 1 file already up to date/);
 });
 
 test('hodgepodge sync/promote reject missing or unknown args (exit 2)', async () => {
@@ -107,7 +107,7 @@ test('hodgepodge promote opens a PR with head sha and artifacts URI', async () =
   const outs = [];
   const code = await main(['promote', '--run-id', 'r1', '--head', 'sandbox', '--base', 'main', '--bucket', 'bkt', '--sha', 'abc123'], { stdout: (s) => outs.push(s), exec: exec.run });
   assert.equal(code, 0);
-  assert.deepEqual(JSON.parse(outs[0]), { url: 'https://github.com/o/r/pull/9' });
+  assert.equal(outs[0], 'promotion PR opened: https://github.com/o/r/pull/9\n');
   const gh = exec.calls.find((c) => c.cmd === 'gh');
   assert.ok(gh?.args.join(' ').includes('s3://bkt/runs/r1/'));
   assert.ok(gh?.args.join(' ').includes('abc123'));

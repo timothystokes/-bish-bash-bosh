@@ -3,6 +3,7 @@ import { acquireRunLock } from './run-lock.js';
 import { runObjective } from './hodge-objective.js';
 import { runReverse } from './hodge-reverse.js';
 import { debugAdapter, createAsker, parseRunArgs, loadRunProject } from './cli-lib.js';
+import { formatObjectiveResult, formatReverseResult } from './cli-format.js';
 
 // `hodge`: the interview flow that gathers requirements and writes specs, or (with --reverse)
 // the reverse-engineering flow that writes specs + characterization tests from existing code.
@@ -48,7 +49,7 @@ export async function runHodge(argv, deps, out, err) {
           inboxDir: project.dir,
           identity: deps.identity,
         });
-        out(`${JSON.stringify(res)}\n`);
+        out(formatObjectiveResult(res));
         return res.status === 'ok' ? 0 : 1;
       } finally {
         close();
@@ -62,7 +63,7 @@ export async function runHodge(argv, deps, out, err) {
       testCommand: deps.testCommand,
       identity: deps.identity,
     });
-    out(`${JSON.stringify(res)}\n`);
+    out(formatReverseResult(res));
     return res.status === 'ok' ? 0 : 1;
   } catch (e) {
     if (debug) out(`[debug] ${e.stack}\n`);

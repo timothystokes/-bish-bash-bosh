@@ -1,8 +1,30 @@
 import { mkdirSync, existsSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
 import { validateConfig } from './config.js';
 import { CONFIG_FILE } from './project-config.js';
+
+const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+
+// Every hodge/podge run refuses to start unless the working tree is clean (it needs a known-good
+// baseline to diff the agent's changes against, and commits the result itself each round). A fresh
+// `config.yml` would otherwise leave the tree dirty, so commit it here; if that is not possible
+// (no git repo yet, or no git user configured), the caller is told to commit it by hand.
+function commitConfig(dir, configPath) {
+  try {
+    git(dir, 'rev-parse', '--is-inside-work-tree');
+  } catch {
+    return false;
+  }
+  try {
+    git(dir, 'add', '--', configPath);
+    git(dir, 'commit', '-q', '-m', 'hodgepodge init: add config');
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // Suggested picks shown by `hodgepodge init`'s interactive prompt (src/hodgepodge.js). This is a
 // convenience catalog only, not enforced anywhere: any adapter/model string still works (see
@@ -32,5 +54,6 @@ export function initProject({ dir, adapter, model }) {
   if (!valid.ok) return { ok: false, reason: `invalid config: ${valid.errors.join('; ')}` };
   mkdirSync(dirname(configPath), { recursive: true });
   writeFileSync(configPath, stringifyYaml(cfg));
-  return { ok: true, dir: projectDir, config: configPath };
+  const committed = commitConfig(projectDir, configPath);
+  return { ok: true, dir: projectDir, config: configPath, committed };
 }

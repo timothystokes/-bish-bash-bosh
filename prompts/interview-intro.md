@@ -1,7 +1,11 @@
 # Interview
 
-Tracks the objective description and every requirements question asked so far. Managed by `hodge`; don't edit.
-One line per question with two checkboxes: `Answered` ticks once the owner has answered (or accepted the
-default), `Specified` ticks once a spec records the decision. Q1 is the objective description, bootstrapped from
-the owner's first answer and always specified (it is context, not a spec decision). Readiness requires every
-question's Specified box ticked.
+This is a list of questions and answers determined through an interview process. 
+
+The format below defines each entry on a new line as:
+
+<index> - Answered: [ ]; Specified: [ ]; Q: <question>; A: <default-answer>.
+
+Tick the Answered box when the question has been answerred or in the default answer is confirmed.
+Tick the Specified box when the question and answer have been distilled into the specification.md
+

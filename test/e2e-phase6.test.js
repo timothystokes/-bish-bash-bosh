@@ -141,7 +141,7 @@ async function run(cmd, dir, config, registry, controlFile) {
       stdout: (s) => outs.push(s),
       stderr: () => {},
     }));
-  return { code, res: JSON.parse(outs.join('')) };
+  return { code, text: outs.join('') };
 }
 
 test('phase 6 regression: lint, formats, scripted build, derived done, QA cycle, evidence, lock', async () => {
@@ -159,13 +159,13 @@ test('phase 6 regression: lint, formats, scripted build, derived done, QA cycle,
     },
   ]);
   const qa = scripted([() => findingsBlock([FINDING]), () => findingsBlock([])]);
-  const { code, res } = await run('podge', dir, cfg(), agentRegistry(build.adapter, qa.adapter));
+  const { code, text } = await run('podge', dir, cfg(), agentRegistry(build.adapter, qa.adapter));
 
-  assert.equal(res.status, 'done', JSON.stringify(res));
+  assert.match(text, /^Done after/, text);
   assert.equal(code, 0);
   assert.equal(build.calls(), 2, 'one build step, one to fix the QA item');
   assert.equal(qa.calls(), 2);
-  assert.deepEqual(res.qa.map((/** @type {any} */ q) => q.status), ['findings', 'clean']);
+  assert.deepEqual(readRunDetails(dir, 'p6').qa.map((/** @type {any} */ q) => q.status), ['findings', 'clean']);
 
   execFileSync('npm', ['test', '--silent'], { cwd: dir, stdio: 'pipe' });
   assert.equal(git(dir, 'status', '--porcelain'), '');
@@ -201,10 +201,10 @@ test('phase 6 regression: an output that does not conform to the declared schema
     },
   ]);
   const qa = scripted([() => findingsBlock([])]);
-  const { code, res } = await run('podge', dir, cfg(), agentRegistry(build.adapter, qa.adapter));
+  const { code, text } = await run('podge', dir, cfg(), agentRegistry(build.adapter, qa.adapter));
 
-  assert.equal(res.status, 'failed', JSON.stringify(res));
-  assert.match(res.reason, /gate formats failed/);
+  assert.match(text, /^Failed after/, text);
+  assert.match(text, /gate formats failed/);
   assert.equal(code, 1);
   assert.equal(qa.calls(), 0, 'QA never runs on a gated build');
   assert.equal(existsSync(join(dir, 'out', 'greeting.json')), false, 'the non-conforming output is not kept');
@@ -241,9 +241,9 @@ test('phase 6 regression: a requirement with no passing test keeps a ticked plan
       return r;
     },
   };
-  const { res } = await run('podge', dir, cfg(), agentRegistry(builder, qa.adapter), controlFile);
+  const { text } = await run('podge', dir, cfg(), agentRegistry(builder, qa.adapter), controlFile);
 
-  assert.notEqual(res.status, 'done', JSON.stringify(res));
+  assert.doesNotMatch(text, /^Done/, text);
   assert.equal(qa.calls(), 0);
   assert.match(readFileSync(join(dir, 'plan.md'), 'utf8'), /- \[ \] Verify: R-greet-3: no passing test/);
   const done = JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'p6', 'done.json'), 'utf8'));
@@ -253,10 +253,10 @@ test('phase 6 regression: a requirement with no passing test keeps a ticked plan
 test('phase 6 regression: spec-lint stops podge before any agent call when a requirement has no mapped test', async () => {
   const dir = makeTarget({ planMd: '# Test plan\n- specs/greet.md -> tests/greet.test.js: greeting behaviour\n' });
   const build = scripted([() => 'should not run']);
-  const { code, res } = await run('podge', dir, cfg(), agentRegistry(build.adapter, scripted([() => findingsBlock([])]).adapter));
-  assert.equal(res.status, 'gated', JSON.stringify(res));
+  const { code, text } = await run('podge', dir, cfg(), agentRegistry(build.adapter, scripted([() => findingsBlock([])]).adapter));
+  assert.match(text, /^Gated/, text);
   assert.equal(code, 1);
-  assert.match(res.reason, /spec-lint failed.*R-greet-1/);
+  assert.match(text, /spec-lint failed.*R-greet-1/);
   assert.equal(build.calls(), 0);
 });
 

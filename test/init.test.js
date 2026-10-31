@@ -1,13 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, realpathSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { initProject } from '../src/init.js';
 import { validateConfig } from '../src/config.js';
 import { main, helpText } from '../src/cli.js';
-import { freshDir, withCwd } from './support/project.js';
+import { freshDir, initGitRepo, withCwd } from './support/project.js';
 
 
 test('writes .hodgepodge/config.yml with a single adapter/model', () => {
@@ -25,6 +26,16 @@ test('writes .hodgepodge/config.yml with a single adapter/model', () => {
   assert.ok(!('roles' in cfg), 'roles is gone: there is a single adapter/model, not one per role');
   assert.ok(!('targetRepo' in cfg), 'targetRepo is gone: there is no separate target dir');
   assert.ok(!('hodgepodge' in cfg), 'hodgepodge (runtime-copy path) is gone: there is no runtime copy');
+  assert.equal(res.committed, false, 'no git repo here, so nothing to commit');
+});
+
+test('commits the config when run inside a git repo (so the tree is clean for hodge/podge)', () => {
+  const dir = freshDir('init-');
+  initGitRepo(dir);
+  const res = initProject({ dir, adapter: 'agent-x', model: 'model-y' });
+  assert.equal(res.ok, true, JSON.stringify(res));
+  assert.equal(res.committed, true);
+  assert.equal(execFileSync('git', ['-C', dir, 'status', '--porcelain'], { encoding: 'utf8' }).trim(), '');
 });
 
 test('refuses to run if .hodgepodge/config.yml already exists (no silent overwrite)', () => {
@@ -63,19 +74,27 @@ async function run(args, lines = []) {
   return { code, out: outs.join(''), err: errs.join('') };
 }
 
-test('cli init asks for a single adapter/model', async () => {
+test('cli init asks for a single adapter/model, commits the config (clean tree for hodge/podge)', async () => {
   const dir = freshDir('init-');
+  initGitRepo(dir);
   const r = await withCwd(dir, () => run(['init'], ['copilot', 'm1']));
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /adapter.*model/s, 'prompts are shown');
   assert.doesNotMatch(r.out, /interview adapter|reverse adapter|build adapter|qa adapter/, 'one prompt, not one per role');
-  const j = JSON.parse(r.out.match(/\{.*\}/s)[0]);
-  assert.equal(j.ok, true);
-  assert.equal(j.dir, realpathSync(dir));
-  assert.equal(j.config, join(realpathSync(dir), '.hodgepodge', 'config.yml'));
+  assert.match(r.out, /Wrote and committed \.hodgepodge\/config\.yml \(adapter: copilot, model: m1\)/);
   const cfg = parseYaml(readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8'));
   assert.equal(cfg.adapter, 'copilot');
   assert.equal(cfg.model, 'm1');
+  assert.equal(execFileSync('git', ['-C', dir, 'status', '--porcelain'], { encoding: 'utf8' }).trim(), '', 'the tree is clean right after init');
+});
+
+test('cli init in a directory with no git repo yet leaves the config uncommitted, with guidance', async () => {
+  const dir = freshDir('init-');
+  const r = await withCwd(dir, () => run(['init'], ['copilot', 'm1']));
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /Wrote \.hodgepodge\/config\.yml \(adapter: copilot, model: m1\)\./);
+  assert.match(r.out, /Commit it before running hodge\/podge/);
+  assert.match(r.out, /git add \.hodgepodge\/config\.yml && git commit/);
 });
 
 test('cli init picks adapter/model by number from the suggested list', async () => {

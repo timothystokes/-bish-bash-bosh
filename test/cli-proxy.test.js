@@ -22,9 +22,8 @@ async function runCli(args) {
     signal: ac.signal,
     stdout: (s) => {
       outs.push(s);
-      try {
-        gotPort(JSON.parse(s).port);
-      } catch {}
+      const m = s.match(/listening on port (\d+)/);
+      if (m) gotPort(Number(m[1]));
     },
     stderr: (s) => errs.push(s),
   });

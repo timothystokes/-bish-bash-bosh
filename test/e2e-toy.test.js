@@ -65,11 +65,9 @@ test('toy objective: podge takes a red target to green unattended', async () => 
       stdout: (s) => outs.push(s),
       stderr: () => {},
     }));
-  const res = JSON.parse(outs.join(''));
-  assert.equal(res.status, 'done', JSON.stringify(res));
+  const text = outs.join('');
+  assert.match(text, /^Done after 1 step/, text);
   assert.equal(code, 0);
-  assert.equal(res.steps.length, 1);
-  assert.match(res.steps[0].sha, /^[0-9a-f]{7,}$/);
 
   // green for real, committed, tree clean, record on disk
   execFileSync('npm', ['test', '--silent'], { cwd: dir, stdio: 'pipe' });
@@ -77,6 +75,7 @@ test('toy objective: podge takes a red target to green unattended', async () => 
   assert.ok(existsSync(join(dir, '.hodgepodge', 'runs', 'toy', 'iterations', '001', 'record.json')));
   const rec = JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'toy', 'iterations', '001', 'record.json'), 'utf8'));
   assert.equal(rec.status, 'ok');
+  assert.match(git(dir, 'rev-parse', 'HEAD'), /^[0-9a-f]{7,}$/);
 });
 
 test('toy objective: green-from-the-start suite is gated (tests must fail first)', async () => {
@@ -98,6 +97,6 @@ test('toy objective: green-from-the-start suite is gated (tests must fail first)
       stdout: (s) => outs.push(s),
       stderr: () => {},
     }));
-  assert.equal(JSON.parse(outs.join('')).status, 'gated');
+  assert.match(outs.join(''), /^Gated/);
   assert.equal(code, 1);
 });

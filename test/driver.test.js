@@ -120,7 +120,7 @@ test('config rejects requireTestPlan: it is not a config field, only a runStep/r
   assert.equal(validateConfig({ ...config(), requireTestPlan: true }).ok, false);
 });
 
-test('podge prints loop JSON, exit 0 when done, 1 otherwise', async () => {
+test('podge prints a plain summary, exit 0 when done, 1 otherwise', async () => {
   const dir = makeRepo('- [ ] one\n');
   // `podge` (unlike a direct runLoop call) always lints specs, so give it one that passes structurally.
   writeFileSync(join(dir, 'specs', 'a.md'), '# Spec: A\nImplementation: none\n');
@@ -136,9 +136,7 @@ test('podge prints loop JSON, exit 0 when done, 1 otherwise', async () => {
       stderr: () => {},
     }));
   assert.equal(code, 1);
-  const res = JSON.parse(out.join(''));
-  assert.equal(res.status, 'failed');
-  assert.equal(res.steps.length, 1);
+  assert.match(out.join(''), /^Failed after 1 step:/);
 });
 
 test('podge reports usage errors with exit 2', async () => {

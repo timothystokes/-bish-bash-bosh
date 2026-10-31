@@ -216,5 +216,5 @@ test('podge enables a QA cycle using the same configured adapter when maxQaCycle
   const code = await withCwd(dir, () => main(['podge'], { registry, testCommand: ['node', '-e', 'process.exit(1)'], identity, stdout: (s) => { out += s; }, stderr: () => {} }));
   assert.equal(code, 0, out);
   assert.deepEqual(used, ['build', 'qa']);
-  assert.equal(JSON.parse(out).status, 'done');
+  assert.match(out, /^Done after/);
 });
