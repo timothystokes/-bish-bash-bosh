@@ -62,8 +62,10 @@ function markAsked(interviewPath, readFile, writeFile, id) {
 }
 
 // Runs the loop against `interview.md` in `repoDir`: finds the next unanswered question, shows it
-// in color, awaits an answer on stdin (Enter alone accepts whatever default text already follows
-// `A:`), writes the answer back with its checkbox marked, then hands the question and answer to
+// in color, awaits an answer on stdin (a real terminal pre-fills the existing default right onto
+// the `A: ` line, editable like anything typed; Enter alone accepts it as-is, and Backspace/Delete
+// erase it character by character, leaving `A: ` ready for a fresh answer), writes the answer back
+// with its checkbox marked, then hands the question and answer to
 // the agent (one call per round, prompts/interview-loop.md's job) before ticking the `Q` checkbox
 // too. `loadSession`/`saveSession` thread one continuing agent session through every round, and
 // across separate `hodge` invocations (the caller persists it, e.g. to a file), so the agent keeps
@@ -74,7 +76,7 @@ function markAsked(interviewPath, readFile, writeFile, id) {
  *   interviewPath: string,
  *   readFile: (p: string) => string,
  *   writeFile: (p: string, s: string) => void,
- *   ask: (prompt: string) => Promise<string | null>,
+ *   ask: (prompt: string, defaultValue?: string) => Promise<string | null>,
  *   say: (s: string) => void,
  *   adapter: { run: (req: object) => Promise<{ session?: unknown }> },
  *   repoDir?: string,
@@ -100,8 +102,7 @@ export async function runInterviewLoop({
     const next = nextQuestion(questions);
     if (!next) return { status: 'ok', answered };
     say(`\n${CYAN}Q: ${next.question}${RESET}\n`);
-    const suffix = next.answer ? ` [${next.answer}]` : '';
-    const reply = await ask(`${YELLOW}A:${suffix} ${RESET}`);
+    const reply = await ask(`${YELLOW}A: ${RESET}`, next.answer);
     if (reply === null) {
       const remaining = parseQuestions(readFile(interviewPath)).filter((q) => !q.qChecked && !q.aChecked).length;
       return { status: 'paused', answered, remaining };

@@ -255,3 +255,41 @@ test('readlineOptions: a TTY input gets terminal mode so Enter submits; piped in
   assert.ok(readlineOptions(tty).output);
   assert.equal(readlineOptions(Readable.from([])).terminal, undefined);
 });
+
+test("createAsker: on a real terminal, a pre-filled default is editable like anything typed — Backspace/Delete erase it, leaving the line ready for a fresh answer", async () => {
+  const { createAsker } = await import('../src/cli-lib.js');
+
+  // Enter alone, default untouched: submits the default verbatim.
+  {
+    const input = Object.assign(new Readable({ read() {} }), { isTTY: true });
+    const { ask } = createAsker(input, () => {});
+    const reply = ask('A: ', 'Developers');
+    await new Promise((r) => setTimeout(r, 20));
+    input.push('\r');
+    assert.equal(await reply, 'Developers');
+  }
+
+  // Backspace once per character of the default clears it down to an empty, still-open line.
+  {
+    const input = Object.assign(new Readable({ read() {} }), { isTTY: true });
+    const { ask } = createAsker(input, () => {});
+    const reply = ask('A: ', 'Developers');
+    await new Promise((r) => setTimeout(r, 20));
+    for (let i = 0; i < 'Developers'.length; i++) input.push('\x7f');
+    input.push('\r');
+    assert.equal(await reply, '', 'the default is fully erased, not just hidden');
+  }
+
+  // Clearing the default and typing something else submits the new text, not the old default.
+  {
+    const input = Object.assign(new Readable({ read() {} }), { isTTY: true });
+    const { ask } = createAsker(input, () => {});
+    const reply = ask('A: ', 'Developers');
+    await new Promise((r) => setTimeout(r, 20));
+    for (let i = 0; i < 'Developers'.length; i++) input.push('\x7f');
+    input.push('Admins');
+    input.push('\r');
+    assert.equal(await reply, 'Admins');
+  }
+});
+

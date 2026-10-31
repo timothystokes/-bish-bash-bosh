@@ -147,11 +147,15 @@ export function resetTty(input) {
 // A single question/answer reader shared by `hodge`'s interview and `hodgepodge init`'s adapter/model prompts.
 // Piped input must keep one reader (a second one would lose buffered lines); a tty gets a fresh reader
 // per question so tty state left by a child process (cooked mode, keyboard protocols) cannot break Enter.
+// `defaultValue`, if given, is only pre-filled into a real terminal's editable line (`rl.write`, so it
+// behaves exactly as if the owner had typed it: Backspace/Delete erase it character by character, leaving
+// `A: ` ready for a fresh answer); piped input has no such line to edit, so it is ignored there and the
+// existing "Enter alone accepts the default" fallback (in `runInterviewLoop`) is what applies instead.
 export function createAsker(input, out) {
   const tty = input.isTTY === true;
   const shared = tty ? undefined : createInterface(readlineOptions(input));
   const sharedLines = shared?.[Symbol.asyncIterator]();
-  const ask = async (prompt) => {
+  const ask = async (prompt, defaultValue) => {
     out(prompt);
     if (sharedLines) {
       const next = await sharedLines.next();
@@ -159,6 +163,7 @@ export function createAsker(input, out) {
     }
     resetTty(input);
     const rl = createInterface(readlineOptions(input));
+    if (defaultValue) rl.write(defaultValue);
     try {
       for await (const line of rl) return line;
       return null;
