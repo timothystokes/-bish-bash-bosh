@@ -60,6 +60,38 @@ export function dropEphemeralEvents(sink) {
   };
 }
 
+// Wrap a plain-text callback so only `assistant.reasoning_delta` events' own text (just
+// `data.deltaContent`, never the surrounding JSON) is forwarded to it, for a caller that wants a
+// live "thinking" stream (e.g. the Interview Loop) without parsing JSONL itself. No-op (returns
+// undefined) when `onReasoning` is omitted, same opt-in shape as `dropEphemeralEvents`.
+export function createReasoningSink(onReasoning) {
+  if (!onReasoning) return undefined;
+  const buf = { stdout: '', stderr: '' };
+  return {
+    write(stream, chunk) {
+      buf[stream] += chunk;
+      const lines = buf[stream].split('\n');
+      buf[stream] = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.startsWith('{')) continue;
+        let ev;
+        try {
+          ev = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (ev?.type === 'assistant.reasoning_delta' && typeof ev?.data?.deltaContent === 'string') {
+          onReasoning(ev.data.deltaContent);
+        }
+      }
+    },
+    flush() {
+      buf.stdout = '';
+      buf.stderr = '';
+    },
+  };
+}
+
 // Adapter driving the Copilot CLI in non-interactive mode. Session tracking is opt-in: a caller
 // that never passes `session` gets the old stateless behaviour unchanged (no `--session-id` flag
 // at all). A caller that passes `session` (undefined on its first call, then whatever this run
@@ -69,20 +101,26 @@ export function createCopilotAdapter(opts = {}) {
   const prefix = opts.prefixArgs ?? [];
   return {
     async run(req) {
-      const { prompt, cwd, limits, onOutput = undefined } = req;
+      const { prompt, cwd, limits, onOutput = undefined, onReasoning = undefined } = req;
       const tracking = Object.hasOwn(req, 'session');
       const sessionId = tracking ? req.session || randomUUID() : undefined;
       const args = [...prefix, ...buildCopilotArgs({ prompt, model: opts.model, sessionId })];
       const live = dropEphemeralEvents(onOutput);
+      const reasoning = createReasoningSink(onReasoning);
+      const write = (!live && !reasoning) ? undefined : (stream, chunk) => {
+        live?.write(stream, chunk);
+        reasoning?.write(stream, chunk);
+      };
       const { code, stdout, stderr, timedOut, changedFiles } = await runProcessAgent({
         command,
         args,
         cwd,
         env: opts.env,
         maxWallClockSeconds: limits.maxWallClockSeconds,
-        onOutput: live?.write,
+        onOutput: write,
       });
       live?.flush();
+      reasoning?.flush();
       const parsed = parseCopilotOutput(stdout);
       const exitStatus = timedOut ? 124 : code;
       const transcript = stderr ? `${parsed.transcript}\n[stderr]\n${stderr}` : parsed.transcript;

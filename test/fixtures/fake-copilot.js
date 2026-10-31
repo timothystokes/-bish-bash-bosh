@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 const fx = JSON.parse(process.env.FAKE_AGENT_FIXTURE ?? '{}');
 if (fx.hang) setInterval(() => {}, 1000);
 else {
+  for (const line of fx.extraLines ?? []) console.log(line);
   for (const [rel, content] of Object.entries(fx.writes ?? {})) {
     const full = join(process.cwd(), rel);
     mkdirSync(dirname(full), { recursive: true });

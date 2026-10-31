@@ -124,7 +124,27 @@ test('the question and the prompt are shown in color, distinguishing Q from A, w
   assert.match(prompts[1], /^\x1b\[33mA:  $/);
   assert.equal(defaults[1], 'pre-filled default', 'the second question\'s existing default is handed to ask, not baked into the prompt text');
   assert.equal(said[1], '\x1b[0m', 'color is reset right after each answer, so later output is not left yellow');
-  assert.match(said[2], /^\x1b\[90mThinking\.\.\.\x1b\[0m\n$/, 'a "Thinking..." line, shown dim/grey, on its own line, right before the agent is called');
+  assert.equal(said[2], '\x1b[90mThinking...', 'a "Thinking..." line, shown dim/grey, right before the agent is called, with no trailing reset/newline yet so live reasoning text can continue on the same line');
+  assert.equal(said[3], '\x1b[0m\n', 'color is reset and the line ended once the agent call has finished');
+});
+
+test('the agent\'s own live reasoning text streams right after "Thinking...", in the same grey, as it arrives', async () => {
+  const { path: interviewPath, dir } = makeFile();
+  /** @type {string[]} */
+  const said = [];
+  /** @type {{ calls: any[], run: (req: any) => Promise<{ exitStatus: number, transcript: string, changedFiles: string[], session?: unknown }> }} */
+  const adapter = {
+    calls: [],
+    run: async (req) => {
+      adapter.calls.push(req);
+      req.onReasoning?.("I'm");
+      req.onReasoning?.(' thinking this through');
+      return { exitStatus: 0, transcript: '', changedFiles: [] };
+    },
+  };
+  await runInterviewLoop({ interviewPath, ...io(), ask: async () => 'a', say: (s) => said.push(s), adapter, repoDir: dir, ...sessionStore() });
+  assert.equal(typeof adapter.calls[0].onReasoning, 'function', 'the adapter request carries an onReasoning callback');
+  assert.deepEqual(said.slice(2, 5), ['\x1b[90mThinking...', "I'm", ' thinking this through'], 'reasoning text is forwarded to say() plain, inheriting the grey already set by "Thinking..."');
 });
 
 test('once every question is answered, a further call reports ok with nothing left to ask or hand to the agent', async () => {

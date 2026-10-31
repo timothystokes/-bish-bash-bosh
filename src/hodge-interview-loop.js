@@ -70,11 +70,14 @@ function markProcessed(interviewPath, readFile, writeFile, id) {
 // accepted — any other key clears the whole thing in one go and starts a fresh answer in the same
 // yellow — see `createAsker`), writes the answer back into that line (checkbox still unticked),
 // prints a "Thinking..." line, hands exactly that round's question and answer to the agent (one
-// call per round, prompts/interview-loop.md's job), then ticks the line's checkbox once the agent
-// has finished. `loadSession`/`saveSession` thread one continuing agent session through every
-// round, and across separate `hodge` invocations (the caller persists it, e.g. to a file), so the
-// agent keeps the whole conversation's context rather than starting fresh each time. Stops at EOF
-// (paused, so a restart resumes where it left off) or once no unprocessed question remains (ok).
+// call per round, prompts/interview-loop.md's job), streaming the agent's own live reasoning text
+// (if any) right after it in the same grey, via the adapter contract's opt-in `onReasoning`
+// callback — adapters that have no such concept simply never call it, so this is a no-op there —
+// then ticks the line's checkbox once the agent has finished. `loadSession`/`saveSession` thread
+// one continuing agent session through every round, and across separate `hodge` invocations (the
+// caller persists it, e.g. to a file), so the agent keeps the whole conversation's context rather
+// than starting fresh each time. Stops at EOF (paused, so a restart resumes where it left off) or
+// once no unprocessed question remains (ok).
 /**
  * @param {{
  *   interviewPath: string,
@@ -117,9 +120,16 @@ export async function runInterviewLoop({
     lines[next.lineIndex] = renderLine(next.id, false, next.question, answer);
     writeFile(interviewPath, lines.join('\n'));
 
-    say(`${GREY}Thinking...${RESET}\n`);
+    say(`${GREY}Thinking...`);
     const prompt = buildInterviewLoopPrompt(next.question, answer);
-    const result = await adapter.run({ prompt, cwd: repoDir, limits: {}, session: loadSession() });
+    const result = await adapter.run({
+      prompt,
+      cwd: repoDir,
+      limits: {},
+      session: loadSession(),
+      onReasoning: (text) => say(text),
+    });
+    say(`${RESET}\n`);
     saveSession(result.session);
 
     markProcessed(interviewPath, readFile, writeFile, next.id);

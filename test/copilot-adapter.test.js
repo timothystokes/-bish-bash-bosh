@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createCopilotAdapter, buildCopilotArgs, parseCopilotOutput, dropEphemeralEvents } from '../src/adapters/copilot.js';
+import { createCopilotAdapter, buildCopilotArgs, parseCopilotOutput, dropEphemeralEvents, createReasoningSink } from '../src/adapters/copilot.js';
 import { adapterContract } from './helpers/adapter-contract.js';
 
 const fake = fileURLToPath(new URL('./fixtures/fake-copilot.js', import.meta.url));
@@ -124,4 +124,49 @@ test('dropEphemeralEvents flushes a trailing partial line and passes through whe
   f.flush();
   assert.deepEqual(out, ['tail without newline']);
   assert.equal(dropEphemeralEvents(undefined), undefined);
+});
+
+test('createReasoningSink forwards only assistant.reasoning_delta text, never the JSON or other events', () => {
+  /** @type {string[]} */
+  const out = [];
+  const f = createReasoningSink((text) => out.push(text));
+  assert.ok(f);
+  const delta1 = JSON.stringify({ type: 'assistant.reasoning_delta', ephemeral: true, data: { deltaContent: "I'm" } });
+  const delta2 = JSON.stringify({ type: 'assistant.reasoning_delta', ephemeral: true, data: { deltaContent: ' thinking' } });
+  const other = JSON.stringify({ type: 'assistant.message', data: { content: 'done' } });
+  f.write('stdout', `${delta1}\n${delta2.slice(0, 10)}`);
+  f.write('stdout', `${delta2.slice(10)}\n${other}\n`);
+  f.flush();
+  assert.deepEqual(out, ["I'm", ' thinking']);
+});
+
+test('createReasoningSink is a no-op (undefined) when onReasoning is omitted', () => {
+  assert.equal(createReasoningSink(undefined), undefined);
+});
+
+test('createCopilotAdapter calls onReasoning with live reasoning text independently of onOutput', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cop-'));
+  try {
+    const reasoningDelta = JSON.stringify({
+      type: 'assistant.reasoning_delta',
+      ephemeral: true,
+      data: { deltaContent: 'thinking out loud' },
+    });
+    /** @type {string[]} */
+    const reasoningOut = [];
+    /** @type {string[]} */
+    const outputOut = [];
+    const r = await make({ exitStatus: 0, transcript: 'ok', writes: {}, extraLines: [reasoningDelta] }).run({
+      prompt: 'p',
+      cwd,
+      limits: {},
+      onReasoning: (text) => reasoningOut.push(text),
+      onOutput: (_s, c) => outputOut.push(c),
+    });
+    assert.equal(r.exitStatus, 0);
+    assert.deepEqual(reasoningOut, ['thinking out loud']);
+    assert.ok(!outputOut.some((c) => c.includes('reasoning_delta')), 'onOutput still drops the ephemeral event');
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
 });
