@@ -278,7 +278,7 @@ test('hodge drives the Interview Loop from stdin, operating on cwd, and hands ea
   assert.equal(seedCode, 0, seedOuts.join(''));
   writeFileSync(
     join(dir, '.hodgepodge', 'interview.md'),
-    `${readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8')}\n# 2\n[ ] Q: Who uses the greeter?\n[ ] A:\n`,
+    `${readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8')}\n2. [ ] Q: Who uses the greeter? A: \n`,
   );
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', 'seed interview store');
@@ -297,12 +297,12 @@ test('hodge drives the Interview Loop from stdin, operating on cwd, and hands ea
   );
   const text = outs.join('');
   assert.equal(code, 0, text);
-  assert.match(text, /Describe the objective in a sentence\./);
+  assert.match(text, /What is the objective\?/);
   assert.match(text, /Who uses the greeter\?/);
   assert.match(text, /Interview complete: 2 questions answered this run\./);
   assert.equal(prompts.length, 2, 'both answered rounds were handed to the agent');
   const afterLoop = readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8');
-  assert.match(afterLoop, /\[x\] Q: Who uses the greeter\?/, 'both rounds ticked once handed to the agent');
+  assert.match(afterLoop, /2\. \[x\] Q: Who uses the greeter\? A: Developers/, 'both rounds checked, with the answer written back, once handed to and processed by the agent');
 });
 
 test('code owns the store: agent edits to .hodgepodge/interview.md are discarded', async () => {

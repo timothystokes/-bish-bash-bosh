@@ -11,32 +11,23 @@ const sample = [
   '',
   'This is a list of Questions (Q) and Answers (A) determined through an interview process. ',
   '',
-  '# 1',
-  '[ ] Q: Describe the objective in a sentence.',
-  '[ ] A: ',
-  '',
-  '# 2',
-  '[ ] Q: Who are the users?',
-  '[ ] A: pre-filled default',
-  '',
-  '# 3',
-  '[x] Q: Already specified.',
-  '[x] A: done already',
+  '1. [ ] Q: Describe the objective in a sentence. A: ',
+  '2. [ ] Q: Who are the users? A: pre-filled default',
+  '3. [x] Q: Already specified. A: done already',
   '',
 ].join('\n');
 
-test('parseQuestions reads each # N / Q / A block, including a pre-filled but unchecked answer', () => {
+test('parseQuestions reads each numbered `N. [ ] Q: ... A: ...` line, including a pre-filled but unprocessed answer', () => {
   const qs = parseQuestions(sample);
   assert.equal(qs.length, 3);
-  assert.deepEqual(qs[0], { id: 1, qChecked: false, question: 'Describe the objective in a sentence.', aChecked: false, answer: '', aLineIndex: 6 });
+  assert.deepEqual(qs[0], { id: 1, checked: false, question: 'Describe the objective in a sentence.', answer: '', lineIndex: 4 });
   assert.equal(qs[1].answer, 'pre-filled default');
-  assert.equal(qs[2].qChecked, true);
-  assert.equal(qs[2].aChecked, true);
+  assert.equal(qs[2].checked, true);
 });
 
-test('nextQuestion is the first block with neither checkbox checked, skipping already-specified ones', () => {
+test('nextQuestion is the first line not yet checked, skipping already-processed ones', () => {
   assert.equal(nextQuestion(parseQuestions(sample))?.id, 1);
-  assert.equal(nextQuestion(parseQuestions(sample.replace('# 1\n[ ] Q: Describe the objective in a sentence.\n[ ] A: ', '# 1\n[x] Q: Describe the objective in a sentence.\n[x] A: x'))).id, 2);
+  assert.equal(nextQuestion(parseQuestions(sample.replace('1. [ ] Q: Describe the objective in a sentence. A: ', '1. [x] Q: Describe the objective in a sentence. A: x'))).id, 2);
 });
 
 test('buildInterviewLoopPrompt prefaces prompts/interview-loop.md onto this round\'s question and answer', () => {
@@ -78,7 +69,7 @@ function sessionStore() {
   return { loadSession: () => store.session, saveSession: (s) => { store.session = s; }, store };
 }
 
-test('an Enter with no input accepts the pre-filled default answer, checks the A box, then hands the round to the agent and checks the Q box too', async () => {
+test('an Enter with no input accepts the pre-filled default answer, writes it back, hands the round to the agent, then ticks the checkbox', async () => {
   const { path: interviewPath, dir } = makeFile();
   const say = () => {};
   let n = 0;
@@ -90,12 +81,10 @@ test('an Enter with no input accepts the pre-filled default answer, checks the A
   assert.equal(res.answered, 2);
   const after = parseQuestions(readFileSync(interviewPath, 'utf8'));
   assert.equal(after[0].answer, 'my objective');
-  assert.equal(after[0].aChecked, true);
-  assert.equal(after[0].qChecked, true, 'ticked once the round has been handed to the agent');
+  assert.equal(after[0].checked, true, 'ticked once the round has been handed to and processed by the agent');
   assert.equal(after[1].answer, 'pre-filled default', 'Enter alone keeps the existing default');
-  assert.equal(after[1].aChecked, true);
-  assert.equal(after[1].qChecked, true);
-  assert.equal(after[2].answer, 'done already', 'an already-answered question is untouched');
+  assert.equal(after[1].checked, true);
+  assert.equal(after[2].answer, 'done already', 'an already-processed question is untouched');
   assert.equal(adapter.calls.length, 2);
   assert.match(adapter.calls[0].prompt, /## Question\n\nDescribe the objective in a sentence\.\n\n## Answer\n\nmy objective/);
   assert.equal(adapter.calls[0].cwd, dir);
@@ -108,7 +97,7 @@ test('EOF (null from ask) pauses without marking the current question or calling
   assert.equal(res.status, 'paused');
   assert.equal(res.answered, 0);
   assert.equal(res.remaining, 2);
-  assert.equal(parseQuestions(readFileSync(interviewPath, 'utf8'))[0].aChecked, false);
+  assert.equal(parseQuestions(readFileSync(interviewPath, 'utf8'))[0].checked, false);
   assert.equal(adapter.calls.length, 0);
 });
 

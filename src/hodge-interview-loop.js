@@ -1,8 +1,8 @@
-// The Interview Loop: a deterministic walk through `.hodgepodge/interview.md`'s checkbox format
-// (see templates/interview-template.md). Each question block has two independent checkboxes: `Q`
-// (ticked once this round has been handed to the agent) and `A` (ticked as soon as the owner has
-// answered, before the agent call). Finding the next question to ask only ever looks at these two
-// checkboxes; the loop never reads or writes anything else about a question's history.
+// The Interview Loop: a deterministic walk through `.hodgepodge/interview.md`'s numbered-line format
+// (see templates/interview-template.md): one line per question, `<n>. [ ] Q: <question> A: <answer>.`,
+// with a single checkbox ticked only once that round has been fully handed to and processed by the
+// agent. Finding the next question to ask only ever looks at that one checkbox; the loop never reads
+// or writes anything else about a question's history.
 import { loadModePrompt } from './prompts.js';
 
 const CYAN = '\x1b[1;36m';
@@ -10,69 +10,68 @@ const YELLOW = '\x1b[33m';
 const GREY = '\x1b[90m';
 const RESET = '\x1b[0m';
 
-const BLOCK = /^# (\d+)\s*$/;
-const Q_LINE = /^\[([ x])\] Q:\s?(.*)$/;
-const A_LINE = /^\[([ x])\] A:\s?(.*)$/;
+const LINE = /^(\d+)\.\s*\[([ x])\]\s*Q:\s*(.*?)\s*A:\s*(.*)$/;
 
-// Parses the checkbox blocks out of an interview.md's text. Returns one entry per well-formed
-// `# N` / `[ ] Q: ...` / `[ ] A: ...` triplet, with the line index of its `A:` line so the loop can
-// rewrite just that line in place (the `Q:` line is always the line directly above it).
+// Parses the numbered question lines out of an interview.md's text. Returns one entry per
+// well-formed `<n>. [ ] Q: <question> A: <answer>` line, with its line index so the loop can
+// rewrite it in place.
 export function parseQuestions(text) {
   const lines = text.split('\n');
   const out = [];
   for (let i = 0; i < lines.length; i++) {
-    const id = BLOCK.exec(lines[i]);
-    if (!id) continue;
-    const q = Q_LINE.exec(lines[i + 1] ?? '');
-    const a = A_LINE.exec(lines[i + 2] ?? '');
-    if (!q || !a) continue;
+    const m = LINE.exec(lines[i]);
+    if (!m) continue;
     out.push({
-      id: Number(id[1]),
-      qChecked: q[1] === 'x',
-      question: q[2].trim(),
-      aChecked: a[1] === 'x',
-      answer: a[2].trim(),
-      aLineIndex: i + 2,
+      id: Number(m[1]),
+      checked: m[2] === 'x',
+      question: m[3].trim(),
+      answer: m[4].trim(),
+      lineIndex: i,
     });
   }
   return out;
 }
 
-// The next question to ask: the first block where neither checkbox is checked yet.
+// The next question to ask: the first line not yet checked.
 export function nextQuestion(questions) {
-  return questions.find((q) => !q.qChecked && !q.aChecked) ?? null;
+  return questions.find((q) => !q.checked) ?? null;
 }
 
 // The agent's prompt for one round: prompts/interview-loop.md's instructions, prefaced onto this
 // round's question and answer. The agent is expected to update .hodgepodge/spec.md and, if it
-// judges the spec still incomplete, append further question blocks to interview.md itself.
+// judges the spec still incomplete, append further question lines to interview.md itself.
 export function buildInterviewLoopPrompt(question, answer) {
   return [loadModePrompt('interview'), '## Question', question, '## Answer', answer].join('\n\n');
 }
 
-// Ticks a question block's `Q` checkbox by id, re-reading the file first since the agent's own
-// call may have already changed it (e.g. appended more questions). A block the agent removed is
-// left alone rather than erroring: the round's answer already landed, which is what matters.
-function markAsked(interviewPath, readFile, writeFile, id) {
+// Renders one question line, checked or not, with its current question/answer text.
+function renderLine(id, checked, question, answer) {
+  return `${id}. [${checked ? 'x' : ' '}] Q: ${question} A: ${answer}`;
+}
+
+// Ticks a question line's checkbox by id, re-reading the file first since the agent's own call may
+// have already changed it (e.g. appended more questions). A line the agent removed is left alone
+// rather than erroring: the round's answer already landed, which is what matters.
+function markProcessed(interviewPath, readFile, writeFile, id) {
   const text = readFile(interviewPath);
   const q = parseQuestions(text).find((x) => x.id === id);
   if (!q) return;
   const lines = text.split('\n');
-  lines[q.aLineIndex - 1] = `[x] Q: ${q.question}`;
+  lines[q.lineIndex] = renderLine(q.id, true, q.question, q.answer);
   writeFile(interviewPath, lines.join('\n'));
 }
 
-// Runs the loop against `interview.md` in `repoDir`: finds the next unanswered question, shows it
+// Runs the loop against `interview.md` in `repoDir`: finds the next unprocessed question, shows it
 // in color, awaits an answer on stdin (a real terminal shows the existing default in grey, ahead of
 // the cursor; Enter alone accepts it as-is — turning it yellow to match the `A:` label as it's
 // accepted — any other key clears the whole thing in one go and starts a fresh answer in the same
-// yellow — see `createAsker`), writes the answer back with its checkbox marked, prints a "Thinking..."
-// line, then hands the question and answer to
-// the agent (one call per round, prompts/interview-loop.md's job) before ticking the `Q` checkbox
-// too. `loadSession`/`saveSession` thread one continuing agent session through every round, and
-// across separate `hodge` invocations (the caller persists it, e.g. to a file), so the agent keeps
-// the whole conversation's context rather than starting fresh each time. Stops at EOF (paused, so
-// a restart resumes where it left off) or once no unanswered question remains (ok).
+// yellow — see `createAsker`), writes the answer back into that line (checkbox still unticked),
+// prints a "Thinking..." line, hands exactly that round's question and answer to the agent (one
+// call per round, prompts/interview-loop.md's job), then ticks the line's checkbox once the agent
+// has finished. `loadSession`/`saveSession` thread one continuing agent session through every
+// round, and across separate `hodge` invocations (the caller persists it, e.g. to a file), so the
+// agent keeps the whole conversation's context rather than starting fresh each time. Stops at EOF
+// (paused, so a restart resumes where it left off) or once no unprocessed question remains (ok).
 /**
  * @param {{
  *   interviewPath: string,
@@ -107,12 +106,12 @@ export async function runInterviewLoop({
     const reply = await ask(`${YELLOW}A: `, next.answer);
     say(RESET);
     if (reply === null) {
-      const remaining = parseQuestions(readFile(interviewPath)).filter((q) => !q.qChecked && !q.aChecked).length;
+      const remaining = parseQuestions(readFile(interviewPath)).filter((q) => !q.checked).length;
       return { status: 'paused', answered, remaining };
     }
     const answer = reply.trim() === '' ? next.answer : reply.trim();
     const lines = text.split('\n');
-    lines[next.aLineIndex] = `[x] A: ${answer}`;
+    lines[next.lineIndex] = renderLine(next.id, false, next.question, answer);
     writeFile(interviewPath, lines.join('\n'));
 
     say(`${GREY}Thinking...${RESET}\n`);
@@ -120,7 +119,7 @@ export async function runInterviewLoop({
     const result = await adapter.run({ prompt, cwd: repoDir, limits: {}, session: loadSession() });
     saveSession(result.session);
 
-    markAsked(interviewPath, readFile, writeFile, next.id);
+    markProcessed(interviewPath, readFile, writeFile, next.id);
     answered++;
   }
 }

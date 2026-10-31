@@ -2,7 +2,5 @@
 
 This is a list of Questions (Q) and Answers (A) determined through an interview process. 
 
-# 1
-[ ] Q: Describe the objective in a sentence.
-[ ] A: 
+1. [ ] Q: What is the objective? A: Default answer.
 

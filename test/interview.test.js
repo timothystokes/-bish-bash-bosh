@@ -170,7 +170,7 @@ test('hodge on a fresh repo first seeds the interview store from its template; o
   // a second, custom question with a pre-filled default so the loop's resume/default behaviour can be exercised
   writeFileSync(
     join(dir, '.hodgepodge', 'interview.md'),
-    `${readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8')}\n# 2\n[ ] Q: Who uses the greeter?\n[ ] A: Developers\n`,
+    `${readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8')}\n2. [ ] Q: Who uses the greeter? A: Developers\n`,
   );
   git(dir, 'add', '-A');
   git(dir, 'commit', '-qm', 'seed interview store');
@@ -178,14 +178,13 @@ test('hodge on a fresh repo first seeds the interview store from its template; o
   const paused = await withCwd(dir, () =>
     main(['hodge'], { registry, identity, input: Readable.from(['Build a greeter\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
   assert.equal(paused, 1, 'paused at EOF, not ok');
-  assert.match(out.join(''), /Describe the objective in a sentence\./);
+  assert.match(out.join(''), /What is the objective\?/);
   assert.match(out.join(''), /Paused after 1 question: 1 question left\. Run `hodge` again to continue\./);
   assert.equal(a.prompts.length, 1, 'one agent round for the one question answered before EOF');
-  assert.match(a.prompts[0], /## Question\n\nDescribe the objective in a sentence\.\n\n## Answer\n\nBuild a greeter/);
+  assert.match(a.prompts[0], /## Question\n\nWhat is the objective\?\n\n## Answer\n\nBuild a greeter/);
   const afterFirst = readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8');
-  assert.match(afterFirst, /\[x\] Q: Describe the objective in a sentence\./, 'ticked once handed to the agent');
-  assert.match(afterFirst, /\[x\] A: Build a greeter/);
-  assert.match(afterFirst, /\[ \] A: Developers/, 'the second question is untouched, not yet asked');
+  assert.match(afterFirst, /1\. \[x\] Q: What is the objective\? A: Build a greeter/, 'checked, and the answer is written back, once handed to and processed by the agent');
+  assert.match(afterFirst, /2\. \[ \] Q: Who uses the greeter\? A: Developers/, 'the second question is untouched, not yet asked');
   out.length = 0;
   const done = await withCwd(dir, () =>
     main(['hodge'], { registry, identity, input: Readable.from(['\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
@@ -194,8 +193,7 @@ test('hodge on a fresh repo first seeds the interview store from its template; o
   assert.match(out.join(''), /Interview complete: 1 question answered this run\./);
   assert.equal(a.prompts.length, 2, 'the second run handed its round to the agent too');
   const afterSecond = readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8');
-  assert.match(afterSecond, /\[x\] A: Developers/, 'Enter alone accepted the pre-filled default');
-  assert.match(afterSecond, /\[x\] Q: Who uses the greeter\?/, 'ticked once handed to the agent');
+  assert.match(afterSecond, /2\. \[x\] Q: Who uses the greeter\? A: Developers/, 'Enter alone accepted the pre-filled default, and the line is checked once handed to and processed by the agent');
   assert.equal(readFileSync(join(dir, 'README.md'), 'utf8'), '# target\n');
 });
 
@@ -204,7 +202,7 @@ test('the agent session is persisted in .hodgepodge/config.yml, not a separate f
   commitProjectConfig(dir, config({ adapter: 'sess' }));
   writeFileSync(
     join(dir, '.hodgepodge', 'interview.md'),
-    `${readFileSync(join(process.cwd(), 'templates', 'interview-template.md'), 'utf8')}\n# 2\n[ ] Q: Who uses the greeter?\n[ ] A: Developers\n`,
+    `${readFileSync(join(process.cwd(), 'templates', 'interview-template.md'), 'utf8')}\n2. [ ] Q: Who uses the greeter? A: Developers\n`,
   );
   git(dir, 'add', '-A');
   git(dir, 'commit', '-qm', 'seed interview store');
