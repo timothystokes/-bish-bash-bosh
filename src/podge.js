@@ -16,10 +16,12 @@ const PLAN_FILE = '.hodgepodge/plan.md';
 const LOG_FILE = '.hodgepodge/podge-log.md';
 
 // `podge`: for now, only the Plan Loop (specification.md -> dependency-ordered checklist items in
-// plan.md). The very first `podge` run in a project seeds plan.md from its template and exits: no
-// lock, no agent call. Later runs drain the Plan Loop, handing each unprocessed specification item to
-// the agent in turn until none remain. `podge step` (routed here as cmd 'step') is untouched: it still
-// runs a single iteration of the older build loop (specs -> test plan -> red tests -> implementation).
+// plan.md). The very first `podge` run in a project seeds plan.md from its template, then falls
+// straight through into the Plan Loop in the same invocation (no owner input is needed in between,
+// unlike hodge's interview seed). Later runs drain the Plan Loop, handing each unprocessed
+// specification item to the agent in turn until none remain. `podge step` (routed here as cmd
+// 'step') is untouched: it still runs a single iteration of the older build loop (specs -> test
+// plan -> red tests -> implementation).
 export async function runPodge(cmd, argv, deps, out, err) {
   const { label, debug, parsed } = parseRunArgs(cmd, argv);
   if (!parsed.ok) {
@@ -37,8 +39,10 @@ export async function runPodge(cmd, argv, deps, out, err) {
     if (!existsSync(join(repo, PLAN_FILE))) {
       writeFileSync(join(repo, PLAN_FILE), readFileSync(join(templatesDir, 'plan-template.md'), 'utf8'));
       if (!existsSync(join(repo, LOG_FILE))) writeFileSync(join(repo, LOG_FILE), '');
-      out(`Wrote ${PLAN_FILE} from its template.\nRun \`podge\` again to start the plan loop.\n`);
-      return 0;
+      out(`Wrote ${PLAN_FILE} from its template.\n`);
+      // Unlike hodge (which needs the owner to actually type an answer before the Interview Loop's
+      // first round means anything), nothing here depends on the owner reviewing or editing the
+      // freshly-seeded plan.md first: fall straight through into the Plan Loop in this same run.
     }
   }
   const lock = acquireRunLock(project.dir);
