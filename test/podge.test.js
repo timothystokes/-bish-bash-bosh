@@ -18,24 +18,31 @@ function fakeAdapter() {
   };
 }
 
-test('podge on a fresh repo seeds plan.md from its template, then falls straight through into the plan loop in the same invocation (no second run needed)', async () => {
+test('podge requires plan.md (written by `gepo`) to exist first', async () => {
   const dir = initGitRepo(freshDir('podge-cli-'));
-  commitProjectConfig(dir, config({ adapter: 'pl' }));
+  commitProjectConfig(dir, config());
+  const err = [];
+  const code = await withCwd(dir, () => main(['podge'], { stdout: () => {}, stderr: (s) => err.push(s) }));
+  assert.equal(code, 2);
+  assert.match(err.join(''), /\.hodgepodge\/plan\.md not found\. Run `gepo` first\./);
+});
+
+test('podge drives the Build Loop over every unprocessed plan.md item, ticking each as it is handed to the agent', async () => {
+  const dir = initGitRepo(freshDir('podge-cli-'));
+  commitProjectConfig(dir, config({ adapter: 'bl' }));
   writeFileSync(
-    join(dir, '.hodgepodge', 'specification.md'),
-    '# Specification\n\n1. [ ] C: Provide a login screen. B: Users can authenticate.\n',
+    join(dir, '.hodgepodge', 'plan.md'),
+    '# Plan\n\n- [ ] Phase: Core. Task: Implement the login screen.\n',
   );
   const adapter = fakeAdapter();
-  const registry = { pl: () => adapter };
+  const registry = { bl: () => adapter };
   const out = [];
   const code = await withCwd(dir, () =>
     main(['podge'], { registry, stdout: (s) => { out.push(s); }, stderr: () => {} }));
   assert.equal(code, 0);
-  const text = out.join('');
-  assert.match(text, /Wrote \.hodgepodge\/plan\.md from its template\./);
-  assert.ok(existsSync(join(dir, '.hodgepodge', 'plan.md')), 'plan.md seeded from the template');
-  assert.equal(adapter.calls.length, 1, 'the one specification item was handed to the agent in this same run, no second invocation needed');
-  assert.match(text, /Plan complete: 1 item processed this run\./);
-  const specAfter = readFileSync(join(dir, '.hodgepodge', 'specification.md'), 'utf8');
-  assert.match(specAfter, /1\. \[x\] C: Provide a login screen\./, 'the item is marked processed');
+  assert.equal(adapter.calls.length, 1);
+  assert.match(out.join(''), /Build complete: 1 item processed this run\./);
+  assert.ok(existsSync(join(dir, '.hodgepodge', 'podge-log.md')), 'podge-log.md is created');
+  const planAfter = readFileSync(join(dir, '.hodgepodge', 'plan.md'), 'utf8');
+  assert.match(planAfter, /- \[x\] Phase: Core\. Task: Implement the login screen\./, 'the item is marked processed');
 });

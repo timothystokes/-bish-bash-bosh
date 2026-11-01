@@ -74,11 +74,11 @@ function markProcessed(specificationPath, readFile, writeFile, id) {
 // `.hodgepodge/plan.md`), then ticks the item's checkbox once the agent has finished. Unlike the
 // Interview Loop there is no human input and no pause: it processes every unprocessed item in one
 // call, stopping only once none remain (status 'ok'). `loadSession`/`saveSession` thread one
-// continuing agent session through every item, and across separate `podge` invocations, so the agent
+// continuing agent session through every item, and across separate `gepo` invocations, so the agent
 // keeps the whole conversation's context rather than starting fresh each time; the very first item of
 // a brand-new session (no session persisted yet) also prefaces prompts/plan-intro.md onto that one
 // call only — never again for a later item or a restart that resumes the same session. `log` (see
-// hodge-log.js), if given, is called once per item with the full prompt sent (`'podge'`) and, if the
+// hodge-log.js), if given, is called once per item with the full prompt sent (`'gepo'`) and, if the
 // agent streamed any reasoning text via an opt-in `onReasoning` callback, the full accumulated text of
 // that stream (`'agent'`) — never the raw JSON behind either.
 /**
@@ -115,7 +115,7 @@ export async function runPlanLoop({
     say(`${GREY}Thinking...${RESET}\n`);
     const session = loadSession();
     const prompt = buildPlanLoopPrompt(next, { includeIntro: session === undefined });
-    log('podge', prompt);
+    log('gepo', prompt);
     let reasoning = '';
     const result = await adapter.run({
       prompt,

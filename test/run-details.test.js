@@ -2,11 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { readRunDetails } from '../src/run-details.js';
 import { createLocalStatusSource, readRunStatus } from '../src/status.js';
 import { renderFrame } from '../src/tui.js';
-import { writeDoneReport } from '../src/podge-done.js';
 import { main } from '../src/cli.js';
 import { writeProjectConfig, withCwd } from './support/project.js';
 
@@ -14,6 +13,15 @@ const control = /** @type {const} */ ({ ok: true, paused: false, stop: false });
 
 const diagnosis = { rootCause: 'rc', evidence: 'ev', fix: 'fx', test: 't', prevention: 'pv' };
 const finding = { classification: 'violated-decision', severity: 'high', spec: 'specs/a.md', consequence: 'bad', diagnosis };
+
+// The old build loop's `writeDoneReport` (src/podge-done.js, removed with it) wrote exactly this: the
+// shape is still live (status.js/tui.js still read done.json off disk), so this fixture-writer is
+// reproduced here rather than reviving the module just for it.
+function writeDoneReport(repoDir, runId, report) {
+  const path = join(repoDir, '.hodgepodge', 'runs', runId, 'done.json');
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(report, null, 2)}\n`);
+}
 
 function makeRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'hodge-details-'));

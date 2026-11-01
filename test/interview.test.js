@@ -220,12 +220,12 @@ test('the agent session is persisted in .hodgepodge/config.yml, not a separate f
   await withCwd(dir, () => main(['hodge'], { registry, identity, input: Readable.from(['Build a greeter\n']), stdout: () => {}, stderr: () => {} }));
   assert.equal(seen[0], undefined, 'no session yet on the very first round');
   let cfg = readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8');
-  assert.match(cfg, /interviewSession: s1/);
+  assert.match(cfg, /hodgeSession: s1/);
   assert.ok(!existsSync(join(dir, '.hodgepodge', 'interview-session.json')), 'no separate session file is written');
   await withCwd(dir, () => main(['hodge'], { registry, identity, input: Readable.from(['\n']), stdout: () => {}, stderr: () => {} }));
   assert.equal(seen[1], 's1', 'the second round resumes the session the first round returned');
   cfg = readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8');
-  assert.match(cfg, /interviewSession: s2/);
+  assert.match(cfg, /hodgeSession: s2/);
 });
 
 test('hodge usage errors exit 2', async () => {

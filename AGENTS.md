@@ -10,7 +10,7 @@ Hodgepodge is a model-agnostic harness for loop-engineering (Ralph-style) delive
 - One item per session: do it, update `plan.md`, stop. Search the repo before assuming something is missing.
 - Tests first: they must exist, fail, then pass. No stubs or partial implementations.
 - Vanilla JS, no JSDoc; `tsc --checkJs` is a lint-only check (`strict:false`). Tests use `node:test`. No model or vendor names in harness logic (config only, `specs/adapters.md`).
-- Keep per-loop context small (`test/next-item.test.js` enforces byte budgets): loops get one plan item plus spec pointers, never whole files. Shrink prompts, don't grow them.
+- Keep per-loop context small: loops get one plan item plus spec pointers, never whole files. Shrink prompts, don't grow them. (No test currently enforces a byte budget on this — `test/next-item.test.js` did, for the old build loop, and was removed with it; a future request could add an equivalent check for `gepo`/`podge`'s prompts.)
 - Missing tools or packages are never a blocker: install them. Only a missing credential is, and say which. `implement later` tasks in `plan.md` are deferred: never pick them or check for their CLIs/keys.
 - On failure tune prompts/specs/gates ("add a sign"); don't just retry.
 - Pre-release: no compatibility code, aliases, deprecation notes or migrations.

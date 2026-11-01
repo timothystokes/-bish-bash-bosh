@@ -1,11 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import Ajv from 'ajv';
 import { writeIterationRecord } from '../src/podge-run-record.js';
-import { writeDoneReport } from '../src/podge-done.js';
 
 const SCHEMAS = ['config', 'record', 'usage', 'diagnosis', 'done'];
 
@@ -24,15 +23,23 @@ const check = (name, data) => {
 /** @type {Record<string, string>} */
 const diagnosis = { rootCause: 'r', evidence: 'e', fix: 'f', test: 't', prevention: 'p' };
 
+// The old build loop's `writeDoneReport` (src/podge-done.js, removed with it) wrote exactly this: the
+// shape is still live (status.js/tui.js still read done.json off disk), so this fixture-writer is
+// reproduced here rather than reviving the module just for it.
+function writeDoneReport(repoDir, runId, report) {
+  const path = join(repoDir, '.hodgepodge', 'runs', runId, 'done.json');
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(report, null, 2)}\n`);
+}
+
 test('every artifact schema compiles in strict mode and has an $id', () => {
   for (const n of SCHEMAS) assert.ok(load(n).$id, n);
 });
 
-test('config schema accepts a single adapter/model and maxQaCycles', () => {
+test('config schema accepts a single adapter/model', () => {
   const cfg = {
     adapter: 'a',
     model: 'm',
-    maxQaCycles: 3,
   };
   assert.equal(check('config', cfg).ok, true);
   const { model, ...noModel } = cfg;

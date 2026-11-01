@@ -6,7 +6,6 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateConfig } from '../src/config.js';
 import { runInterview, buildInterviewPrompt } from '../src/hodge-interview.js';
-import { runLoop } from '../src/podge-driver.js';
 import { checkReadiness } from '../src/readiness.js';
 import { main } from '../src/cli.js';
 import { freshDir, seedObjectiveProject, withCwd, writeProjectConfig } from './support/project.js';
@@ -148,16 +147,6 @@ test('interview with a bootstrapped store: a ready result is ok; it may write .h
   });
   assert.equal(res.status, 'ok', JSON.stringify(res));
   assert.deepEqual(checkReadiness(repo), { ready: true, gaps: [] });
-});
-
-test('run is gated until the objective is ready (no agent call)', async () => {
-  const { repo, config } = briefed();
-  let called = 0;
-  const adapter = { async run() { called++; return { transcript: '', exitStatus: 0, changedFiles: [] }; } };
-  const res = await runLoop({ config, repoDir: repo, runId: 'r1', adapter, identity, requireTestPlan: true });
-  assert.equal(res.status, 'gated');
-  assert.match(String(res.reason), /not ready/);
-  assert.equal(called, 0);
 });
 
 test('hodgepodge ready reports gaps then ready', async () => {

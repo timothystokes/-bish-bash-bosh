@@ -1,9 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { helpText } from '../src/cli.js';
 
 test('helpText mentions hodge and usage', () => {
@@ -27,24 +24,9 @@ test('bin/hodgepodge with no args prints help', () => {
   assert.match(out, /Usage:/);
 });
 
-test('bin/hodge and bin/podge --help print the shared help', () => {
-  for (const b of ['hodge', 'podge']) {
+test('bin/hodge, bin/gepo and bin/podge --help print the shared help', () => {
+  for (const b of ['hodge', 'gepo', 'podge']) {
     assert.equal(execFileSync('node', [`bin/${b}`, '--help'], { encoding: 'utf8' }).trim(), helpText().trim());
-  }
-});
-
-test('podge step runs one iteration', async () => {
-  const { main } = await import('../src/cli.js');
-  const prev = process.cwd();
-  process.chdir(mkdtempSync(join(tmpdir(), 'cli-nocfg-')));
-  try {
-    /** @type {string[]} */
-    const errs = [];
-    const code = await main(['podge', 'step'], { stdout: () => {}, stderr: (s) => { errs.push(s); } });
-    assert.equal(code, 2);
-    assert.match(errs.join(''), /podge step: /);
-  } finally {
-    process.chdir(prev);
   }
 });
 
@@ -66,9 +48,8 @@ test('removed commands are rejected', async () => {
   }
 });
 
-test('bin/hodgepodge does not host hodge, podge or step', () => {
-  for (const c of ['hodge', 'podge', 'step']) {
+test('bin/hodgepodge does not host hodge, gepo or podge', () => {
+  for (const c of ['hodge', 'gepo', 'podge']) {
     assert.equal(spawnSync('node', ['bin/hodgepodge', c], { encoding: 'utf8' }).status, 2, c);
   }
-  assert.equal(spawnSync('node', ['bin/hodgepodge', 'podge', 'step'], { encoding: 'utf8' }).status, 2);
 });

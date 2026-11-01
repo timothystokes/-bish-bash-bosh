@@ -30,31 +30,3 @@ export function exportBundle({ sourceDir, builderDir }) {
   return { ok: true, sha: git(dest, 'rev-parse', 'HEAD').trim(), files: git(dest, 'ls-files').split('\n').filter(Boolean) };
 }
 
-// Firewall gate for clean-room mode: the builder repo must hold a spec bundle, its root commit may
-// contain only specs/ and tests/, and it must not point at the source repo.
-export function checkCleanRoomGate(repoDir, opts = {}) {
-  const fail = (reason) => ({ ok: false, reason: `clean-room firewall: ${reason}` });
-  let roots;
-  try {
-    roots = git(repoDir, 'rev-list', '--max-parents=0', 'HEAD').split('\n').filter(Boolean);
-  } catch {
-    return fail('builder repo has no commits; run `hodgepodge clean-room` to export the bundle');
-  }
-  const leaked = new Set();
-  for (const root of roots) {
-    for (const f of git(repoDir, 'ls-tree', '-r', '--name-only', root).split('\n').filter(Boolean)) {
-      if (!BUNDLE.some((d) => f.startsWith(`${d}/`))) leaked.add(f);
-    }
-  }
-  if (leaked.size > 0) return fail(`root commit holds files outside specs/ and tests/: ${[...leaked].join(', ')}`);
-  const specs = join(repoDir, 'specs');
-  if (!existsSync(specs) || !readdirSync(specs).some((f) => f.endsWith('.md'))) return fail('builder repo has no specs/*.md');
-  if (!existsSync(join(repoDir, 'tests'))) return fail('builder repo has no tests/');
-  const forbidden = new Set(opts.sourceRemotes ?? []);
-  if (forbidden.size > 0) {
-    const urls = git(repoDir, 'remote', '-v').split('\n').map((l) => l.split(/\s+/)[1]).filter(Boolean);
-    const hit = urls.find((u) => forbidden.has(u));
-    if (hit) return fail(`builder repo has the source as a remote: ${hit}`);
-  }
-  return { ok: true, detail: 'bundle is specs + tests only' };
-}

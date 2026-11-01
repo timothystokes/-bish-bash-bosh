@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseSpecificationItems, nextSpecificationItem, runPlanLoop, buildPlanLoopPrompt } from '../src/podge-plan-loop.js';
+import { parseSpecificationItems, nextSpecificationItem, runPlanLoop, buildPlanLoopPrompt } from '../src/gepo-plan-loop.js';
 import { loadModePrompt, loadPlanIntro } from '../src/prompts.js';
 
 const sample = [
@@ -53,7 +53,7 @@ test('buildPlanLoopPrompt only prefaces plan-intro.md when includeIntro is passe
 });
 
 function makeFile() {
-  const dir = mkdtempSync(join(tmpdir(), 'podge-plan-loop-'));
+  const dir = mkdtempSync(join(tmpdir(), 'gepo-plan-loop-'));
   const path = join(dir, 'specification.md');
   writeFileSync(path, sample);
   return { path, dir };
@@ -142,7 +142,7 @@ test('plan-intro.md is not re-included after a restart that resumes an already-p
   assert.ok(!adapter.calls[0].prompt.startsWith(loadPlanIntro().trimEnd()), 'a restart resuming a persisted session never gets the intro again');
 });
 
-test('log is called once per item with the full prompt sent (\'podge\') and once with the full accumulated reasoning text (\'agent\') when the agent streams any', async () => {
+test('log is called once per item with the full prompt sent (\'gepo\') and once with the full accumulated reasoning text (\'agent\') when the agent streams any', async () => {
   const { path: specificationPath, dir } = makeFile();
   /** @type {[string, string][]} */
   const logged = [];
@@ -155,7 +155,7 @@ test('log is called once per item with the full prompt sent (\'podge\') and once
     specificationPath, ...io(), say: () => {}, adapter, repoDir: dir,
     log: (source, text) => logged.push([source, text]), ...sessionStore(),
   });
-  assert.equal(logged[0][0], 'podge');
+  assert.equal(logged[0][0], 'gepo');
   assert.match(logged[0][1], /## Constraint\n\nProvide a login screen\.\n\n## Benefit\n\nUsers can authenticate\./);
   assert.deepEqual(logged[1], ['agent', 'step one, step two']);
 });
@@ -168,6 +168,6 @@ test('log is only called with the "podge" entry, never an "agent" one, when the 
     specificationPath, ...io(), say: () => {}, adapter: fakeAdapter(), repoDir: dir,
     log: (source, text) => logged.push([source, text]), ...sessionStore(),
   });
-  assert.deepEqual(logged[0], ['podge', logged[0][1]]);
+  assert.deepEqual(logged[0], ['gepo', logged[0][1]]);
   assert.ok(!logged.some((l) => l[0] === 'agent'), 'no "agent" entry is logged when the adapter never streams any reasoning text');
 });

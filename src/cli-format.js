@@ -20,26 +20,17 @@ export function formatPlanLoopResult(res) {
   return `Plan complete: ${plural(res.processed, 'item')} processed this run.\n`;
 }
 
+// `podge`'s Build Loop (runBuildLoop): {status, processed}. Same shape and the same reasoning as
+// formatPlanLoopResult above: every unprocessed plan.md item is handed to the agent in one run.
+export function formatBuildLoopResult(res) {
+  return `Build complete: ${plural(res.processed, 'item')} processed this run.\n`;
+}
+
 // `hodge --reverse` (runReverse): {status, sha, reason?}.
 export function formatReverseResult(res) {
   const { status, sha, reason } = res;
   if (status === 'ok') return `Reverse-engineered specs and tests (commit ${short(sha)}).\n`;
   return `Reverse ${status}${reason ? `: ${reason}` : ''}.\n`;
-}
-
-// `podge step` (runStep): {sha, iteration, status, reason?}.
-export function formatStepResult(res) {
-  const { status, sha, iteration, reason } = res;
-  if (status === 'ok') return `Step ${iteration} ok (commit ${short(sha)}).\n`;
-  return `Step ${iteration} ${status}${reason ? `: ${reason}` : ''}.\n`;
-}
-
-// `podge` (runLoop): {status, steps, reason?, qa?}.
-export function formatLoopResult(res) {
-  const { status, steps, reason, qa } = res;
-  const counts = `${plural(steps.length, 'step')}${qa ? `, ${plural(qa.length, 'QA cycle')}` : ''}`;
-  if (status === 'done') return `Done after ${counts}.\n`;
-  return `${status[0].toUpperCase()}${status.slice(1)} after ${counts}${reason ? `: ${reason}` : ''}.\n`;
 }
 
 // `hodgepodge spec-lint` (lintSpecs): {ok, problems}.

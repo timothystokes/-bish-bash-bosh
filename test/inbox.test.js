@@ -7,9 +7,7 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { addEntry, readInbox, consumeInbox, inboxSection, INBOX_FILE } from '../src/inbox.js';
 import { main } from '../src/cli.js';
-import { buildPrompt, buildPlanPrompt, runStep } from '../src/podge-step.js';
 import { buildInterviewPrompt, runInterview } from '../src/hodge-interview.js';
-import { createFakeAdapter } from '../src/adapter.js';
 import { writeProjectConfig, withCwd } from './support/project.js';
 
 const tmp = () => mkdtempSync(join(tmpdir(), 'hodge-inbox-'));
@@ -59,9 +57,6 @@ test('O-3: prompts carry the entries only when given', () => {
   const repo = tmp();
   mkdirSync(join(repo, 'specs'));
   writeFileSync(join(repo, 'plan.md'), '- [ ] item\n');
-  assert.doesNotMatch(buildPrompt(repo), /More todos/);
-  assert.match(buildPrompt(repo, 'forward', undefined, '- t1\n'), /## More todos[\s\S]*- t1/);
-  assert.match(buildPlanPrompt(repo, undefined, '- t1\n'), /## More todos[\s\S]*- t1/);
   assert.doesNotMatch(buildInterviewPrompt(repo, 'obj'), /More questions/);
   assert.match(buildInterviewPrompt(repo, 'obj', false, '- q1\n'), /## More questions[\s\S]*- q1/);
 });
@@ -107,35 +102,6 @@ const cfg = {
   adapter: 'fake',
   model: 'm',
 };
-
-test('O-3: runStep sends the project todos in its prompt and consumes them after an ok step', async () => {
-  const repo = makeRepo();
-  const inboxDir = tmp();
-  addEntry(inboxDir, 'podge', 'cover the empty case');
-  /** @type {string[]} */
-  const prompts = [];
-  const adapter = {
-    run: async (/** @type {{prompt: string}} */ req) => {
-      prompts.push(req.prompt);
-      writeFileSync(join(repo, 'src.txt'), 'x');
-      return { exitStatus: 0, transcript: '', changedFiles: [] };
-    },
-  };
-  const res = await runStep({ config: cfg, repoDir: repo, runId: 'r', adapter: /** @type {any} */ (adapter), testCommand: ['true'], inboxDir });
-  assert.match(prompts[0], /## More todos[\s\S]*cover the empty case/);
-  if (res.status === 'ok') assert.equal(readInbox(inboxDir, 'podge'), '');
-  else assert.match(readInbox(inboxDir, 'podge'), /cover the empty case/);
-});
-
-test('O-3: a gated or failed step keeps the todos for the next one', async () => {
-  const repo = makeRepo();
-  writeFileSync(join(repo, 'dirty'), 'x');
-  const inboxDir = tmp();
-  addEntry(inboxDir, 'podge', 'keep me');
-  const res = await runStep({ config: cfg, repoDir: repo, runId: 'r', adapter: createFakeAdapter({ exitStatus: 0, transcript: '', writes: {} }), testCommand: ['true'], inboxDir });
-  assert.equal(res.status, 'gated');
-  assert.equal(readInbox(inboxDir, 'podge'), '- keep me\n');
-});
 
 test('O-3: runInterview sends the project questions and consumes them unless the round failed', async () => {
   const repo = makeRepo();

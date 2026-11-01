@@ -50,27 +50,27 @@ async function run(args) {
   return { code, err: errs.join('') };
 }
 
-test('hodge, podge and podge step refuse a project held by a live process, and release the lock when done', async () => {
+test('hodge, gepo and podge refuse a project held by a live process, and release the lock when done', async () => {
   const dir = tmp();
   initGitRepo(dir);
   await withCwd(dir, async () => {
     commitProjectConfig(dir, { adapter: 'f', model: 'm' });
     mkdirSync(join(dir, '.hodgepodge'), { recursive: true });
     writeFileSync(join(dir, '.hodgepodge', 'interview.md'), '# Interview\n');
-    // podge's own first-run seed (of plan.md from specification.md) bypasses the lock by design,
-    // same as hodge's own interview.md seed above: pre-seed both so podge's lock-protected branch
-    // is exercised here, not its seed-and-exit-0 branch.
+    // gepo's own first-run seed (of plan.md from specification.md) bypasses the lock by design,
+    // same as hodge's own interview.md seed above: pre-seed both so gepo's and podge's
+    // lock-protected branches are exercised here, not their seed-and-exit-0 branches.
     writeFileSync(join(dir, '.hodgepodge', 'specification.md'), '# Specification\n');
     writeFileSync(join(dir, '.hodgepodge', 'plan.md'), '# Plan\n');
     writeFileSync(join(dir, LOCK_FILE), `${process.ppid}\n`);
-    for (const args of [['hodge'], ['hodge', '--reverse'], ['podge'], ['podge', 'step']]) {
+    for (const args of [['hodge'], ['hodge', '--reverse'], ['gepo'], ['podge']]) {
       const r = await run(args);
       assert.equal(r.code, 2, args.join(' '));
       assert.match(r.err, /another run holds this project/);
     }
     mkdirSync(dirname(join(dir, LOCK_FILE)), { recursive: true });
     writeFileSync(join(dir, LOCK_FILE), '2147483646\n');
-    const r = await main(['podge', 'step'], { stdout: () => {}, stderr: () => {}, registry: {} });
+    const r = await main(['podge'], { stdout: () => {}, stderr: () => {}, registry: {} });
     assert.notEqual(r, undefined);
     assert.equal(existsSync(join(dir, LOCK_FILE)), false);
   });

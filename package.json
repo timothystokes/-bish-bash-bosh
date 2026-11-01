@@ -7,6 +7,7 @@
   "bin": {
     "hodgepodge": "bin/hodgepodge",
     "hodge": "bin/hodge",
+    "gepo": "bin/gepo",
     "podge": "bin/podge"
   },
   "engines": {

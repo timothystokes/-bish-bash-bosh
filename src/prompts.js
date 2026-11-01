@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** Modes named in specs/modes.md; each needs its own file in prompts/ before it can run. */
-export const MODES = ['interview', 'plan', 'plan-loop', 'forward', 'reverse', 'brownfield', 'test-hardening', 'clean-room'];
+export const MODES = ['interview', 'plan-loop', 'build-loop', 'reverse'];
 
 const promptsDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'prompts');
 
@@ -18,11 +18,6 @@ export function loadModePrompt(mode) {
   return readFileSync(file, 'utf8').trimEnd();
 }
 
-/** Prompt for the QA cycle (not a mode: it runs between build cycles, never as the loop prompt). */
-export function loadQaPrompt() {
-  return readFileSync(join(promptsDir, 'qa.md'), 'utf8').trimEnd();
-}
-
 /** `prompts/interview-intro.md`'s raw content. Two unrelated consumers: the legacy, CLI-unreachable
  * `hodge-questions.js` store uses it untrimmed as `STORE_HEADER`, its literal file header; the live
  * Interview Loop (`src/hodge-interview-loop.js`) prefaces it, trimmed, onto the very first agent
@@ -33,11 +28,19 @@ export function loadInterviewIntro() {
 }
 
 /** `prompts/plan-intro.md`'s raw content, prefaced (trimmed, by the caller) onto the very first agent
- * prompt of a new Plan Loop session only (`src/podge-plan-loop.js`) — mirrors `loadInterviewIntro`
+ * prompt of a new Plan Loop session only (`src/gepo-plan-loop.js`) — mirrors `loadInterviewIntro`
  * above exactly, for the same reason: never on a later item, never again after a restart that resumes
- * the same persisted `planSession` id. */
+ * the same persisted `gepoSession` id. */
 export function loadPlanIntro() {
   return readFileSync(join(promptsDir, 'plan-intro.md'), 'utf8');
+}
+
+/** `prompts/build-intro.md`'s raw content, prefaced (trimmed, by the caller) onto the very first agent
+ * prompt of a new Build Loop session only (`src/podge-build-loop.js`) — mirrors `loadPlanIntro` above
+ * exactly, for the same reason: never on a later item, never again after a restart that resumes the
+ * same persisted `podgeSession` id. */
+export function loadBuildIntro() {
+  return readFileSync(join(promptsDir, 'build-intro.md'), 'utf8');
 }
 
 // Guidance for one declared spec format (`prompts/formats/<format>.md`).

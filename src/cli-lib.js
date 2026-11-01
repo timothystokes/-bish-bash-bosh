@@ -3,9 +3,9 @@ import { resolve } from 'node:path';
 import { loadProjectConfig, CONFIG_FILE } from './project-config.js';
 
 export const LOGO = [
-  '╷ ╷╭─╮┌─╮╭─╴┌─╴┌─╮╭─╮┌─╮╭─╴┌─╴',
-  '├─┤│ ││ ││╶┐├╴ ├─╯│ ││ ││╶┐├╴ ',
-  '╵ ╵╰─╯└─╯╰─╯└─╴╵  ╰─╯└─╯╰─╯└─╴'
+  '\x1b[0;34m╷ ╷╭─╮┌─╮\x1b[0;32m╭─╴┌─╴\x1b[0;33m┌─╮╭─╮\x1b[0;31m┌─╮╭─╴┌─╴\x1b[0m',
+  '\x1b[0;34m├─┤│ ││ │\x1b[0;32m│╶┐├╴ \x1b[0;33m├─╯│ │\x1b[0;31m│ ││╶┐├╴ \x1b[0m',
+  '\x1b[0;34m╵ ╵╰─╯└─╯\x1b[0;32m╰─╯└─╴\x1b[0;33m╵  ╰─╯\x1b[0;31m└─╯╰─╯└─╴\x1b[0m'
 ].join('\n');
 
 export function helpText() {
@@ -14,18 +14,18 @@ export function helpText() {
     '',
     'hodgepodge: model-agnostic harness for loop-engineered delivery',
     '',
-    'Three programs, one flow: `hodgepodge init`, then `hodge` (requirements and specs), then `podge` (plan and implementation).',
+    'Three loops, one flow: `hodgepodge init`, then `hodge` (requirements and specs), `gepo` (plan), `podge` (build).',
     '',
     'Usage:',
     '  hodgepodge init   (interactive: asks which adapter/model to use for everything)',
     '  hodge  [--run-id <id>] [--reverse] [--debug]',
-    '  podge  [--run-id <id>] [--control <control.json>] [--debug]   (with `maxQaCycles` in .hodgepodge/config.yml, done also needs a clean QA report; findings return to the plan, up to maxQaCycles)',
-    '  podge step [--run-id <id>] [--debug]',
-    '  --debug (or HODGEPODGE_DEBUG=1) on hodge/podge/podge step: log to stdout the agent prompt, the agent process raw stdout/stderr live, each call\'s exit status and parsed transcript, every gate result with its detail, test output on failure, and stack traces. The transcript is agent output, not the environment, but it may contain whatever the agent printed: do not share debug logs unreviewed.',
+    '  gepo   [--run-id <id>] [--debug]',
+    '  podge  [--run-id <id>] [--debug]',
+    '  --debug (or HODGEPODGE_DEBUG=1) on hodge/gepo/podge: log to stdout the agent prompt, the agent process raw stdout/stderr live, each call\'s exit status, changed files and parsed transcript, and stack traces. The transcript is agent output, not the environment, but it may contain whatever the agent printed: do not share debug logs unreviewed.',
     '  hodgepodge <command> ...   (the commands below)',
-    '  hodge, podge and podge step hold a single-run lock (.hodgepodge/lock, PID; stale locks are cleared) and refuse to start while another live run holds the project.',
+    '  hodge, gepo and podge hold a single-run lock (.hodgepodge/lock, PID; stale locks are cleared) and refuse to start while another live run holds the project.',
     '  Every command operates on the current project (cwd); there is no sandbox dir and no `--dir` flag. `hodgepodge init` writes ./.hodgepodge/config.yml holding',
-    '  adapter and model, so after `cd` into your project just run `hodgepodge init` once, then `hodge`, then `podge`.',
+    '  adapter and model, so after `cd` into your project just run `hodgepodge init` once, then `hodge`, then `gepo`, then `podge`.',
     '  hodgepodge clean-room --source <dir> --repo <builder-dir>',
     '  hodgepodge status [--run-id <id>] [--control <control.json>]',
     '  hodgepodge tui --control <control.json> [--run-id <id>]',
@@ -42,26 +42,26 @@ export function helpText() {
     '',
     'Commands:',
     '  init   ask which adapter/model to use for everything, then write ./.hodgepodge/config.yml; refuses if ./.hodgepodge/config.yml already exists; no scaffolding (no target repo, no runtime copy, no launcher scripts); prints a short confirmation message; exit 0 only when ok',
-    '  hodge  requirements gathering: the very first run only writes `.hodgepodge/interview.md` and `.hodgepodge/specification.md` from their templates and exits (no agent call); run again to start the Interview Loop, which is pure code (no agent): it finds the first unanswered question in `interview.md`, shows it in colour, reads your answer from stdin (Enter alone keeps any existing default text), marks its answered checkbox, and repeats; Ctrl-D (EOF) pauses and a rerun resumes;',
+    '  hodge  requirements gathering: the very first run only writes `.hodgepodge/interview.md` and `.hodgepodge/specification.md` from their templates and exits (no agent call); run again to start the Interview Loop, which is pure code (no agent): it finds the first unanswered question in `interview.md`, shows it in colour, reads your answer from stdin (Enter alone keeps any existing default text), hands the round to the agent, marks its answered checkbox, and repeats; Ctrl-D (EOF) pauses and a rerun resumes;',
     '         with --reverse it instead reverse-engineers specs/ + characterization tests from existing code (commits only if only specs/tests changed,',
     '         spec-lint passes and the test suite is green); exit 0 only when ok (or, without --reverse, once every question is answered)',
-    '  podge  planning and implementation: with specs but no tests/PLAN.md the first step writes the test plan, red tests and plan.md; then loops steps until the plan is done and verified (suite, types, every R-<spec>-<n> named by a passing test; writes .hodgepodge/runs/<id>/done.json) (plus a clean QA report when config has `maxQaCycles`) or a step fails/gates (failed iterations write diagnosis.json: root cause, evidence, fix, test, prevention) (--control <file> honours control.json, the only way to bound an otherwise non-terminating loop);',
-    '         prints JSON {status, steps, reason?}; exit 0 only when done',
-    '  podge step  run one loop iteration (the unit `podge` and the cloud driver repeat); prints JSON {sha, iteration, status}',
-    '         (--run-id defaults to "default")',
+    '  gepo   plan: refuses to run until `.hodgepodge/specification.md` exists (run `hodge` first); the very first run writes `.hodgepodge/plan.md` from its template, then falls straight into the Plan Loop, which hands each unprocessed specification.md item to the agent in turn (one dependency-ordered checklist per item, appended to plan.md) until every item is processed;',
+    '         prints a plain summary of items processed; exit 0 only when ok',
+    '  podge  build: refuses to run until `.hodgepodge/plan.md` exists (run `gepo` first); the Build Loop hands each unprocessed plan.md item to the agent in turn, writing the actual files and configuration for it in the project root, until every item is processed;',
+    '         prints a plain summary of items processed; exit 0 only when ok',
     '  clean-room  export only specs/ + tests/ from --source into a fresh git repo at --repo (the builder never sees source); prints JSON {ok, sha, files};',
-    '         exit 0 only when ok. Then run `podge` there with config mode clean-room (firewall gate checks the bundle first)',
-    '  status  print JSON run status: iterations, seconds, plus `details` (declared formats, readiness by dimension, QA findings, done evidence) and control state with --control',
-    '  tui    live terminal view: log tail, seconds and iterations, declared formats, readiness by dimension, QA findings, done evidence; keys p pause, r resume, s steer, x stop (confirmed), q quit',
+    '         exit 0 only when ok',
+    '  status  print JSON run status: iterations, seconds, plus `details` (declared formats, readiness by dimension) and control state with --control',
+    '  tui    live terminal view: log tail, seconds and iterations, declared formats, readiness by dimension; keys p pause, r resume, s steer, x stop (confirmed), q quit',
     '  proxy  secret-redacting, usage-metering proxy in front of a model endpoint; prints JSON {port} then serves until SIGINT/SIGTERM',
-    '  ready  check the specs are captured at a fine grain (granularity, testable/atomic requirements, negative paths, no vague words or unmeasured non-functional requirements, all ten dimensions covered or n/a with a reason per spec, no placeholders,\n         no open questions); prints JSON {ready, gaps}; exit 0 only when ready. `podge` is gated by it once the project has started an interview (`.hodgepodge/interview.md` exists)',
+    '  ready  check the specs are captured at a fine grain (granularity, testable/atomic requirements, negative paths, no vague words or unmeasured non-functional requirements, all ten dimensions covered or n/a with a reason per spec, no placeholders,\n         no open questions); prints JSON {ready, gaps}; exit 0 only when ready',
     '  spec-lint  check specs/*.md structure, Implementation field, requirement IDs and tests/PLAN.md mapping; prints JSON {ok, problems};',
     '         exit 0 only when clean',
     '  sync   copy .hodgepodge/runs/<id>/** to S3 (idempotent, needs the `aws` CLI); prints JSON {uploaded, skipped}',
     '  promote  open a promotion-review PR from --head to --base with the commit and artifacts URI (needs `gh`); never merges; prints JSON {url}',
     '  kill   stop the run container: sets stop in --control first (so no new iteration starts), then `docker stop`; prints JSON {stopped, name};\n         exit 0 when stopped or already gone, 1 on docker failure',
-    '  console  plain outer console (no model, no lock) for a running loop: each line you type is queued as a bullet in ./more-questions.md (hodge: assessed and added to the open questions next round) or ./more-todos.md (podge: added to plan.md by the end-of-session checklist before the next item is assessed); consumed after a successful round/step; /quit or Ctrl-D ends',
-    '  control  write pause/resume/stop/steer to a control file read by `podge --control`; prints JSON {ok}',
+    '  console  plain outer console (no model, no lock) for a running loop: each line you type is queued as a bullet in ./more-questions.md (hodge: assessed and added to the open questions next round) or ./more-todos.md (podge: added to plan.md by the end-of-session checklist before the next item is assessed); consumed after a successful round/item; /quit or Ctrl-D ends',
+    '  control  write pause/resume/stop/steer to a control file read by `hodgepodge tui`/`status`; prints JSON {ok}',
     '',
   ].join('\n');
 }
@@ -238,13 +238,13 @@ export async function askChoice(ask, out, label, choices) {
   return Number.isInteger(n) && n >= 1 && n <= choices.length ? choices[n - 1] : answer;
 }
 
-// Shared argument shape for hodge/podge/step/status/tui: the display label for error messages, whether
+// Shared argument shape for hodge/gepo/podge/status/tui: the display label for error messages, whether
 // `hodge --reverse` was passed, debug mode, and the parsed --run-id(/--control) flags.
 export function parseRunArgs(cmd, argv) {
-  const label = cmd === 'hodge' || cmd === 'podge' ? cmd : cmd === 'step' ? 'podge step' : `hodgepodge ${cmd}`;
+  const label = cmd === 'hodge' || cmd === 'gepo' || cmd === 'podge' ? cmd : `hodgepodge ${cmd}`;
   const reverse = cmd === 'hodge' && argv.includes('--reverse');
   const debug = argv.includes('--debug') || process.env['HODGEPODGE_DEBUG'] === '1';
-  const parsed = parseStepArgs(argv.slice(1).filter((a) => !(reverse && a === '--reverse') && a !== '--debug'), { control: cmd === 'podge' || cmd === 'status' || cmd === 'tui' });
+  const parsed = parseStepArgs(argv.slice(1).filter((a) => !(reverse && a === '--reverse') && a !== '--debug'), { control: cmd === 'status' || cmd === 'tui' });
   return { label, reverse, debug, parsed };
 }
 
