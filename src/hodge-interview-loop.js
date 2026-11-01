@@ -3,7 +3,7 @@
 // with a single checkbox ticked only once that round has been fully handed to and processed by the
 // agent. Finding the next question to ask only ever looks at that one checkbox; the loop never reads
 // or writes anything else about a question's history.
-import { loadModePrompt } from './prompts.js';
+import { loadModePrompt, loadInterviewIntro } from './prompts.js';
 
 const CYAN = '\x1b[1;36m';
 const YELLOW = '\x1b[33m';
@@ -43,8 +43,14 @@ export function nextQuestion(questions) {
 // The agent's prompt for one round: prompts/interview-loop.md's instructions, prefaced onto this
 // round's question and answer. The agent is expected to update .hodgepodge/specification.md and, if it
 // judges the spec still incomplete, append further question lines to interview.md itself.
-export function buildInterviewLoopPrompt(question, answer) {
-  return [loadModePrompt('interview'), '## Question', question, '## Answer', answer].join('\n\n');
+// `includeIntro` prefaces prompts/interview-intro.md onto the very top of all of that: the caller
+// passes it only for the first round of a brand-new session (see runInterviewLoop below), never for
+// a later round or a restart that resumes the same persisted session.
+export function buildInterviewLoopPrompt(question, answer, { includeIntro = false } = {}) {
+  const parts = [];
+  if (includeIntro) parts.push(loadInterviewIntro().trimEnd());
+  parts.push(loadModePrompt('interview'), '## Question', question, '## Answer', answer);
+  return parts.join('\n\n');
 }
 
 // Renders one question line, checked or not, with its current question/answer text.
@@ -71,13 +77,15 @@ function markProcessed(interviewPath, readFile, writeFile, id) {
 // yellow — see `createAsker`), writes the answer back into that line (checkbox still unticked),
 // prints a "Thinking..." line, hands exactly that round's question and answer to the agent (one
 // call per round, prompts/interview-loop.md's job), streaming the agent's own live reasoning text
-// (if any) right after it in the same grey, via the adapter contract's opt-in `onReasoning`
+// (if any) on the following line, in the same grey, via the adapter contract's opt-in `onReasoning`
 // callback — adapters that have no such concept simply never call it, so this is a no-op there —
 // then ticks the line's checkbox once the agent has finished. `loadSession`/`saveSession` thread
 // one continuing agent session through every round, and across separate `hodge` invocations (the
 // caller persists it, e.g. to a file), so the agent keeps the whole conversation's context rather
-// than starting fresh each time. Stops at EOF (paused, so a restart resumes where it left off) or
-// once no unprocessed question remains (ok).
+// than starting fresh each time; the very first round of a brand-new session (no session persisted
+// yet) also prefaces prompts/interview-intro.md onto that one call only — never again for a later
+// round or a restart that resumes the same session. Stops at EOF (paused, so a restart resumes
+// where it left off) or once no unprocessed question remains (ok).
 /**
  * @param {{
  *   interviewPath: string,
@@ -120,14 +128,15 @@ export async function runInterviewLoop({
     lines[next.lineIndex] = renderLine(next.id, false, next.question, answer);
     writeFile(interviewPath, lines.join('\n'));
 
-    say(`${GREY}Thinking...`);
-    const prompt = buildInterviewLoopPrompt(next.question, answer);
+    say(`${GREY}Thinking...\n`);
+    const session = loadSession();
+    const prompt = buildInterviewLoopPrompt(next.question, answer, { includeIntro: session === undefined });
     const result = await adapter.run({
       prompt,
       cwd: repoDir,
       limits: {},
-      session: loadSession(),
-      onReasoning: (text) => say(text),
+      session,
+      onReasoning: (chunk) => say(chunk),
     });
     say(`${RESET}\n`);
     saveSession(result.session);

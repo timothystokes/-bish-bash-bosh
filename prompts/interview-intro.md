@@ -1,11 +1,1 @@
-# Interview
-
-This is a list of questions and answers determined through an interview process. 
-
-The format below defines each entry on a new line as:
-
-<index> - Answered: [ ]; Specified: [ ]; Q: <question>; A: <default-answer>.
-
-Tick the Answered box when the question has been answerred or in the default answer is confirmed.
-Tick the Specified box when the question and answer have been distilled into the specification.md
-
+This is the start of a new Interview Loop session for this project. Over many separate rounds — each its own call, each handing you exactly one answered question — you and the owner will discover and draft this project's specs together from scratch. Treat every later round in this session as a continuation of this same conversation: remember what has already been asked, answered and specified; never repeat or re-ask a settled question.

@@ -7,7 +7,8 @@ export const MODES = ['interview', 'plan', 'plan-loop', 'forward', 'reverse', 'b
 
 const promptsDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'prompts');
 
-/** The `interview` mode's loop prompt is named interview-loop.md (interview-intro.md is a separate, unrelated file). */
+/** The `interview` mode's loop prompt is named interview-loop.md; `interview-intro.md` is loaded
+ * separately (see `loadInterviewIntro` below), not through this mode-file map. */
 const MODE_FILES = { interview: 'interview-loop.md' };
 
 export function loadModePrompt(mode) {
@@ -22,9 +23,11 @@ export function loadQaPrompt() {
   return readFileSync(join(promptsDir, 'qa.md'), 'utf8').trimEnd();
 }
 
-/** Static header written at the top of a project's `.hodgepodge/interview.md` the first time it is created.
- * Not trimmed (unlike the other loaders here): it is the store's literal file header, not a section joined
- * with others, and keeps its own trailing blank line before the question list. */
+/** `prompts/interview-intro.md`'s raw content. Two unrelated consumers: the legacy, CLI-unreachable
+ * `hodge-questions.js` store uses it untrimmed as `STORE_HEADER`, its literal file header; the live
+ * Interview Loop (`src/hodge-interview-loop.js`) prefaces it, trimmed, onto the very first agent
+ * prompt of a new session only — never on a later round, and never again after a restart that
+ * resumes the same persisted session id. Not trimmed here: callers decide that for themselves. */
 export function loadInterviewIntro() {
   return readFileSync(join(promptsDir, 'interview-intro.md'), 'utf8');
 }

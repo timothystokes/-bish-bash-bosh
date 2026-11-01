@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseQuestions, nextQuestion, runInterviewLoop, buildInterviewLoopPrompt } from '../src/hodge-interview-loop.js';
-import { loadModePrompt } from '../src/prompts.js';
+import { loadModePrompt, loadInterviewIntro } from '../src/prompts.js';
 
 const sample = [
   '# Interview',
@@ -124,11 +124,11 @@ test('the question and the prompt are shown in color, distinguishing Q from A, w
   assert.match(prompts[1], /^\x1b\[33mA:  $/);
   assert.equal(defaults[1], 'pre-filled default', 'the second question\'s existing default is handed to ask, not baked into the prompt text');
   assert.equal(said[1], '\x1b[0m', 'color is reset right after each answer, so later output is not left yellow');
-  assert.equal(said[2], '\x1b[90mThinking...', 'a "Thinking..." line, shown dim/grey, right before the agent is called, with no trailing reset/newline yet so live reasoning text can continue on the same line');
+  assert.equal(said[2], '\x1b[90mThinking...\n', 'a "Thinking..." line, shown dim/grey, right before the agent is called, with its own trailing newline so any live reasoning text streams starting on the next line');
   assert.equal(said[3], '\x1b[0m\n', 'color is reset and the line ended once the agent call has finished');
 });
 
-test('the agent\'s own live reasoning text streams right after "Thinking...", in the same grey, as it arrives', async () => {
+test('the agent\'s own live reasoning text streams on the line after "Thinking...", in the same grey, as it arrives', async () => {
   const { path: interviewPath, dir } = makeFile();
   /** @type {string[]} */
   const said = [];
@@ -144,7 +144,32 @@ test('the agent\'s own live reasoning text streams right after "Thinking...", in
   };
   await runInterviewLoop({ interviewPath, ...io(), ask: async () => 'a', say: (s) => said.push(s), adapter, repoDir: dir, ...sessionStore() });
   assert.equal(typeof adapter.calls[0].onReasoning, 'function', 'the adapter request carries an onReasoning callback');
-  assert.deepEqual(said.slice(2, 5), ['\x1b[90mThinking...', "I'm", ' thinking this through'], 'reasoning text is forwarded to say() plain, inheriting the grey already set by "Thinking..."');
+  assert.deepEqual(said.slice(2, 5), ['\x1b[90mThinking...\n', "I'm", ' thinking this through'], 'reasoning text is forwarded to say() plain, inheriting the grey already set by "Thinking..."');
+});
+
+test('buildInterviewLoopPrompt only prefaces interview-intro.md when includeIntro is passed, and puts it above everything else', () => {
+  const withIntro = buildInterviewLoopPrompt('Q', 'A', { includeIntro: true });
+  const withoutIntro = buildInterviewLoopPrompt('Q', 'A');
+  assert.ok(withIntro.startsWith(loadInterviewIntro().trimEnd()));
+  assert.ok(withIntro.endsWith(withoutIntro));
+  assert.equal(withoutIntro.includes(loadInterviewIntro().trimEnd()), false);
+});
+
+test('interview-intro.md is prefaced onto the agent prompt only on the very first round of a brand-new session, never on a later round in the same loop', async () => {
+  const { path: interviewPath, dir } = makeFile();
+  const adapter = fakeAdapter((req) => ({ session: req.session ? `${req.session}+` : 's1' }));
+  await runInterviewLoop({ interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir, ...sessionStore() });
+  assert.ok(adapter.calls[0].prompt.startsWith(loadInterviewIntro().trimEnd()), 'first-ever round of this session: intro included');
+  assert.equal(adapter.calls[1].prompt.startsWith(loadInterviewIntro().trimEnd()), false, 'second round of the same session: no intro');
+});
+
+test('interview-intro.md is not re-included after a restart that resumes an already-persisted session', async () => {
+  const { path: interviewPath, dir } = makeFile();
+  const adapter = fakeAdapter();
+  const session = sessionStore();
+  session.store.session = 's1'; // simulates a config.yml already carrying a session from a prior invocation
+  await runInterviewLoop({ interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir, ...session });
+  assert.equal(adapter.calls[0].prompt.startsWith(loadInterviewIntro().trimEnd()), false, 'a resumed session never gets the intro again, even on its first round since the restart');
 });
 
 test('once every question is answered, a further call reports ok with nothing left to ask or hand to the agent', async () => {
