@@ -23,6 +23,9 @@ export function formatPlanLoopResult(res) {
 // `podge`'s Build Loop (runBuildLoop): {status, processed}. Same shape and the same reasoning as
 // formatPlanLoopResult above: every unprocessed plan.md item is handed to the agent in one run.
 export function formatBuildLoopResult(res) {
+  if (res.status === 'failed') {
+    return `Build stopped after ${plural(res.processed, 'item')}: tests failed on "${res.item.phase}: ${res.item.task}" (unticked; run \`podge\` again to retry).\n${res.output}\n`;
+  }
   return `Build complete: ${plural(res.processed, 'item')} processed this run.\n`;
 }
 

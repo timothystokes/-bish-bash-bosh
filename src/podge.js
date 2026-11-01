@@ -1,20 +1,26 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { stringify as stringifyYaml } from 'yaml';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { resolveAdapter, defaultRegistry } from './adapters/index.js';
 import { acquireRunLock } from './run-lock.js';
 import { runBuildLoop } from './podge-build-loop.js';
+import { runTestSuite } from './podge-test-runner.js';
 import { createLogger } from './hodge-log.js';
 import { debugAdapter, parseRunArgs, loadRunProject } from './cli-lib.js';
 import { formatBuildLoopResult } from './cli-format.js';
 
+const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 const PLAN_FILE = '.hodgepodge/plan.md';
 const LOG_FILE = '.hodgepodge/podge-log.md';
+const HARNESS_FILE = '.hodgepodge/test-harness.js';
+const TESTS_DIR = '.hodgepodge/tests';
 
 // `podge`: the Build Loop (plan.md's dependency-ordered checklist items -> actual files and
 // configuration in the project root). Requires plan.md to already exist (written by `gepo`, the Plan
-// Loop) before it can run at all. Each unprocessed plan item is handed to the agent in turn, same
-// shape as the Plan Loop: no pause, one continuing agent session across the whole loop.
+// Loop) before it can run at all. Each unprocessed plan item is handed to a fresh-context build agent
+// call, gated by podge's own code running the bundled test harness (never the agent's self-report)
+// before and after a fresh-context QA agent call; only once both gates pass is the item ticked (see
+// src/podge-build-loop.js). Unlike `hodge`/`gepo` there is no continuing agent session.
 export async function runPodge(cmd, argv, deps, out, err) {
   const { label, debug, parsed } = parseRunArgs(cmd, argv);
   if (!parsed.ok) {
@@ -29,6 +35,10 @@ export async function runPodge(cmd, argv, deps, out, err) {
     return 2;
   }
   if (!existsSync(join(repo, LOG_FILE))) writeFileSync(join(repo, LOG_FILE), '');
+  if (!existsSync(join(repo, HARNESS_FILE))) {
+    writeFileSync(join(repo, HARNESS_FILE), readFileSync(join(templatesDir, 'test-harness.js'), 'utf8'));
+  }
+  mkdirSync(join(repo, TESTS_DIR), { recursive: true });
   const lock = acquireRunLock(project.dir);
   if (!lock.ok) {
     err(`${label}: ${lock.error}\n`);
@@ -43,11 +53,7 @@ export async function runPodge(cmd, argv, deps, out, err) {
       say: out,
       adapter,
       repoDir: repo,
-      loadSession: () => config.podgeSession,
-      saveSession: (session) => {
-        config.podgeSession = session;
-        writeFileSync(project.configPath, stringifyYaml(config));
-      },
+      runTests: ({ cwd }) => runTestSuite(cwd),
       log: createLogger(join(repo, LOG_FILE)),
     });
     out(formatBuildLoopResult(res));

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../src/cli.js';
 import { freshDir, initGitRepo, commitProjectConfig, withCwd } from './support/project.js';
@@ -13,9 +13,19 @@ function fakeAdapter() {
     calls,
     run: async (req) => {
       calls.push(req);
-      return { exitStatus: 0, transcript: '', changedFiles: [], session: req.session };
+      return { exitStatus: 0, transcript: '', changedFiles: [] };
     },
   };
+}
+
+// Writes a trivially-passing `.hodgepodge/tests/*.test.js` file, as if the agent had already added
+// one: podge's own code-enforced test gate requires at least one to exist before it will tick an item.
+function seedPassingTest(dir) {
+  mkdirSync(join(dir, '.hodgepodge', 'tests'), { recursive: true });
+  writeFileSync(
+    join(dir, '.hodgepodge', 'tests', 'a.test.js'),
+    "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\ntest('ok', () => assert.ok(true));\n",
+  );
 }
 
 test('podge requires plan.md (written by `gepo`) to exist first', async () => {
@@ -27,7 +37,48 @@ test('podge requires plan.md (written by `gepo`) to exist first', async () => {
   assert.match(err.join(''), /\.hodgepodge\/plan\.md not found\. Run `gepo` first\./);
 });
 
-test('podge drives the Build Loop over every unprocessed plan.md item, ticking each as it is handed to the agent', async () => {
+test('podge seeds .hodgepodge/test-harness.js from its template and creates .hodgepodge/tests/ on its first run', async () => {
+  const dir = initGitRepo(freshDir('podge-cli-'));
+  commitProjectConfig(dir, config({ adapter: 'bl' }));
+  writeFileSync(join(dir, '.hodgepodge', 'plan.md'), '# Plan\n\n');
+  const code = await withCwd(dir, () =>
+    main(['podge'], { registry: { bl: fakeAdapter }, stdout: () => {}, stderr: () => {} }));
+  assert.equal(code, 0, 'nothing to process, but seeding still happens');
+  assert.ok(existsSync(join(dir, '.hodgepodge', 'test-harness.js')), 'test-harness.js is seeded');
+  assert.ok(existsSync(join(dir, '.hodgepodge', 'tests')), '.hodgepodge/tests/ is created');
+});
+
+test('podge drives the Build Loop over every unprocessed plan.md item: a fresh-context build call, then a fresh-context QA call, ticking only once its own test-gate passes both times', async () => {
+  const dir = initGitRepo(freshDir('podge-cli-'));
+  commitProjectConfig(dir, config({ adapter: 'bl' }));
+  writeFileSync(
+    join(dir, '.hodgepodge', 'plan.md'),
+    '# Plan\n\n- [ ] Phase: Core. Task: Implement the login screen.\n',
+  );
+  const adapter = {
+    calls: [],
+    run: async (req) => {
+      adapter.calls.push(req);
+      // The build call is expected to write the item's test; simulate that happening once the
+      // build call has actually run, before podge's own code runs the test gate.
+      if (adapter.calls.length === 1) seedPassingTest(dir);
+      return { exitStatus: 0, transcript: '', changedFiles: [] };
+    },
+  };
+  const registry = { bl: () => adapter };
+  const out = [];
+  const code = await withCwd(dir, () =>
+    main(['podge'], { registry, stdout: (s) => out.push(s), stderr: () => {} }));
+  assert.equal(code, 0);
+  assert.equal(adapter.calls.length, 2, 'one build call and one QA call for the single item');
+  assert.match(out.join(''), /Build complete: 1 item processed this run\./);
+  assert.ok(existsSync(join(dir, '.hodgepodge', 'podge-log.md')), 'podge-log.md is created');
+  const planAfter = readFileSync(join(dir, '.hodgepodge', 'plan.md'), 'utf8');
+  assert.match(planAfter, /- \[x\] Phase: Core\. Task: Implement the login screen\./, 'the item is marked processed');
+  for (const call of adapter.calls) assert.ok(!Object.hasOwn(call, 'session'), 'podge never opts into session tracking');
+});
+
+test('podge stops and leaves the item unticked when its own test gate fails, reporting why', async () => {
   const dir = initGitRepo(freshDir('podge-cli-'));
   commitProjectConfig(dir, config({ adapter: 'bl' }));
   writeFileSync(
@@ -35,14 +86,12 @@ test('podge drives the Build Loop over every unprocessed plan.md item, ticking e
     '# Plan\n\n- [ ] Phase: Core. Task: Implement the login screen.\n',
   );
   const adapter = fakeAdapter();
-  const registry = { bl: () => adapter };
   const out = [];
   const code = await withCwd(dir, () =>
-    main(['podge'], { registry, stdout: (s) => { out.push(s); }, stderr: () => {} }));
-  assert.equal(code, 0);
-  assert.equal(adapter.calls.length, 1);
-  assert.match(out.join(''), /Build complete: 1 item processed this run\./);
-  assert.ok(existsSync(join(dir, '.hodgepodge', 'podge-log.md')), 'podge-log.md is created');
+    main(['podge'], { registry: { bl: () => adapter }, stdout: (s) => out.push(s), stderr: () => {} }));
+  assert.equal(code, 1, 'the agent never added a test, so the gate fails');
+  assert.equal(adapter.calls.length, 1, 'only the build call happens; QA is never reached');
+  assert.match(out.join(''), /Build stopped after 0 items/);
   const planAfter = readFileSync(join(dir, '.hodgepodge', 'plan.md'), 'utf8');
-  assert.match(planAfter, /- \[x\] Phase: Core\. Task: Implement the login screen\./, 'the item is marked processed');
+  assert.match(planAfter, /- \[ \] Phase: Core\./, 'left unticked so a later `podge` run retries it');
 });

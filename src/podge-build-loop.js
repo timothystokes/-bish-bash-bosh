@@ -1,11 +1,12 @@
 // The Build Loop: a deterministic walk through `.hodgepodge/plan.md`'s dependency-ordered checklist
 // (see prompts/plan-loop.md for the format the Plan Loop's agent writes into it: one line per item,
 // `- [ ] Phase: <phase> Task: <task>`), with a single checkbox ticked only once that item has been
-// fully handed to and processed by the agent. Unlike the Interview Loop there is no human input: each
-// unprocessed item is simply handed to the agent in turn (prompts/build-loop.md's prompt). The agent's
-// job is to implement that one item — the actual files and configuration in the project root; the
-// loop itself never writes source files, only ticks the checkbox once the agent has finished.
-import { loadModePrompt, loadBuildIntro } from './prompts.js';
+// implemented, independently verified and both gates have passed. Unlike the Interview Loop there is
+// no human input: each unprocessed item is simply handed to the agent in turn. Every call — build or
+// QA — starts a fresh agent context (no continuing session, unlike `hodge`/`gepo`): the agent is
+// instructed to read `.hodgepodge/plan.md` and the project's own source/test files rather than rely
+// on memory of earlier calls.
+import { loadModePrompt } from './prompts.js';
 
 const CYAN = '\x1b[1;36m';
 const GREY = '\x1b[90m';
@@ -31,17 +32,20 @@ export function nextPlanItem(items) {
   return items.find((i) => !i.checked) ?? null;
 }
 
-// The agent's prompt for one item: prompts/build-loop.md's instructions, prefaced onto this item's
-// phase and task. The agent is expected to implement the item in the project root; it is not expected
-// to edit specification.md, interview.md or plan.md. `includeIntro` prefaces prompts/build-intro.md
-// onto the very top of all of that: the caller passes it only for the first item of a brand-new
-// session (see runBuildLoop below), never for a later item or a restart that resumes the same
-// persisted session.
-export function buildBuildLoopPrompt(item, { includeIntro = false } = {}) {
-  const parts = [];
-  if (includeIntro) parts.push(loadBuildIntro().trimEnd());
-  parts.push(loadModePrompt('build-loop'), '## Phase', item.phase, '## Task', item.task);
-  return parts.join('\n\n');
+// The build agent's prompt for one item: prompts/build-loop.md's instructions (test-driven: write a
+// failing test first, using the bundled `.hodgepodge/test-harness.js`, then implement), prefaced onto
+// this item's phase and task. The agent is expected to implement the item in the project root; it is
+// not expected to edit specification.md, interview.md or plan.md.
+export function buildBuildLoopPrompt(item) {
+  return [loadModePrompt('build-loop'), '## Phase', item.phase, '## Task', item.task].join('\n\n');
+}
+
+// The QA agent's prompt for the same item, called only once the build call's test-gate has passed:
+// prompts/qa-loop.md's instructions (independently verify against interview.md/specification.md/
+// plan.md and the source, fix bugs directly rather than merely reporting them), prefaced onto the
+// same phase and task.
+export function buildQaLoopPrompt(item) {
+  return [loadModePrompt('qa-loop'), '## Phase', item.phase, '## Task', item.task].join('\n\n');
 }
 
 // Renders one plan item line, checked or not, with its current phase/task text.
@@ -60,29 +64,38 @@ function markProcessed(planPath, readFile, writeFile, lineIndex, phase, task) {
   writeFile(planPath, lines.join('\n'));
 }
 
+async function callAgent(adapter, repoDir, prompt, log, logSource) {
+  log(logSource, prompt);
+  let reasoning = '';
+  // No `session` key: every call (build or QA) is opted out of session tracking, so each one is a
+  // fresh agent context with no memory of any earlier call in this loop (see adapters/*.js: session
+  // tracking is opt-in via `Object.hasOwn(req, 'session')`).
+  await adapter.run({ prompt, cwd: repoDir, limits: {}, onReasoning: (chunk) => { reasoning += chunk; } });
+  if (reasoning) log('agent', reasoning);
+}
+
 // Runs the loop against `plan.md` in `repoDir`: finds the next unprocessed item, shows it in colour,
-// prints a "Thinking..." line, hands exactly that item to the agent (one call per item,
-// prompts/build-loop.md's job, expected to implement it as real files/configuration in the project
-// root), then ticks the item's checkbox once the agent has finished. Unlike the Plan Loop there is no
-// human input and no pause: it processes every unprocessed item in one call, stopping only once none
-// remain (status 'ok'). `loadSession`/`saveSession` thread one continuing agent session through every
-// item, and across separate `podge` invocations, so the agent keeps the whole conversation's context
-// rather than starting fresh each time; the very first item of a brand-new session (no session
-// persisted yet) also prefaces prompts/build-intro.md onto that one call only — never again for a
-// later item or a restart that resumes the same session. `log` (see hodge-log.js), if given, is called
-// once per item with the full prompt sent (`'podge'`) and, if the agent streamed any reasoning text via
-// an opt-in `onReasoning` callback, the full accumulated text of that stream (`'agent'`) — never the
-// raw JSON behind either.
+// then for that one item: (1) a fresh-context build agent call (prompts/build-loop.md, expected to
+// write a failing test then implement it), (2) `runTests` — podge's own code, never the agent's
+// self-report — runs the full `.hodgepodge/tests/` suite; a failure here stops this invocation with
+// the item left unticked (a later `podge` run naturally retries it, since the loop always picks the
+// first unticked item), (3) a fresh-context QA agent call (prompts/qa-loop.md, independently verifies
+// against interview.md/specification.md/plan.md and the source, and is expected to fix any bug it
+// finds directly), (4) `runTests` again as the final gate; only once both gates have passed is the
+// item's checkbox ticked. Unlike the Plan Loop there is no human input and no pause: it processes
+// every unprocessed item in one call, stopping only once none remain (status 'ok') or a gate fails
+// (status 'failed'). `log` (see hodge-log.js), if given, is called with the full prompt sent for each
+// agent call (`'podge'`) and, if the agent streamed any reasoning text via an opt-in `onReasoning`
+// callback, the full accumulated text of that stream (`'agent'`) — never the raw JSON behind either.
 /**
  * @param {{
  *   planPath: string,
  *   readFile: (p: string) => string,
  *   writeFile: (p: string, s: string) => void,
  *   say: (s: string) => void,
- *   adapter: { run: (req: object) => Promise<{ session?: unknown }> },
+ *   adapter: { run: (req: object) => Promise<object> },
  *   repoDir?: string,
- *   loadSession?: () => unknown,
- *   saveSession?: (session: unknown) => void,
+ *   runTests: (opts: { cwd: string }) => { ok: boolean, output: string },
  *   log?: (source: string, text: string) => void,
  * }} opts
  */
@@ -93,8 +106,7 @@ export async function runBuildLoop({
   say,
   adapter,
   repoDir,
-  loadSession = () => undefined,
-  saveSession = (/** @type {unknown} */ _session) => {},
+  runTests,
   log = (/** @type {string} */ _source, /** @type {string} */ _text) => {},
 }) {
   let processed = 0;
@@ -104,20 +116,25 @@ export async function runBuildLoop({
     const next = nextPlanItem(items);
     if (!next) return { status: 'ok', processed };
     say(`\n${CYAN}Phase: ${next.phase}${RESET}\n`);
+
     say(`${GREY}Thinking...${RESET}\n`);
-    const session = loadSession();
-    const prompt = buildBuildLoopPrompt(next, { includeIntro: session === undefined });
-    log('podge', prompt);
-    let reasoning = '';
-    const result = await adapter.run({
-      prompt,
-      cwd: repoDir,
-      limits: {},
-      session,
-      onReasoning: (/** @type {string} */ chunk) => { reasoning += chunk; },
-    });
-    if (reasoning) log('agent', reasoning);
-    saveSession(result.session);
+    await callAgent(adapter, repoDir, buildBuildLoopPrompt(next), log, 'podge');
+
+    let result = runTests({ cwd: repoDir });
+    if (!result.ok) {
+      log('podge', `tests failed after implementation:\n${result.output}`);
+      return { status: 'failed', processed, item: next, output: result.output };
+    }
+
+    say(`${GREY}Verifying...${RESET}\n`);
+    await callAgent(adapter, repoDir, buildQaLoopPrompt(next), log, 'podge');
+
+    result = runTests({ cwd: repoDir });
+    if (!result.ok) {
+      log('podge', `tests failed after verification:\n${result.output}`);
+      return { status: 'failed', processed, item: next, output: result.output };
+    }
+
     markProcessed(planPath, readFile, writeFile, next.lineIndex, next.phase, next.task);
     processed++;
   }

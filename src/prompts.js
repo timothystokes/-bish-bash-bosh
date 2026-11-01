@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** Modes named in specs/modes.md; each needs its own file in prompts/ before it can run. */
-export const MODES = ['interview', 'plan-loop', 'build-loop', 'reverse'];
+export const MODES = ['interview', 'plan-loop', 'build-loop', 'qa-loop', 'reverse'];
 
 const promptsDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'prompts');
 
@@ -33,14 +33,6 @@ export function loadInterviewIntro() {
  * the same persisted `gepoSession` id. */
 export function loadPlanIntro() {
   return readFileSync(join(promptsDir, 'plan-intro.md'), 'utf8');
-}
-
-/** `prompts/build-intro.md`'s raw content, prefaced (trimmed, by the caller) onto the very first agent
- * prompt of a new Build Loop session only (`src/podge-build-loop.js`) — mirrors `loadPlanIntro` above
- * exactly, for the same reason: never on a later item, never again after a restart that resumes the
- * same persisted `podgeSession` id. */
-export function loadBuildIntro() {
-  return readFileSync(join(promptsDir, 'build-intro.md'), 'utf8');
 }
 
 // Guidance for one declared spec format (`prompts/formats/<format>.md`).
