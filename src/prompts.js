@@ -32,6 +32,14 @@ export function loadInterviewIntro() {
   return readFileSync(join(promptsDir, 'interview-intro.md'), 'utf8');
 }
 
+/** `prompts/plan-intro.md`'s raw content, prefaced (trimmed, by the caller) onto the very first agent
+ * prompt of a new Plan Loop session only (`src/podge-plan-loop.js`) — mirrors `loadInterviewIntro`
+ * above exactly, for the same reason: never on a later item, never again after a restart that resumes
+ * the same persisted `planSession` id. */
+export function loadPlanIntro() {
+  return readFileSync(join(promptsDir, 'plan-intro.md'), 'utf8');
+}
+
 // Guidance for one declared spec format (`prompts/formats/<format>.md`).
 export function loadFormatSkill(format) {
   const file = join(promptsDir, 'formats', `${format}.md`);

@@ -185,36 +185,3 @@ test('runLoop propagates a failed QA run as a failed loop', async () => {
   assert.match(res.reason ?? '', /qa/i);
 });
 
-test('podge enables a QA cycle using the same configured adapter when maxQaCycles is set', async () => {
-  const dir = makeRepo('- [x] one\n');
-  /** @type {string[]} */
-  const used = [];
-  let calls = 0;
-  const registry = {
-    // the adapter id resolves twice: build first, then qa (podge.js resolves build before qa)
-    b: () => {
-      const label = (calls += 1) === 1 ? 'build' : 'qa';
-      return {
-        async run() {
-          used.push(label);
-          // No tests/PLAN.md yet, so the build call is the plan step: it must leave it mapped
-          // (requireTestPlan is on for real `podge` runs).
-          if (label === 'build') {
-            mkdirSync(join(dir, 'tests'), { recursive: true });
-            writeFileSync(join(dir, 'tests', 'PLAN.md'), '| specs/a.md | tests/a.test.js |\n');
-            writeFileSync(join(dir, 'tests', 'a.test.js'), '// a\n');
-          }
-          return { exitStatus: 0, transcript: label === 'qa' ? block([]) : '', changedFiles: [] };
-        },
-      };
-    },
-  };
-  commitProjectConfig(dir, config({ maxQaCycles: 5 }));
-  let out = '';
-  // Red, so the plan step's own "suite must be red" check passes; the build step never runs the
-  // real regression check (a plan step's tests are red by design).
-  const code = await withCwd(dir, () => main(['podge'], { registry, testCommand: ['node', '-e', 'process.exit(1)'], identity, stdout: (s) => { out += s; }, stderr: () => {} }));
-  assert.equal(code, 0, out);
-  assert.deepEqual(used, ['build', 'qa']);
-  assert.match(out, /^Done after/);
-});

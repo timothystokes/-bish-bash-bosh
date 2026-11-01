@@ -116,5 +116,4 @@ test('Q-7: a round is driven by code: the agent gets only the answers by id, nev
   assert.match(prompts[1], /Q2 \[Greeting\] Print to stdout\?: yes/);
   assert.match(prompts[1], /Q3 \[Errors\] Exit code on bad input\?: 64/);
   for (const p of prompts) assert.doesNotMatch(p, /## \.hodgepodge\/interview/, 'the question store is never shown');
-  assert.match(prompts[1], /never open `?\.hodgepodge\/interview\.md`?/i);
 });

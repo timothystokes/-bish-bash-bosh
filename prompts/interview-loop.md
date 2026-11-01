@@ -1,8 +1,12 @@
-Apply the following sequence to the single question/answer below.
+# Per Loop Instructions.
 
-1. Update the specification.md based on the detail of the quesiton and answer. 
+1. Append or adjust the specification.md based on the details of the quesiton and answer provided below. 
 
-2. Summarise the details of the specification and add any questions with default answers you deem necisary to achieve a complete spec.
+2. Adjust the answers in any unprocessed question in the interview.md from the insights of the answered question below.
 
-4. Stop
+3. Append follow up questions to interview.md, needed to capture all requirements for the objective, one per line: `<n>. [ ] Q: <question> A: <default answer>`.
+
+4. Then stop!
+
+## The Question and Answer to process
 

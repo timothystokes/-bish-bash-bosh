@@ -58,7 +58,6 @@ test('the interview prompt carries stage and current readiness gaps once the sto
   const p = buildInterviewPrompt(repo, 'Build a greeter CLI');
   assert.doesNotMatch(p, /## Readiness gaps/, 'no readiness check until the interview is ending');
   assert.match(p, /## Stage: broad/);
-  assert.match(p, /never open `?\.hodgepodge\/interview\.md`?/i);
   const closing = buildInterviewPrompt(repo, 'Build a greeter CLI', true);
   assert.match(closing, /## Readiness gaps/);
   assert.match(closing, /specs\/ has no \*\.md specs/);

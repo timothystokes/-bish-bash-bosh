@@ -157,22 +157,6 @@ test('hodgepodge control rejects bad usage', async () => {
   assert.equal(await main(['control', '--file', '/tmp/x.json'], { stderr: capture(e) }), 2);
 });
 
-test('podge --control passes the control file so a stop is honoured', async () => {
-  const dir = makeRepo();
-  const f = join(mkdtempSync(join(tmpdir(), 'hodge-ctl-')), 'control.json');
-  writeFileSync(f, JSON.stringify({ stop: true }));
-  commitProjectConfig(dir, cfg('fake'));
-  const o = /** @type {string[]} */ ([]);
-  const code = await withCwd(dir, () =>
-    main(['podge', '--control', f], {
-      registry: { fake: () => createFakeAdapter({ exitStatus: 0, transcript: '', writes: {} }) },
-      stdout: capture(o),
-      stderr: capture([]),
-    }));
-  assert.equal(code, 1);
-  assert.match(o.join(''), /^Stopped after 0 steps: stop requested via control file\.\n$/);
-});
-
 test('--debug logs the agent transcript and gate results to stdout; off by default', async () => {
   const run = async (/** @type {string[]} */ extra) => {
     const dir = makeRepo();

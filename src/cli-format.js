@@ -14,6 +14,12 @@ export function formatInterviewLoopResult(res) {
   return `Paused after ${plural(answered, 'question')}: ${plural(res.remaining, 'question')} left. Run \`hodge\` again to continue.\n`;
 }
 
+// `podge`'s Plan Loop (runPlanLoop): {status, processed}. Unlike the Interview Loop there is no
+// pause state: every unprocessed specification item is handed to the agent in one run.
+export function formatPlanLoopResult(res) {
+  return `Plan complete: ${plural(res.processed, 'item')} processed this run.\n`;
+}
+
 // `hodge --reverse` (runReverse): {status, sha, reason?}.
 export function formatReverseResult(res) {
   const { status, sha, reason } = res;

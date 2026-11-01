@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseSpecificationItems, nextSpecificationItem, runPlanLoop, buildPlanLoopPrompt } from '../src/podge-plan-loop.js';
-import { loadModePrompt } from '../src/prompts.js';
+import { loadModePrompt, loadPlanIntro } from '../src/prompts.js';
 
 const sample = [
   '# Specification',
@@ -41,6 +41,15 @@ test('buildPlanLoopPrompt prefaces prompts/plan-loop.md onto the item\'s constra
   const p = buildPlanLoopPrompt({ constraint: 'Provide a login screen.', benefit: 'Users can authenticate.' });
   assert.ok(p.startsWith(loadModePrompt('plan-loop')));
   assert.match(p, /## Constraint\n\nProvide a login screen\.\n\n## Benefit\n\nUsers can authenticate\./);
+});
+
+test('buildPlanLoopPrompt only prefaces plan-intro.md when includeIntro is passed, and puts it above everything else', () => {
+  const item = { constraint: 'Provide a login screen.', benefit: 'Users can authenticate.' };
+  const withoutIntro = buildPlanLoopPrompt(item);
+  const withIntro = buildPlanLoopPrompt(item, { includeIntro: true });
+  assert.ok(withIntro.startsWith(loadPlanIntro().trimEnd()));
+  assert.ok(withIntro.endsWith(withoutIntro));
+  assert.ok(!withoutIntro.includes(loadPlanIntro().trimEnd()));
 });
 
 function makeFile() {
@@ -114,4 +123,51 @@ test('the same session is threaded through every item, and persisted via saveSes
   assert.equal(adapter.calls[0].session, undefined, 'no session yet on the very first item');
   assert.equal(adapter.calls[1].session, 's1', 'the second item resumes what the first item returned');
   assert.equal(session.store.session, 's1+', 'the final session is persisted for a future podge invocation');
+});
+
+test('plan-intro.md is prefaced onto the agent prompt only on the very first item of a brand-new session, never on a later item in the same loop', async () => {
+  const { path: specificationPath, dir } = makeFile();
+  const adapter = fakeAdapter((req) => ({ session: req.session ? `${req.session}+` : 's1' }));
+  await runPlanLoop({ specificationPath, ...io(), say: () => {}, adapter, repoDir: dir, ...sessionStore() });
+  assert.ok(adapter.calls[0].prompt.startsWith(loadPlanIntro().trimEnd()), 'the first item of a brand-new session gets the intro');
+  assert.ok(!adapter.calls[1].prompt.startsWith(loadPlanIntro().trimEnd()), 'the second item in the same loop does not');
+});
+
+test('plan-intro.md is not re-included after a restart that resumes an already-persisted session', async () => {
+  const { path: specificationPath, dir } = makeFile();
+  const adapter = fakeAdapter();
+  const session = sessionStore();
+  session.store.session = 's1';
+  await runPlanLoop({ specificationPath, ...io(), say: () => {}, adapter, repoDir: dir, ...session });
+  assert.ok(!adapter.calls[0].prompt.startsWith(loadPlanIntro().trimEnd()), 'a restart resuming a persisted session never gets the intro again');
+});
+
+test('log is called once per item with the full prompt sent (\'podge\') and once with the full accumulated reasoning text (\'agent\') when the agent streams any', async () => {
+  const { path: specificationPath, dir } = makeFile();
+  /** @type {[string, string][]} */
+  const logged = [];
+  const adapter = fakeAdapter((req) => {
+    req.onReasoning?.('step one, ');
+    req.onReasoning?.('step two');
+    return {};
+  });
+  await runPlanLoop({
+    specificationPath, ...io(), say: () => {}, adapter, repoDir: dir,
+    log: (source, text) => logged.push([source, text]), ...sessionStore(),
+  });
+  assert.equal(logged[0][0], 'podge');
+  assert.match(logged[0][1], /## Constraint\n\nProvide a login screen\.\n\n## Benefit\n\nUsers can authenticate\./);
+  assert.deepEqual(logged[1], ['agent', 'step one, step two']);
+});
+
+test('log is only called with the "podge" entry, never an "agent" one, when the adapter never streams any reasoning text', async () => {
+  const { path: specificationPath, dir } = makeFile();
+  /** @type {[string, string][]} */
+  const logged = [];
+  await runPlanLoop({
+    specificationPath, ...io(), say: () => {}, adapter: fakeAdapter(), repoDir: dir,
+    log: (source, text) => logged.push([source, text]), ...sessionStore(),
+  });
+  assert.deepEqual(logged[0], ['podge', logged[0][1]]);
+  assert.ok(!logged.some((l) => l[0] === 'agent'), 'no "agent" entry is logged when the adapter never streams any reasoning text');
 });

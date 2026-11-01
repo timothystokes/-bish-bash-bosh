@@ -120,25 +120,6 @@ test('config rejects requireTestPlan: it is not a config field, only a runStep/r
   assert.equal(validateConfig({ ...config(), requireTestPlan: true }).ok, false);
 });
 
-test('podge prints a plain summary, exit 0 when done, 1 otherwise', async () => {
-  const dir = makeRepo('- [ ] one\n');
-  // `podge` (unlike a direct runLoop call) always lints specs, so give it one that passes structurally.
-  writeFileSync(join(dir, 'specs', 'a.md'), '# Spec: A\nImplementation: none\n');
-  git(dir, 'commit', '-aqm', 'fix spec title');
-  commitProjectConfig(dir, config());
-  const out = /** @type {string[]} */ ([]);
-  const code = await withCwd(dir, () =>
-    main(['podge', '--run-id', 'r'], {
-      registry: { f: () => createFakeAdapter({ exitStatus: 1, transcript: 'no', writes: {} }) },
-      testCommand: pass,
-      identity,
-      stdout: (s) => { out.push(s); },
-      stderr: () => {},
-    }));
-  assert.equal(code, 1);
-  assert.match(out.join(''), /^Failed after 1 step:/);
-});
-
 test('podge reports usage errors with exit 2', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'hodge-drv-cfg-'));
   const err = /** @type {string[]} */ ([]);

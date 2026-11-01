@@ -54,7 +54,6 @@ const agent = (writes, exitStatus = 0) => {
 };
 
 test('interview prompt exists, carries the objective and the spec template, not the test-plan template', () => {
-  assert.match(loadModePrompt('interview'), /one decision/i);
   const dir = makeRepo();
   const p = buildInterviewPrompt(dir, 'Build a greeter');
   assert.match(p, /Build a greeter/);

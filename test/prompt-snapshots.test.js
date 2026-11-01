@@ -38,24 +38,13 @@ test('H-13: build prompts scope the red step to the new test file and reserve th
   }
 });
 
-test('H-14: interview prompt captures Out of scope', () => {
-  const p = loadModePrompt('interview');
-  assert.match(p, /## Out of scope/);
-  assert.match(p, /ask the owner/i);
-});
-
-test('H-14: objective interview protocol asks for Out of scope per spec', () => {
-  const kit = readFileSync(join(snapDir, '..', '..', 'prompts', 'interview-loop.md'), 'utf8');
-  assert.match(kit, /Out of scope/);
-});
-
-test('interview drafts specs from each answer and reports resolved ids and gaps with defaults in response.json, never reading the log', () => {
+test('interview-loop.md tells the agent to update specification.md, adjust unprocessed questions and append follow-up questions in the store\'s own line format, then stop', () => {
   const kit = readFileSync(join(snapDir, '..', '..', 'prompts', 'interview-loop.md'), 'utf8');
   for (const text of [loadModePrompt('interview'), kit]) {
-    assert.match(text, /draft[^.]*?spec[^.]*?(each|every) answer/i);
-    assert.match(text, /response\.json/i);
-    assert.match(text, /"default"/);
-    assert.match(text, /never open `?\.hodgepodge\/interview\.md`?/i);
+    assert.match(text, /specification\.md/i);
+    assert.match(text, /interview\.md/i);
+    assert.match(text, /\[ \] Q: <question> A: <default answer>/);
+    assert.match(text, /stop/i);
   }
 });
 
@@ -65,7 +54,6 @@ test('H-16: gate-checked prompts forbid gaming the gate', () => {
     assert.match(p, /never (tick|mark)[^.\n]*(done|implemented)[^.\n]*(satisfy|pass)[^.\n]*gate/i, mode);
     assert.match(p, /do not weaken (any )?(validation|check)/i, mode);
   }
-  assert.match(loadModePrompt('interview'), /never mark[^.\n]*(ready|covered)[^.\n]*gate/i);
 });
 
 test('H-19: test-hardening needs a green baseline, a throwaway worktree and a diagnosis per surviving mutant', () => {

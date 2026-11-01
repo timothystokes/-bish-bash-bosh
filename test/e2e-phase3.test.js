@@ -2,96 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { main } from '../src/cli.js';
-import { commitProjectConfig, withCwd } from './support/project.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const bin = join(here, '..', 'bin', 'hodgepodge');
-const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
 const AWS = 'AKIAIOSFODNN7EXAMPLE';
-
-const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
-  execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
-
-/**
- * @param {string[]} argv
- */
-async function hodge(argv, registry, extra = {}) {
-  /** @type {string[]} */
-  const outs = [];
-  const code = await main(argv, {
-    ...(registry ? { registry } : {}),
-    identity: { root: '/nonexistent/hodgepodge', remotes: [] },
-    stdout: (s) => outs.push(s),
-    stderr: () => {},
-    ...extra,
-  });
-  return { code, text: outs.join('') };
-}
-
-test('phase 3 exit: pause, steer and stop via hodgepodge control drive podge', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-p3-'));
-  git(dir, 'init', '-q', '-b', 'main');
-  git(dir, 'config', 'user.email', 't@example.com');
-  git(dir, 'config', 'user.name', 'T');
-  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'toy', type: 'module', scripts: { test: 'node -e 0' } }));
-  writeFileSync(join(dir, 'plan.md'), '- [ ] a\n- [ ] b\n- [ ] c\n');
-  mkdirSync(join(dir, 'specs'));
-  writeFileSync(join(dir, 'specs', 'a.md'), '# Spec: A\nImplementation: none\n');
-  mkdirSync(join(dir, 'tests'));
-  writeFileSync(join(dir, 'tests', 'PLAN.md'), '| specs/a.md | tests/a.test.js |\n');
-  writeFileSync(join(dir, 'tests', 'a.test.js'), '// a\n');
-  git(dir, 'add', '-A');
-  git(dir, 'commit', '-qm', 'target');
-
-  const tmp = mkdtempSync(join(tmpdir(), 'hodge-cfg-'));
-  const ctl = join(tmp, 'control.json');
-  const config = {
-    adapter: 'scripted', model: 'm',
-  };
-
-  /** @type {string[]} */
-  const prompts = [];
-  const adapter = {
-    async run(req) {
-      prompts.push(req.prompt);
-      const n = prompts.length;
-      writeFileSync(join(req.cwd, 'plan.md'), '- [x] a\n- [ ] b\n- [ ] c\n');
-      mkdirSync(join(req.cwd, 'src'), { recursive: true });
-      writeFileSync(join(req.cwd, 'src', `f${n}.txt`), `${n}\n`);
-      // the operator stops the run while iteration 2 is in flight
-      if (n === 2) await hodge(['control', '--file', ctl, 'stop']);
-      return { exitStatus: 0, transcript: `iter ${n}`, changedFiles: [`src/f${n}.txt`, 'plan.md'] };
-    },
-  };
-
-  // pause first, then steer: the run must not start an iteration while paused
-  assert.equal((await hodge(['control', '--file', ctl, 'pause'])).text, 'control updated\n');
-  assert.equal((await hodge(['control', '--file', ctl, 'steer', 'prefer small functions'])).text, 'control updated\n');
-  commitProjectConfig(dir, config);
-  // Red until the first iteration's file lands, then green: satisfies the test-plan gate's
-  // "red before the first build iteration" rule without needing a real test framework.
-  const testCommand = ['node', '-e', "process.exit(require('fs').existsSync('src/f1.txt') ? 0 : 1)"];
-  const running = withCwd(dir, () =>
-    hodge(['podge', '--run-id', 'p3', '--control', ctl], { scripted: () => adapter }, { testCommand }));
-  await sleep(300);
-  assert.equal(prompts.length, 0, 'no iteration while paused');
-  assert.equal(existsSync(join(dir, 'runs', 'p3')), false);
-
-  assert.equal((await hodge(['control', '--file', ctl, 'resume'])).text, 'control updated\n');
-  const run = await running;
-
-  assert.match(run.text, /^Stopped after 2 steps/, run.text);
-  assert.equal(run.code, 1);
-  assert.match(prompts[0], /prefer small functions/);
-  assert.doesNotMatch(prompts[1], /prefer small functions/, 'steer is used for one iteration only');
-  assert.equal(JSON.parse(readFileSync(ctl, 'utf8')).steer, undefined);
-  assert.equal(git(dir, 'status', '--porcelain'), '');
-});
 
 test('phase 3 exit: hodgepodge proxy (subprocess) redacts secrets, audits without values, and meters usage', async () => {
   /** @type {string[]} */

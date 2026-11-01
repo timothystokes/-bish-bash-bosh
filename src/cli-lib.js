@@ -5,7 +5,7 @@ import { loadProjectConfig, CONFIG_FILE } from './project-config.js';
 export const LOGO = [
   '╷ ╷╭─╮┌─╮╭─╴┌─╴┌─╮╭─╮┌─╮╭─╴┌─╴',
   '├─┤│ ││ ││╶┐├╴ ├─╯│ ││ ││╶┐├╴ ',
-  '╵ ╵╰─╯└─╯╰─╯└─╴╵  ╰─╯└─╯╰─╯╰─╴'
+  '╵ ╵╰─╯└─╯╰─╯└─╴╵  ╰─╯└─╯╰─╯└─╴'
 ].join('\n');
 
 export function helpText() {

@@ -1,1 +1,7 @@
-This is the start of a new Interview Loop session for this project. Over many separate rounds — each its own call, each handing you exactly one answered question — you and the owner will discover and draft this project's specs together from scratch. Treat every later round in this session as a continuation of this same conversation: remember what has already been asked, answered and specified; never repeat or re-ask a settled question.
+# Interview
+
+You are helping to capture requirements for a new solution using an interview loop based on the local .hodgepodge/interview.md file.
+
+The loop is controlled my a harness which will invoke you, passing the details of a question with a verified answer, with the goal of you completing the local .hidgepodge/specification.md file. The question and answer you recieve will be prefixed with specific instruction per loop. Once you have processed the one question and answer then you stop and allow the harness to capture the next answer and invoke you again.
+
+Here is the first loop instructions...

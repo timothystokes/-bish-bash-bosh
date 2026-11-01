@@ -4,7 +4,7 @@
 // agent. Unlike the Interview Loop there is no human input: each unprocessed item is simply handed to
 // the agent in turn (prompts/plan-loop.md's prompt). The agent's job is to turn it into
 // dependency-ordered checklist items in `.hodgepodge/plan.md`; the loop itself never writes plan.md.
-import { loadModePrompt } from './prompts.js';
+import { loadModePrompt, loadPlanIntro } from './prompts.js';
 
 const CYAN = '\x1b[1;36m';
 const GREY = '\x1b[90m';
@@ -41,9 +41,15 @@ export function nextSpecificationItem(items) {
 
 // The agent's prompt for one item: prompts/plan-loop.md's instructions, prefaced onto this item's
 // constraint and benefit. The agent is expected to turn it into checklist items in
-// `.hodgepodge/plan.md`; it is not expected to edit specification.md or interview.md.
-export function buildPlanLoopPrompt(item) {
-  return [loadModePrompt('plan-loop'), '## Constraint', item.constraint, '## Benefit', item.benefit].join('\n\n');
+// `.hodgepodge/plan.md`; it is not expected to edit specification.md or interview.md. `includeIntro`
+// prefaces prompts/plan-intro.md onto the very top of all of that: the caller passes it only for the
+// first item of a brand-new session (see runPlanLoop below), never for a later item or a restart that
+// resumes the same persisted session.
+export function buildPlanLoopPrompt(item, { includeIntro = false } = {}) {
+  const parts = [];
+  if (includeIntro) parts.push(loadPlanIntro().trimEnd());
+  parts.push(loadModePrompt('plan-loop'), '## Constraint', item.constraint, '## Benefit', item.benefit);
+  return parts.join('\n\n');
 }
 
 // Renders one specification item line, checked or not, with its current constraint/benefit text.
@@ -69,7 +75,12 @@ function markProcessed(specificationPath, readFile, writeFile, id) {
 // Interview Loop there is no human input and no pause: it processes every unprocessed item in one
 // call, stopping only once none remain (status 'ok'). `loadSession`/`saveSession` thread one
 // continuing agent session through every item, and across separate `podge` invocations, so the agent
-// keeps the whole conversation's context rather than starting fresh each time.
+// keeps the whole conversation's context rather than starting fresh each time; the very first item of
+// a brand-new session (no session persisted yet) also prefaces prompts/plan-intro.md onto that one
+// call only — never again for a later item or a restart that resumes the same session. `log` (see
+// hodge-log.js), if given, is called once per item with the full prompt sent (`'podge'`) and, if the
+// agent streamed any reasoning text via an opt-in `onReasoning` callback, the full accumulated text of
+// that stream (`'agent'`) — never the raw JSON behind either.
 /**
  * @param {{
  *   specificationPath: string,
@@ -80,6 +91,7 @@ function markProcessed(specificationPath, readFile, writeFile, id) {
  *   repoDir?: string,
  *   loadSession?: () => unknown,
  *   saveSession?: (session: unknown) => void,
+ *   log?: (source: string, text: string) => void,
  * }} opts
  */
 export async function runPlanLoop({
@@ -91,6 +103,7 @@ export async function runPlanLoop({
   repoDir,
   loadSession = () => undefined,
   saveSession = (/** @type {unknown} */ _session) => {},
+  log = (/** @type {string} */ _source, /** @type {string} */ _text) => {},
 }) {
   let processed = 0;
   for (;;) {
@@ -100,8 +113,18 @@ export async function runPlanLoop({
     if (!next) return { status: 'ok', processed };
     say(`\n${CYAN}C: ${next.constraint}${RESET}\n`);
     say(`${GREY}Thinking...${RESET}\n`);
-    const prompt = buildPlanLoopPrompt(next);
-    const result = await adapter.run({ prompt, cwd: repoDir, limits: {}, session: loadSession() });
+    const session = loadSession();
+    const prompt = buildPlanLoopPrompt(next, { includeIntro: session === undefined });
+    log('podge', prompt);
+    let reasoning = '';
+    const result = await adapter.run({
+      prompt,
+      cwd: repoDir,
+      limits: {},
+      session,
+      onReasoning: (/** @type {string} */ chunk) => { reasoning += chunk; },
+    });
+    if (reasoning) log('agent', reasoning);
     saveSession(result.session);
     markProcessed(specificationPath, readFile, writeFile, next.id);
     processed++;

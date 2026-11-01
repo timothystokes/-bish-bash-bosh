@@ -57,6 +57,11 @@ test('hodge, podge and podge step refuse a project held by a live process, and r
     commitProjectConfig(dir, { adapter: 'f', model: 'm' });
     mkdirSync(join(dir, '.hodgepodge'), { recursive: true });
     writeFileSync(join(dir, '.hodgepodge', 'interview.md'), '# Interview\n');
+    // podge's own first-run seed (of plan.md from specification.md) bypasses the lock by design,
+    // same as hodge's own interview.md seed above: pre-seed both so podge's lock-protected branch
+    // is exercised here, not its seed-and-exit-0 branch.
+    writeFileSync(join(dir, '.hodgepodge', 'specification.md'), '# Specification\n');
+    writeFileSync(join(dir, '.hodgepodge', 'plan.md'), '# Plan\n');
     writeFileSync(join(dir, LOCK_FILE), `${process.ppid}\n`);
     for (const args of [['hodge'], ['hodge', '--reverse'], ['podge'], ['podge', 'step']]) {
       const r = await run(args);
