@@ -147,6 +147,37 @@ test('the agent\'s own live reasoning text streams on the line after "Thinking..
   assert.deepEqual(said.slice(2, 5), ['\x1b[90mThinking...\n', "I'm", ' thinking this through'], 'reasoning text is forwarded to say() plain, inheriting the grey already set by "Thinking..."');
 });
 
+test('log is called once with the full prompt sent (\'hodge\') and once with the full accumulated reasoning text (\'agent\'), plain text, never the Q/A/"Thinking..." lines shown on screen', async () => {
+  const { path: interviewPath, dir } = makeFile();
+  /** @type {[string, string][]} */
+  const logged = [];
+  const adapter = fakeAdapter((req) => {
+    req.onReasoning?.('step one, ');
+    req.onReasoning?.('step two');
+    return {};
+  });
+  await runInterviewLoop({
+    interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir,
+    log: (source, text) => logged.push([source, text]), ...sessionStore(),
+  });
+  assert.equal(logged[0][0], 'hodge');
+  assert.match(logged[0][1], /## Question\n\nDescribe the objective in a sentence\.\n\n## Answer\n\na/);
+  assert.deepEqual(logged[1], ['agent', 'step one, step two']);
+});
+
+test('log is only called with the "hodge" entry, never an "agent" one, when the adapter never streams any reasoning text', async () => {
+  const { path: interviewPath, dir } = makeFile();
+  /** @type {[string, string][]} */
+  const logged = [];
+  const adapter = fakeAdapter();
+  await runInterviewLoop({
+    interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir,
+    log: (source, text) => logged.push([source, text]), ...sessionStore(),
+  });
+  assert.deepEqual(logged[0], ['hodge', logged[0][1]]);
+  assert.ok(!logged.some((l) => l[0] === 'agent'), 'no "agent" entry is logged when the adapter never streams any reasoning text');
+});
+
 test('buildInterviewLoopPrompt only prefaces interview-intro.md when includeIntro is passed, and puts it above everything else', () => {
   const withIntro = buildInterviewLoopPrompt('Q', 'A', { includeIntro: true });
   const withoutIntro = buildInterviewLoopPrompt('Q', 'A');

@@ -5,6 +5,7 @@ import { stringify as stringifyYaml } from 'yaml';
 import { resolveAdapter, defaultRegistry } from './adapters/index.js';
 import { acquireRunLock } from './run-lock.js';
 import { runInterviewLoop } from './hodge-interview-loop.js';
+import { createLogger } from './hodge-log.js';
 import { runReverse } from './hodge-reverse.js';
 import { debugAdapter, createAsker, parseRunArgs, loadRunProject } from './cli-lib.js';
 import { formatInterviewLoopResult, formatReverseResult } from './cli-format.js';
@@ -12,6 +13,7 @@ import { formatInterviewLoopResult, formatReverseResult } from './cli-format.js'
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 const INTERVIEW_FILE = '.hodgepodge/interview.md';
 const SPEC_FILE = '.hodgepodge/specification.md';
+const LOG_FILE = '.hodgepodge/hodge-log.md';
 
 // `hodge`: the interview flow that gathers requirements and writes specs, or (with --reverse)
 // the reverse-engineering flow that writes specs + characterization tests from existing code.
@@ -26,10 +28,13 @@ export async function runHodge(argv, deps, out, err) {
   if (!project) return 2;
   const { config, repo } = project;
   // The very first `hodge` run in a project just seeds the interview store and spec file from
-  // their templates: no agent call, no lock, no run folder. Later runs proceed as usual.
+  // their templates, and creates an empty hodge-log.md (every prompt sent to the agent and every
+  // piece of its own output shown in the console gets appended there from then on, see
+  // hodge-log.js): no agent call, no lock, no run folder. Later runs proceed as usual.
   if (!reverse && !existsSync(join(repo, INTERVIEW_FILE))) {
     writeFileSync(join(repo, INTERVIEW_FILE), readFileSync(join(templatesDir, 'interview-template.md'), 'utf8'));
     writeFileSync(join(repo, SPEC_FILE), readFileSync(join(templatesDir, 'specification-template.md'), 'utf8'));
+    writeFileSync(join(repo, LOG_FILE), '');
     out(`Wrote ${INTERVIEW_FILE} and ${SPEC_FILE} from their templates.\nRun \`hodge\` again to start the interview.\n`);
     return 0;
   }
@@ -68,6 +73,7 @@ export async function runHodge(argv, deps, out, err) {
             config.interviewSession = session;
             writeFileSync(project.configPath, stringifyYaml(config));
           },
+          log: createLogger(join(repo, LOG_FILE)),
         });
         out(formatInterviewLoopResult(res));
         return res.status === 'ok' ? 0 : 1;

@@ -85,7 +85,11 @@ function markProcessed(interviewPath, readFile, writeFile, id) {
 // than starting fresh each time; the very first round of a brand-new session (no session persisted
 // yet) also prefaces prompts/interview-intro.md onto that one call only — never again for a later
 // round or a restart that resumes the same session. Stops at EOF (paused, so a restart resumes
-// where it left off) or once no unprocessed question remains (ok).
+// where it left off) or once no unprocessed question remains (ok). `log` (see hodge-log.js), if
+// given, is called once per round with the full prompt sent (`'hodge'`) and, if the agent streamed
+// any reasoning text, the full accumulated text of that stream (`'agent'`) — never the raw JSON
+// behind either, and never the Q/A/"Thinking..." lines shown on screen, only the prompt in and the
+// agent's own output out.
 /**
  * @param {{
  *   interviewPath: string,
@@ -97,6 +101,7 @@ function markProcessed(interviewPath, readFile, writeFile, id) {
  *   repoDir?: string,
  *   loadSession?: () => unknown,
  *   saveSession?: (session: unknown) => void,
+ *   log?: (source: string, text: string) => void,
  * }} opts
  */
 export async function runInterviewLoop({
@@ -109,6 +114,7 @@ export async function runInterviewLoop({
   repoDir,
   loadSession = () => undefined,
   saveSession = (/** @type {unknown} */ _session) => {},
+  log = (/** @type {string} */ _source, /** @type {string} */ _text) => {},
 }) {
   let answered = 0;
   for (;;) {
@@ -131,14 +137,20 @@ export async function runInterviewLoop({
     say(`${GREY}Thinking...\n`);
     const session = loadSession();
     const prompt = buildInterviewLoopPrompt(next.question, answer, { includeIntro: session === undefined });
+    log('hodge', prompt);
+    let reasoning = '';
     const result = await adapter.run({
       prompt,
       cwd: repoDir,
       limits: {},
       session,
-      onReasoning: (chunk) => say(chunk),
+      onReasoning: (chunk) => {
+        reasoning += chunk;
+        say(chunk);
+      },
     });
     say(`${RESET}\n`);
+    if (reasoning) log('agent', reasoning);
     saveSession(result.session);
 
     markProcessed(interviewPath, readFile, writeFile, next.id);

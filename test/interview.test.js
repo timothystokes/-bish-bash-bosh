@@ -166,6 +166,7 @@ test('hodge on a fresh repo first seeds the interview store from its template; o
     readFileSync(join(dir, '.hodgepodge', 'specification.md'), 'utf8'),
     readFileSync(join(process.cwd(), 'templates', 'specification-template.md'), 'utf8'),
   );
+  assert.equal(readFileSync(join(dir, '.hodgepodge', 'hodge-log.md'), 'utf8'), '', 'hodge-log.md is created empty on the very first run, before any prompt is ever sent');
   assert.ok(!existsSync(join(dir, '.hodgepodge', 'runs')), 'no run folder on the seed-only run');
   // a second, custom question with a pre-filled default so the loop's resume/default behaviour can be exercised
   writeFileSync(
@@ -185,6 +186,8 @@ test('hodge on a fresh repo first seeds the interview store from its template; o
   const afterFirst = readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8');
   assert.match(afterFirst, /1\. \[x\] Q: What is the objective\? A: Build a greeter/, 'checked, and the answer is written back, once handed to and processed by the agent');
   assert.match(afterFirst, /2\. \[ \] Q: Who uses the greeter\? A: Developers/, 'the second question is untouched, not yet asked');
+  const logAfterFirst = readFileSync(join(dir, '.hodgepodge', 'hodge-log.md'), 'utf8');
+  assert.match(logAfterFirst, /^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] hodge: .*## Answer\n\nBuild a greeter/s, 'the full prompt sent to the agent is logged, plain text with a timestamp');
   out.length = 0;
   const done = await withCwd(dir, () =>
     main(['hodge'], { registry, identity, input: Readable.from(['\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
