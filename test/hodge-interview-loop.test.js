@@ -119,9 +119,9 @@ test('the question and the prompt are shown in color, distinguishing Q from A, w
   const ask = async (p, d) => { prompts.push(p); defaults.push(d); return 'x'; };
   await runInterviewLoop({ interviewPath, ...io(), ask, say: (s) => said.push(s), adapter: fakeAdapter(), repoDir: dir, ...sessionStore() });
   assert.match(said[0], /\x1b\[1;36mQ: Describe the objective in a sentence\.\x1b\[0m/);
-  assert.match(prompts[0], /^\x1b\[33mA:  $/, 'no trailing reset: the prompt stays "active" so a pre-filled default and anything typed after it inherit the same color; two trailing spaces so the cursor/answer sits one column clear of the colon, not immediately after it');
+  assert.match(prompts[0], /^\x1b\[33mA: $/, 'no trailing reset: the prompt stays "active" so a pre-filled default and anything typed after it inherit the same color; one trailing space so the cursor/answer sits one column clear of the colon, not immediately after it');
   assert.equal(defaults[0], '', 'no existing default for the first question');
-  assert.match(prompts[1], /^\x1b\[33mA:  $/);
+  assert.match(prompts[1], /^\x1b\[33mA: $/);
   assert.equal(defaults[1], 'pre-filled default', 'the second question\'s existing default is handed to ask, not baked into the prompt text');
   assert.equal(said[1], '\x1b[0m', 'color is reset right after each answer, so later output is not left yellow');
   assert.equal(said[2], '\x1b[90mThinking...\n', 'a "Thinking..." line, shown dim/grey, right before the agent is called, with its own trailing newline so any live reasoning text streams starting on the next line');

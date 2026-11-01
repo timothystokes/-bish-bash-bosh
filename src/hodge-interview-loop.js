@@ -117,7 +117,7 @@ export async function runInterviewLoop({
     const next = nextQuestion(questions);
     if (!next) return { status: 'ok', answered };
     say(`\n${CYAN}Q: ${next.question}${RESET}\n`);
-    const reply = await ask(`${YELLOW}A:  `, next.answer);
+    const reply = await ask(`${YELLOW}A: `, next.answer);
     say(RESET);
     if (reply === null) {
       const remaining = parseQuestions(readFile(interviewPath)).filter((q) => !q.checked).length;
