@@ -37,7 +37,7 @@ function helpCommands() {
 test('G-4: every CLI command is documented in README or a spec', () => {
   const docs = [read('README.md'), ...['adapters', 'cloud-driver', 'control-and-safety', 'formats', 'gates', 'loop', 'modes', 'repos'].map((s) => read(`specs/${s}.md`))].join('\n');
   const cmds = helpCommands();
-  assert.ok(cmds.length >= 14, `parsed commands: ${cmds.join(', ')}`);
+  assert.ok(cmds.length >= 13, `parsed commands: ${cmds.join(', ')}`);
   for (const c of cmds) {
     const pattern = ['bish', 'bosh'].includes(c) ? new RegExp(`\\b${c}\\b`) : new RegExp(`bish-bash-bosh ${c}\\b|\`${c}( step)?\``);
     assert.match(docs, pattern, `command '${c}' is in CLI help but undocumented`);

@@ -7,10 +7,8 @@ import { CONFIG_FILE } from './project-config.js';
 
 const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 
-// Every bish/bosh run refuses to start unless the working tree is clean (it needs a known-good
-// baseline to diff the agent's changes against, and commits the result itself each round). A fresh
-// `config.yml` would otherwise leave the tree dirty, so commit it here; if that is not possible
-// (no git repo yet, or no git user configured), the caller is told to commit it by hand.
+// Reverse engineering requires a clean baseline. Commit new config when possible; otherwise
+// the caller tells the owner to commit it by hand.
 function commitConfig(dir, configPath) {
   try {
     git(dir, 'rev-parse', '--is-inside-work-tree');
@@ -19,14 +17,14 @@ function commitConfig(dir, configPath) {
   }
   try {
     git(dir, 'add', '--', configPath);
-    git(dir, 'commit', '-q', '-m', 'bish-bash-bosh init: add config');
+    git(dir, 'commit', '-q', '-m', 'bish: add config', '--only', '--', configPath);
     return true;
   } catch {
     return false;
   }
 }
 
-// Suggested picks shown by `bish-bash-bosh init`'s interactive prompt (src/bish-bash-bosh.js). This is a
+// Suggested picks shown by `bish`'s first-run setup (src/bish.js). This is a
 // convenience catalog only, not enforced anywhere: any adapter/model string still works (see
 // src/adapters/index.js's registry and specs/adapters.md's documented exception for this list).
 // It goes stale as vendors release models; update it by hand when that happens.
@@ -38,7 +36,7 @@ export const MODEL_CHOICES = {
   // openai-http hits an arbitrary /chat/completions endpoint: no catalog, type the model directly.
 };
 
-// `bish-bash-bosh init`: writes <dir>/.bish-bash-bosh/config.yml (default dir: cwd) with the single
+// `bish` setup: writes <dir>/.bish-bash-bosh/config.yml (default dir: cwd) with the single
 // adapter/model the owner picked. Refuses if a config already exists.
 // There is no sandbox to scaffold: no target repo, no runtime copy, no launcher scripts.
 export function initProject({ dir, adapter, model }) {

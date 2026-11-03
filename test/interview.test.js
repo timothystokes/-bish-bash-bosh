@@ -232,8 +232,8 @@ test('bish usage errors exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
   const e = (/** @type {string} */ s) => { err.push(s); };
   const missing = mkdtempSync(join(tmpdir(), 'bish-int-missing-'));
-  assert.equal(await withCwd(missing, () => main(['bish'], { stdout: () => {}, stderr: e })), 2);
-  assert.match(err.join(''), /config\.yml/);
+  assert.equal(await withCwd(missing, () => main(['bish'], { input: Readable.from([]), stdout: () => {}, stderr: e })), 2);
+  assert.match(err.join(''), /no adapter given/);
 
   const norole = mkdtempSync(join(tmpdir(), 'bish-int-norole-'));
   writeProjectConfig(norole, config({ adapter: 'missing' }));
@@ -323,4 +323,3 @@ test("createAsker: on a real terminal, a question's existing default is shown as
     assert.equal(await reply, 'Q');
   }
 });
-

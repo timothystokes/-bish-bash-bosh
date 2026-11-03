@@ -6,7 +6,7 @@
 
 A model-agnostic harness for delivering software with loop engineering (Ralph-style): one task per loop iteration, fresh agent context, specs and a plan file as state, and tests as gates.
 
-Bish-Bash-Bosh holds the harness only. It operates directly on your project (the current working directory): `bish-bash-bosh init` writes `.bish-bash-bosh/config.yml` there, then `bish`, `bash` and `bosh` drive the build in place.
+Bish-Bash-Bosh holds the harness only. It operates directly on your project (the current working directory): `bish` sets up `.bish-bash-bosh/config.yml` automatically when needed, then `bish`, `bash` and `bosh` drive the build in place.
 
 ## Requirements
 
@@ -20,12 +20,12 @@ Bish-Bash-Bosh holds the harness only. It operates directly on your project (the
 npm install
 HARNESS="$PWD/bin"
 cd your-project
-"$HARNESS/bish-bash-bosh" init   # interactive: asks which adapter/model to use for every phase
+"$HARNESS/bish"   # first run: asks for adapter/model if needed, then seeds the interview files
 ```
 
-The commands are `bish` (requirements/specs), `bash` (plan), and `bosh` (build); `bish-bash-bosh` provides init and management commands. Because `bash` is also a system shell, invoke the planner explicitly as `"$HARNESS/bash"` (that is, `/path/to/bish-bash-bosh/bin/bash`), and the other commands as `"$HARNESS/bish"` and `"$HARNESS/bosh"`. The bare command names below are shorthand for those explicit paths. Avoid `npm link` or putting the harness's `bin/` first on `PATH`: that can shadow the shell used by scripts and agents.
+The commands are `bish` (setup and requirements/specs), `bash` (plan), and `bosh` (build); `bish-bash-bosh` provides management commands. Because `bash` is also a system shell, invoke the planner explicitly as `"$HARNESS/bash"` (that is, `/path/to/bish-bash-bosh/bin/bash`), and the other commands as `"$HARNESS/bish"` and `"$HARNESS/bosh"`. The bare command names below are shorthand for those explicit paths. Avoid `npm link` or putting the harness's `bin/` first on `PATH`: that can shadow the shell used by scripts and agents.
 
-`init` writes `.bish-bash-bosh/config.yml` in the current directory (config: adapter, model); it refuses to run if `.bish-bash-bosh/config.yml` already exists. It does no scaffolding: no target repo, no runtime copy, no launcher scripts. Then run the commands directly in your project; they take no config, repo or objective flags, and no `--dir`:
+Run `bish` directly: if `.bish-bash-bosh/config.yml` is missing, it asks for one adapter/model pair (numbered suggestions or your own values), writes the config, and commits it when possible; otherwise it prints manual commit guidance. Blank input or EOF during setup aborts without writing config or interview templates. Existing config is validated and reused without setup prompts; invalid or unreadable config is an error, never silently replaced. `bish --reverse` uses the same automatic setup before its normal reverse flow. There is no separate setup command and no scaffolding of a target repo, runtime copy, or launcher scripts. The commands take no config, repo or objective flags, and no `--dir`:
 
 ```sh
 bish            # requirements and specs: the first run seeds .bish-bash-bosh/interview.md and specification.md from their templates (no agent call); run again to start the Interview Loop, which asks each unanswered question from interview.md one at a time (any existing default is shown in grey ahead of the cursor — Enter accepts it as-is and recolors it to match the `A:` label, any other key clears it in one go and the new answer is typed in that same color), shows "Thinking..." followed by the agent's own live reasoning text streamed on the next line in the same grey (the very first round of a brand-new session also prefaces prompts/interview-intro.md once, never again), then hands each answered round to the agent, and keeps going until every question is answered (or `bish --reverse` to derive specs from code)
@@ -55,7 +55,7 @@ When a spec declares a format, `bish` adds that format's skill snippet (`prompts
 
 `.bish-bash-bosh/config.yml` (YAML, at the project root) is validated against `src/config.schema.json`. The key parts (run artifacts `record.json`, `usage.json`, `diagnosis.json` and `done.json` have schemas in `src/schemas/`):
 
-- `adapter`/`model`: a single adapter and model used for every phase. Models live in config only. `init` asks for them interactively; hand-edit `.bish-bash-bosh/config.yml` to change them later. The agent may write anywhere in the project.
+- `adapter`/`model`: a single adapter and model used for every phase. Models live in config only. `bish` asks for them interactively when config is missing; hand-edit `.bish-bash-bosh/config.yml` to change them later. The agent may write anywhere in the project.
 - `bishSession`: written and read by `bish`'s Interview Loop only — the opaque, adapter-defined token for its one continuing agent session (see `specs/adapters.md`); the harness rewrites it after every round, nothing else uses or reads it.
 - `bashSession`: the same, but for `bash`'s Plan Loop; the harness rewrites it after every item, nothing else uses or reads it. `bosh`'s Build Loop has no such field: every build/QA call is a fresh agent context.
 - `usage.json` holds wall-clock `{seconds}` per iteration, summed across a run for visibility (`bish-bash-bosh status`/`tui`). The harness does not track tokens or cost, and there is no run-wide cap: watch real spend on the model backend.

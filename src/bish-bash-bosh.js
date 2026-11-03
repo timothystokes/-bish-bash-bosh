@@ -4,7 +4,6 @@ import { createInterface } from 'node:readline';
 import { CONFIG_FILE } from './project-config.js';
 import { lintSpecs } from './spec-lint.js';
 import { checkReadiness } from './readiness.js';
-import { initProject, ADAPTER_CHOICES, MODEL_CHOICES } from './init.js';
 import { exportBundle } from './clean-room.js';
 import { createLocalStatusSource, readRunStatus } from './status.js';
 import { readControl, writeControl } from './control.js';
@@ -13,13 +12,13 @@ import { addEntry, INBOX_FILE } from './inbox.js';
 import { createSecretProxy } from './secret-proxy.js';
 import { syncArtifacts, requestPromotion } from './artifacts.js';
 import { createAwsCliS3Client, createGhPrOpener, defaultRun } from './cloud-clients.js';
-import { repoFor, parseFlags, parseRunArgs, loadRunProject, createAsker, askChoice } from './cli-lib.js';
+import { repoFor, parseFlags, parseRunArgs, loadRunProject } from './cli-lib.js';
 import {
   formatSpecLint, formatReadiness, formatSync, formatPromote, formatCleanRoom,
   formatProxyListening, formatControlWrite, formatStatus,
 } from './cli-format.js';
 
-// Every top-level command other than `bish` and `bosh`/`bosh step`: project init, run observability
+// Every top-level command other than the phase commands: run observability
 // (status, tui, console), cloud sync/promotion, spec/readiness checks, the pause/resume/stop control
 // file and the secret-redacting proxy.
 export async function runBishBashBosh(cmd, argv, deps, out, err) {
@@ -67,49 +66,6 @@ export async function runBishBashBosh(cmd, argv, deps, out, err) {
     } catch (e) {
       err(`bish-bash-bosh ${cmd}: ${e.message}\n`);
       return 2;
-    }
-  }
-  if (cmd === 'init') {
-    const v = parseFlags(argv.slice(1), [], 'bish-bash-bosh init', err);
-    if (!v) return 2;
-    const dir = resolve('.');
-    const configPath = join(dir, CONFIG_FILE);
-    if (existsSync(configPath)) {
-      err(`bish-bash-bosh init: ${configPath} already exists\n`);
-      return 1;
-    }
-    const input = deps.input ?? process.stdin;
-    const { ask, close } = createAsker(input, out);
-    // Picks for both adapter and model: a numbered list of known options, falling back to whatever
-    // is typed (so an unlisted adapter/model, or scripted stdin, still works).
-    const askModel = async (adapter, label) => {
-      const choices = MODEL_CHOICES[adapter];
-      return choices ? askChoice(ask, out, label, choices) : ask(`${label}: `);
-    };
-    try {
-      const adapter = await askChoice(ask, out, 'adapter', ADAPTER_CHOICES);
-      if (!adapter) {
-        err('bish-bash-bosh init: aborted (no adapter given)\n');
-        return 2;
-      }
-      const model = await askModel(adapter, 'model');
-      if (!model) {
-        err('bish-bash-bosh init: aborted (no model given)\n');
-        return 2;
-      }
-      const res = initProject({ dir, adapter, model });
-      if (!res.ok) {
-        err(`bish-bash-bosh init: ${res.reason}\n`);
-        return 1;
-      }
-      if (res.committed) {
-        out(`Wrote and committed ${CONFIG_FILE} (adapter: ${adapter}, model: ${model}).\nRun \`bish\` to start the interview.\n`);
-      } else {
-        out(`Wrote ${CONFIG_FILE} (adapter: ${adapter}, model: ${model}).\nCommit it before running bish/bosh (a clean working tree is required to start a run):\n  git add ${CONFIG_FILE} && git commit -m "bish-bash-bosh init"\nThen run \`bish\` to start the interview.\n`);
-      }
-      return 0;
-    } finally {
-      close();
     }
   }
   if (cmd === 'clean-room') {

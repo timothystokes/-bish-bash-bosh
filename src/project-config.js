@@ -15,7 +15,7 @@ export function loadProjectConfig(dir = '.') {
   try {
     raw = readFileSync(configPath, 'utf8');
   } catch (e) {
-    return { ok: false, error: `cannot read config '${configPath}' (run \`bish-bash-bosh init\` first): ${e.message}` };
+    return { ok: false, error: `cannot read config '${configPath}' (run \`bish\` to set up the project): ${e.message}` };
   }
   let config;
   try {

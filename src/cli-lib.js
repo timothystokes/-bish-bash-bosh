@@ -14,19 +14,18 @@ export function helpText() {
     '',
     'bish-bash-bosh: model-agnostic harness for loop-engineered delivery',
     '',
-    'Three loops, one flow: `bish-bash-bosh init`, then `bish` (requirements and specs), `bash` (plan), `bosh` (build).',
+    'Three loops, one flow: `bish` (setup, requirements and specs), `bash` (plan), `bosh` (build).',
     'The planner shares its name with the bash shell: invoke /path/to/bish-bash-bosh/bin/bash explicitly; do not put the harness bin directory ahead of the system shell on PATH.',
     '',
     'Usage:',
-    '  bish-bash-bosh init   (interactive: asks which adapter/model to use for everything)',
     '  bish  [--run-id <id>] [--reverse] [--debug]',
     '  bash   [--run-id <id>] [--debug]',
     '  bosh  [--run-id <id>] [--debug]',
     '  --debug (or BISH_BASH_BOSH_DEBUG=1) on bish/bash/bosh: log to stdout the agent prompt, the agent process raw stdout/stderr live, each call\'s exit status, changed files and parsed transcript, and stack traces. The transcript is agent output, not the environment, but it may contain whatever the agent printed: do not share debug logs unreviewed.',
     '  bish-bash-bosh <command> ...   (the commands below)',
     '  bish, bash and bosh hold a single-run lock (.bish-bash-bosh/lock, PID; stale locks are cleared) and refuse to start while another live run holds the project.',
-    '  Every command operates on the current project (cwd); there is no sandbox dir and no `--dir` flag. `bish-bash-bosh init` writes ./.bish-bash-bosh/config.yml holding',
-    '  adapter and model, so after `cd` into your project just run `bish-bash-bosh init` once, then `bish`, then `bash`, then `bosh`.',
+    '  Every command operates on the current project (cwd); there is no sandbox dir and no `--dir` flag. When config is missing, `bish` asks for the adapter and model',
+    '  and writes ./.bish-bash-bosh/config.yml automatically. Existing config is validated and reused, never overwritten; there is no separate setup command.',
     '  bish-bash-bosh clean-room --source <dir> --repo <builder-dir>',
     '  bish-bash-bosh status [--run-id <id>] [--control <control.json>]',
     '  bish-bash-bosh tui --control <control.json> [--run-id <id>]',
@@ -41,8 +40,7 @@ export function helpText() {
     'Spec formats: a spec may declare `## Formats` bullets, checked by `ready` and the loop. Known formats: `gherkin`, `json-schema`, `openapi`.',
     '',
     'Commands:',
-    '  init   ask which adapter/model to use for everything, then write ./.bish-bash-bosh/config.yml; refuses if ./.bish-bash-bosh/config.yml already exists; no scaffolding (no target repo, no runtime copy, no launcher scripts); prints a short confirmation message; exit 0 only when ok',
-    '  bish  requirements gathering: the very first run only writes `.bish-bash-bosh/interview.md` and `.bish-bash-bosh/specification.md` from their templates and exits (no agent call); run again to start the Interview Loop, which is pure code (no agent): it finds the first unanswered question in `interview.md`, shows it in colour, reads your answer from stdin (Enter alone keeps any existing default text), hands the round to the agent, marks its answered checkbox, and repeats; Ctrl-D (EOF) pauses and a rerun resumes;',
+    '  bish  setup and requirements gathering: if config is missing, asks for the adapter/model and writes `.bish-bash-bosh/config.yml` (committed when possible); blank input or EOF aborts without writing config. Existing invalid config is an error, not a reason to reset setup. The very first interview run writes `.bish-bash-bosh/interview.md` and `.bish-bash-bosh/specification.md` from their templates and exits (no agent call); run again to start the Interview Loop: it finds the first unanswered question in `interview.md`, shows it in colour, reads your answer from stdin (Enter alone keeps any existing default text), hands the round to the agent, marks its answered checkbox, and repeats; Ctrl-D (EOF) pauses and a rerun resumes;',
     '         with --reverse it instead reverse-engineers specs/ + characterization tests from existing code (commits only if only specs/tests changed,',
     '         spec-lint passes and the test suite is green); exit 0 only when ok (or, without --reverse, once every question is answered)',
     '  bash   plan: refuses to run until `.bish-bash-bosh/specification.md` exists (run `bish` first); the very first run writes `.bish-bash-bosh/plan.md` from its template, then falls straight into the Plan Loop, which hands each unprocessed specification.md item to the agent in turn (one dependency-ordered checklist per item, appended to plan.md) until every item is processed;',
@@ -159,7 +157,7 @@ function lastColor(prompt) {
   return matches.length ? matches[matches.length - 1][0] : '';
 }
 
-// A single question/answer reader shared by `bish`'s interview and `bish-bash-bosh init`'s adapter/model prompts.
+// One reader for `bish`'s setup and interview prompts, including buffered piped answers.
 // Piped input must keep one reader (a second one would lose buffered lines); a tty gets a fresh reader
 // per question so tty state left by a child process (cooked mode, keyboard protocols) cannot break Enter.
 // On a real terminal, `defaultValue` is shown in grey as a suggestion ahead of the cursor, in the
@@ -226,7 +224,7 @@ export function createAsker(input, out, output = process.stdout) {
   return { ask, close: () => shared?.close() };
 }
 
-// Prompt with a numbered list of suggested choices (e.g. `init`'s adapter/model picker): prints the
+// Prompt with a numbered list of suggested choices (e.g. `bish`'s adapter/model picker): prints the
 // list, then accepts either the choice's number or any typed value (so a value outside the list, or
 // scripted stdin, still works). Returns the chosen string, or '' if the answer is blank.
 export async function askChoice(ask, out, label, choices) {

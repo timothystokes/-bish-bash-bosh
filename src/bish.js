@@ -7,8 +7,10 @@ import { acquireRunLock } from './run-lock.js';
 import { runInterviewLoop } from './bish-interview-loop.js';
 import { createLogger } from './bish-log.js';
 import { runReverse } from './bish-reverse.js';
-import { debugAdapter, createAsker, parseRunArgs, loadRunProject } from './cli-lib.js';
+import { debugAdapter, createAsker, askChoice, parseRunArgs, loadRunProject } from './cli-lib.js';
 import { formatInterviewLoopResult, formatReverseResult } from './cli-format.js';
+import { initProject, ADAPTER_CHOICES, MODEL_CHOICES } from './init.js';
+import { CONFIG_FILE } from './project-config.js';
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 const INTERVIEW_FILE = '.bish-bash-bosh/interview.md';
@@ -24,8 +26,43 @@ export async function runBish(argv, deps, out, err) {
     err(`${label}: ${parsed.error}\n`);
     return 2;
   }
-  const project = loadRunProject(label, err);
-  if (!project) return 2;
+  const { ask, close } = createAsker(deps.input ?? process.stdin, out);
+  try {
+    if (!existsSync(CONFIG_FILE)) {
+      const adapter = await askChoice(ask, out, 'adapter', ADAPTER_CHOICES);
+      if (!adapter) {
+        err(`${label}: aborted (no adapter given)\n`);
+        return 2;
+      }
+      const choices = MODEL_CHOICES[adapter];
+      const model = choices ? await askChoice(ask, out, 'model', choices) : await ask('model: ');
+      if (!model) {
+        err(`${label}: aborted (no model given)\n`);
+        return 2;
+      }
+      const res = initProject({ dir: '.', adapter, model });
+      if (!res.ok) {
+        err(`${label}: ${res.reason}\n`);
+        return 1;
+      }
+      out(`Wrote${res.committed ? ' and committed' : ''} ${CONFIG_FILE} (adapter: ${adapter}, model: ${model}).\n`);
+      if (!res.committed) {
+        out(`Commit it before running bish/bosh when a clean working tree is required:\n  git add ${CONFIG_FILE} && git commit -m "bish: add config"\n`);
+      }
+    }
+    const project = loadRunProject(label, err);
+    if (!project) return 2;
+    return await runConfiguredBish(project, { reverse, debug, parsed }, deps, out, err, ask);
+  } catch (e) {
+    if (debug) out(`[debug] ${e.stack}\n`);
+    err(`${label}: ${e.message}\n`);
+    return 2;
+  } finally {
+    close();
+  }
+}
+
+async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out, err, ask) {
   const { config, repo } = project;
   // The very first `bish` run in a project just seeds the interview store and spec file from
   // their templates, and creates an empty bish-log.md (every prompt sent to the agent and every
@@ -45,7 +82,7 @@ export async function runBish(argv, deps, out, err) {
   }
   const lock = acquireRunLock(project.dir);
   if (!lock.ok) {
-    err(`${label}: ${lock.error}\n`);
+    err(`bish: ${lock.error}\n`);
     return 2;
   }
   try {
@@ -57,29 +94,23 @@ export async function runBish(argv, deps, out, err) {
       // (persisted to config.yml's `bishSession` field, distinct from other phases, which
       // never use it) carrying the rest of the conversation's context across rounds and across
       // separate `bish` invocations.
-      const input = deps.input ?? process.stdin;
-      const { ask, close } = createAsker(input, out);
-      try {
-        const res = await runInterviewLoop({
-          interviewPath: join(repo, INTERVIEW_FILE),
-          readFile: (p) => readFileSync(p, 'utf8'),
-          writeFile: (p, s) => writeFileSync(p, s),
-          ask,
-          say: out,
-          adapter,
-          repoDir: repo,
-          loadSession: () => config.bishSession,
-          saveSession: (session) => {
-            config.bishSession = session;
-            writeFileSync(project.configPath, stringifyYaml(config));
-          },
-          log: createLogger(join(repo, LOG_FILE)),
-        });
-        out(formatInterviewLoopResult(res));
-        return res.status === 'ok' ? 0 : 1;
-      } finally {
-        close();
-      }
+      const res = await runInterviewLoop({
+        interviewPath: join(repo, INTERVIEW_FILE),
+        readFile: (p) => readFileSync(p, 'utf8'),
+        writeFile: (p, s) => writeFileSync(p, s),
+        ask,
+        say: out,
+        adapter,
+        repoDir: repo,
+        loadSession: () => config.bishSession,
+        saveSession: (session) => {
+          config.bishSession = session;
+          writeFileSync(project.configPath, stringifyYaml(config));
+        },
+        log: createLogger(join(repo, LOG_FILE)),
+      });
+      out(formatInterviewLoopResult(res));
+      return res.status === 'ok' ? 0 : 1;
     }
     const res = await runReverse({
       config,
@@ -91,10 +122,6 @@ export async function runBish(argv, deps, out, err) {
     });
     out(formatReverseResult(res));
     return res.status === 'ok' ? 0 : 1;
-  } catch (e) {
-    if (debug) out(`[debug] ${e.stack}\n`);
-    err(`${label}: ${e.message}\n`);
-    return 2;
   } finally {
     lock.release();
   }
