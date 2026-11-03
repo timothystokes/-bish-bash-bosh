@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
-import { writeIterationRecord } from '../src/podge-run-record.js';
+import { writeIterationRecord } from '../src/bosh-run-record.js';
 import { readRunDetails } from '../src/run-details.js';
 import { createLocalStatusSource } from '../src/status.js';
 import { renderFrame, createTui, runTui } from '../src/tui.js';
@@ -23,7 +23,7 @@ const rec = (transcript) => ({
 });
 
 function makeRun() {
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-tui-'));
+  const dir = mkdtempSync(join(tmpdir(), 'bish-tui-'));
   writeIterationRecord(dir, 'r1', 1, rec('old line'));
   writeIterationRecord(dir, 'r1', 2, rec('l1\nl2\nl3\nl4'));
   return dir;
@@ -121,7 +121,7 @@ test('runTui draws frames, handles input, and resolves on quit', async () => {
   assert.equal(JSON.parse(readFileSync(join(dir, 'c.json'), 'utf8')).paused, true);
 });
 
-test('hodgepodge tui requires --control', async () => {
+test('bish-bash-bosh tui requires --control', async () => {
   /** @type {string[]} */
   const errs = [];
   const code = await main(['tui'], { stdout: () => {}, stderr: (/** @type {string} */ s) => errs.push(s) });

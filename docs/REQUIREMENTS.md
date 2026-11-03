@@ -36,4 +36,4 @@ Live log tail, web dashboard, pause/resume/steer, kill switch, cost meter agains
 Repo template (prompts, scripts, docs) and an installable CLI.
 
 ## Execution targets
-Local (Docker) is the main goal for now; scaling to AWS is a future goal (proposed: ECS Fargate per run, S3 artifacts, Secrets Manager, Step Functions for pause/approval, CloudWatch for dashboard/cost).
+Local command-line execution is the current target. Container support and infrastructure have been removed at the owner's request. Scaling to AWS remains deferred; the original cloud ideas are background only (`../specs/cloud-driver.md`).

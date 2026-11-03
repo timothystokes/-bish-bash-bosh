@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { SMOKE_PROMPT, SMOKE_FILE, expectedSmokeOutput, runSmoke } from '../src/smoke.js';
 import { createFakeAdapter } from '../src/adapter.js';
 
-const tmp = () => mkdtempSync(join(tmpdir(), 'hodge-smoke-'));
+const tmp = () => mkdtempSync(join(tmpdir(), 'bish-smoke-'));
 const limits = { maxWallClockSeconds: 60 };
 
 const GOOD = `for (let i = 1; i <= 15; i++) console.log(i % 15 === 0 ? 'FizzBuzz' : i % 3 === 0 ? 'Fizz' : i % 5 === 0 ? 'Buzz' : i);\n`;

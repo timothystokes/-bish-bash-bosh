@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateConfig } from '../src/config.js';
-import { runInterview, buildInterviewPrompt } from '../src/hodge-interview.js';
+import { runInterview, buildInterviewPrompt } from '../src/bish-interview.js';
 import { checkReadiness } from '../src/readiness.js';
 import { main } from '../src/cli.js';
 import { freshDir, seedObjectiveProject, withCwd, writeProjectConfig } from './support/project.js';
@@ -15,10 +15,10 @@ const buildConfig = {
   adapter: 'agent-x',
   model: 'model-y',
 };
-const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
+const identity = { root: '/nonexistent/bish-bash-bosh', remotes: [] };
 
-// Seeds a project fixture (plan.md + package.json + .hodgepodge/config.yml), committed clean. No kit is
-// scaffolded any more: the interview store self-bootstraps on the first `hodge` round.
+// Seeds a project fixture (plan.md + package.json + .bish-bash-bosh/config.yml), committed clean. No kit is
+// scaffolded any more: the interview store self-bootstraps on the first `bish` round.
 function sandbox() {
   const dir = freshDir('objseed-');
   seedObjectiveProject(dir);
@@ -28,9 +28,9 @@ function sandbox() {
   return { dir, repo: dir, config: buildConfig };
 }
 
-test('objective seed has no kit to copy: nothing under .hodgepodge until hodge bootstraps it', () => {
+test('objective seed has no kit to copy: nothing under .bish-bash-bosh until bish bootstraps it', () => {
   const { repo } = sandbox();
-  assert.ok(!existsSync(join(repo, '.hodgepodge', 'interview.md')), 'no question until hodge bootstraps the objective');
+  assert.ok(!existsSync(join(repo, '.bish-bash-bosh', 'interview.md')), 'no question until bish bootstraps the objective');
   assert.equal(git(repo, 'status', '--porcelain'), '');
   assert.ok(!existsSync(join(repo, 'specs')), 'specs come from the conversation, not the seed');
 });
@@ -42,18 +42,18 @@ test('config has a single adapter/model', () => {
   assert.equal(config.model, 'model-y');
 });
 
-test('hodge has no --objective option (the objective is gathered interactively)', async () => {
+test('bish has no --objective option (the objective is gathered interactively)', async () => {
   /** @type {string[]} */
   const errs = [];
-  const code = await main(['hodge', '--objective', 'x'], { stdout: () => {}, stderr: (s) => errs.push(s) });
+  const code = await main(['bish', '--objective', 'x'], { stdout: () => {}, stderr: (s) => errs.push(s) });
   assert.equal(code, 2);
   assert.match(errs.join(''), /unknown argument '--objective'/);
 });
 
 test('the interview prompt carries stage and current readiness gaps once the store exists', () => {
   const { repo } = sandbox();
-  mkdirSync(join(repo, '.hodgepodge'), { recursive: true });
-  writeFileSync(join(repo, '.hodgepodge', 'interview.md'), '# Interview\n\n1 - Answered: [x]; Specified: [x]; Topic: objective; Q: Describe the objective; A: Build a greeter CLI\n');
+  mkdirSync(join(repo, '.bish-bash-bosh'), { recursive: true });
+  writeFileSync(join(repo, '.bish-bash-bosh', 'interview.md'), '# Interview\n\n1 - Answered: [x]; Specified: [x]; Topic: objective; Q: Describe the objective; A: Build a greeter CLI\n');
   const p = buildInterviewPrompt(repo, 'Build a greeter CLI');
   assert.doesNotMatch(p, /## Readiness gaps/, 'no readiness check until the interview is ending');
   assert.match(p, /## Stage: broad/);
@@ -105,8 +105,8 @@ const agent = (writes) => ({
 // `runInterview` explicitly, as `runObjective` would once it has bootstrapped the store.
 function briefed() {
   const { dir, repo, config } = sandbox();
-  mkdirSync(join(repo, '.hodgepodge'), { recursive: true });
-  writeFileSync(join(repo, '.hodgepodge', 'interview.md'), '# Interview\n\n1 - Answered: [x]; Specified: [x]; Topic: objective; Q: Describe the objective; A: Build a greeter\n');
+  mkdirSync(join(repo, '.bish-bash-bosh'), { recursive: true });
+  writeFileSync(join(repo, '.bish-bash-bosh', 'interview.md'), '# Interview\n\n1 - Answered: [x]; Specified: [x]; Topic: objective; Q: Describe the objective; A: Build a greeter\n');
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'objective');
   return { dir, repo, config };
@@ -123,33 +123,33 @@ test('interview with a bootstrapped store: lint-clean but not ready is kept as i
   assert.match(res.reason ?? '', /2 requirements/);
   assert.ok(existsSync(join(repo, 'specs', 'greet.md')), 'progress is kept for the next round');
   assert.equal(git(repo, 'status', '--porcelain'), '');
-  assert.equal(JSON.parse(readFileSync(join(repo, '.hodgepodge', 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'incomplete');
+  assert.equal(JSON.parse(readFileSync(join(repo, '.bish-bash-bosh', 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'incomplete');
 });
 
 test('interview with a bootstrapped store: a round that leaves a question runs no spec-lint, even with a broken spec', async () => {
   const { repo, config } = briefed();
   const res = await runInterview({
     config, repoDir: repo, runId: 'r1', identity, objective: 'Build a greeter',
-    adapter: agent({ 'specs/bad.md': 'no title\n', '.hodgepodge/response.json': '{"resolved":[],"gaps":[{"topic":"T","question":"Who?","default":"devs"}]}' }),
+    adapter: agent({ 'specs/bad.md': 'no title\n', '.bish-bash-bosh/response.json': '{"resolved":[],"gaps":[{"topic":"T","question":"Who?","default":"devs"}]}' }),
   });
   assert.equal(res.status, 'incomplete');
   assert.match(res.reason ?? '', /waiting for the owner/);
 });
 
-test('interview with a bootstrapped store: a ready result is ok; it may write .hodgepodge/notes.md', async () => {
+test('interview with a bootstrapped store: a ready result is ok; it may write .bish-bash-bosh/notes.md', async () => {
   const { repo, config } = briefed();
   const res = await runInterview({
     config, repoDir: repo, runId: 'r1', identity, objective: 'Build a greeter',
     adapter: agent({
       'specs/greet.md': goodSpec,
-      '.hodgepodge/notes.md': '- locale is out of scope\n',
+      '.bish-bash-bosh/notes.md': '- locale is out of scope\n',
     }),
   });
   assert.equal(res.status, 'ok', JSON.stringify(res));
   assert.deepEqual(checkReadiness(repo), { ready: true, gaps: [] });
 });
 
-test('hodgepodge ready reports gaps then ready', async () => {
+test('bish-bash-bosh ready reports gaps then ready', async () => {
   const { repo } = briefed();
   /** @type {string[]} */
   const outs = [];
@@ -168,12 +168,12 @@ test('hodgepodge ready reports gaps then ready', async () => {
   assert.equal(ok.out, 'ready: yes\n');
 });
 
-test('hodge on a fresh project seeds interview.md, then the Interview Loop asks its first question from stdin and hands the round to the agent', async () => {
+test('bish on a fresh project seeds interview.md, then the Interview Loop asks its first question from stdin and hands the round to the agent', async () => {
   const { repo } = sandbox();
-  // first run only seeds .hodgepodge/interview.md from the template
+  // first run only seeds .bish-bash-bosh/interview.md from the template
   let seed = '';
   const seedCode = await withCwd(repo, () =>
-    main(['hodge'], { registry: {}, input: Readable.from(['\n']), stdout: (s) => (seed += s), stderr: () => {} }));
+    main(['bish'], { registry: {}, input: Readable.from(['\n']), stdout: (s) => (seed += s), stderr: () => {} }));
   assert.equal(seedCode, 0, seed);
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'seed interview store');
@@ -181,7 +181,7 @@ test('hodge on a fresh project seeds interview.md, then the Interview Loop asks 
   /** @type {string[]} */
   const prompts = [];
   const code = await withCwd(repo, () =>
-    main(['hodge'], {
+    main(['bish'], {
       registry: { 'agent-x': () => ({ run: async (req) => { prompts.push(req.prompt); return { exitStatus: 0, transcript: '', changedFiles: [] }; } }) },
       input: Readable.from(['\n']),
       stdout: (s) => (out += s),
@@ -192,7 +192,7 @@ test('hodge on a fresh project seeds interview.md, then the Interview Loop asks 
   assert.match(out, /What is the objective\?/);
   assert.match(out, /Interview complete: 1 question answered this run\./);
   assert.equal(prompts.length, 1, 'the one question answered this run was handed to the agent');
-  const afterLoop = readFileSync(join(repo, '.hodgepodge', 'interview.md'), 'utf8');
+  const afterLoop = readFileSync(join(repo, '.bish-bash-bosh', 'interview.md'), 'utf8');
   assert.match(afterLoop, /1\. \[x\] Q: What is the objective\? A: Unknown\./m, 'Enter alone accepted the pre-filled default, and the line is checked once handed to and processed by the agent');
 });
 

@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-export const LOCK_FILE = '.hodgepodge/lock';
+export const LOCK_FILE = '.bish-bash-bosh/lock';
 
 function alive(pid) {
   try {
@@ -12,7 +12,7 @@ function alive(pid) {
   }
 }
 
-// Take the single-run lock of the project: `<dir>/.hodgepodge/lock` holds the owner's PID.
+// Take the single-run lock of the project: `<dir>/.bish-bash-bosh/lock` holds the owner's PID.
 // A lock whose PID is dead or unreadable is stale and is replaced.
 export function acquireRunLock(dir) {
   const file = join(dir, LOCK_FILE);

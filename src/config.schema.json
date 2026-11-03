@@ -1,13 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "hodgepodge-config",
+  "$id": "bish-bash-bosh-config",
   "type": "object",
   "additionalProperties": false,
   "required": ["adapter", "model"],
   "properties": {
     "adapter": { "type": "string", "minLength": 1 },
     "model": { "type": "string", "minLength": 1 },
-    "hodgeSession": { "description": "Opaque continuation token for the Interview Loop's one continuing agent session; shape is adapter-defined (see specs/adapters.md). Named distinctly from other phases since only `hodge` uses it." },
-    "gepoSession": { "description": "Opaque continuation token for the Plan Loop's one continuing agent session; shape is adapter-defined (see specs/adapters.md). Named distinctly from other phases since only `gepo` uses it." }
+    "bishSession": { "description": "Opaque continuation token for the Interview Loop's one continuing agent session; shape is adapter-defined (see specs/adapters.md). Named distinctly from other phases since only `bish` uses it." },
+    "bashSession": { "description": "Opaque continuation token for the Plan Loop's one continuing agent session; shape is adapter-defined (see specs/adapters.md). Named distinctly from other phases since only `bash` uses it." }
   }
 }

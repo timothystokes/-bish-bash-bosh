@@ -23,7 +23,7 @@ function real(p) {
   }
 }
 
-// Identify the hodgepodge checkout this code runs from.
+// Identify the bish-bash-bosh checkout this code runs from.
 export function harnessIdentity(rootDir) {
   const root = real(rootDir ?? join(dirname(fileURLToPath(import.meta.url)), '..'));
   let remotes = [];
@@ -43,7 +43,7 @@ export function harnessIdentity(rootDir) {
   return { root, remotes };
 }
 
-// Repo gate: refuse when the target repo is hodgepodge itself.
+// Repo gate: refuse when the target repo is bish-bash-bosh itself.
 export function checkRepoGate(target, self = harnessIdentity()) {
   if (typeof target !== 'string' || target.trim() === '') {
     return { ok: false, reason: 'target repo is empty' };
@@ -51,12 +51,12 @@ export function checkRepoGate(target, self = harnessIdentity()) {
   const selfRoot = real(self.root);
   const selfIds = new Set(self.remotes.map(normalizeRepoId));
   if (selfIds.has(normalizeRepoId(target))) {
-    return { ok: false, reason: 'target repo is hodgepodge itself (remote match)' };
+    return { ok: false, reason: 'target repo is bish-bash-bosh itself (remote match)' };
   }
   if (isAbsolute(target) || target.startsWith('.')) {
     const rel = relative(selfRoot, real(target));
     if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) {
-      return { ok: false, reason: 'target repo is hodgepodge itself (path match)' };
+      return { ok: false, reason: 'target repo is bish-bash-bosh itself (path match)' };
     }
   }
   return { ok: true };

@@ -62,15 +62,15 @@ test('gh opener runs gh pr create (never merge) and returns the URL', async () =
   await assert.rejects(failing.openPullRequest({ title: 'T', body: 'B', head: 'h', base: 'b' }), /nope/);
 });
 
-test('help documents hodgepodge sync and hodgepodge promote', () => {
-  assert.match(helpText(), /hodgepodge sync --bucket/);
-  assert.match(helpText(), /hodgepodge promote --run-id/);
+test('help documents bish-bash-bosh sync and bish-bash-bosh promote', () => {
+  assert.match(helpText(), /bish-bash-bosh sync --bucket/);
+  assert.match(helpText(), /bish-bash-bosh promote --run-id/);
 });
 
-test('hodgepodge sync uploads run records, then skips them on a repeat', async () => {
-  const repo = mkdtempSync(join(tmpdir(), 'hodge-sync-'));
-  mkdirSync(join(repo, '.hodgepodge', 'runs', 'r1'), { recursive: true });
-  writeFileSync(join(repo, '.hodgepodge', 'runs', 'r1', 'a.json'), '{}');
+test('bish-bash-bosh sync uploads run records, then skips them on a repeat', async () => {
+  const repo = mkdtempSync(join(tmpdir(), 'bish-sync-'));
+  mkdirSync(join(repo, '.bish-bash-bosh', 'runs', 'r1'), { recursive: true });
+  writeFileSync(join(repo, '.bish-bash-bosh', 'runs', 'r1', 'a.json'), '{}');
   /** @type {Record<string, string>} */
   const store = {};
   const exec = fakeRun(({ args }) => {
@@ -90,7 +90,7 @@ test('hodgepodge sync uploads run records, then skips them on a repeat', async (
   assert.match(outs[1], /synced: 0 files uploaded, 1 file already up to date/);
 });
 
-test('hodgepodge sync/promote reject missing or unknown args (exit 2)', async () => {
+test('bish-bash-bosh sync/promote reject missing or unknown args (exit 2)', async () => {
   /** @type {string[]} */
   const errs = [];
   const e = { stderr: (/** @type {string} */ s) => errs.push(s) };
@@ -101,7 +101,7 @@ test('hodgepodge sync/promote reject missing or unknown args (exit 2)', async ()
   assert.equal(await main(['promote', '--run-id', 'r1', '--head', 'x', '--base', 'x', '--bucket', 'b'], { ...e, exec: fakeRun(() => ({ code: 0 })).run }), 2);
 });
 
-test('hodgepodge promote opens a PR with head sha and artifacts URI', async () => {
+test('bish-bash-bosh promote opens a PR with head sha and artifacts URI', async () => {
   const exec = fakeRun(({ cmd }) => (cmd === 'gh' ? { code: 0, stdout: 'https://github.com/o/r/pull/9\n' } : { code: 0, stdout: 'abc123\n' }));
   /** @type {string[]} */
   const outs = [];

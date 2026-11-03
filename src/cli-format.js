@@ -7,81 +7,74 @@ const short = (sha) => (sha ? sha.slice(0, 7) : sha);
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const bullets = (items) => items.map((i) => `  - ${i}`).join('\n');
 
-// `hodge`'s Interview Loop (runInterviewLoop): {status, answered, remaining?}.
+// `bish`'s Interview Loop (runInterviewLoop): {status, answered, remaining?}.
 export function formatInterviewLoopResult(res) {
   const { status, answered } = res;
   if (status === 'ok') return `Interview complete: ${plural(answered, 'question')} answered this run.\n`;
-  return `Paused after ${plural(answered, 'question')}: ${plural(res.remaining, 'question')} left. Run \`hodge\` again to continue.\n`;
+  return `Paused after ${plural(answered, 'question')}: ${plural(res.remaining, 'question')} left. Run \`bish\` again to continue.\n`;
 }
 
-// `podge`'s Plan Loop (runPlanLoop): {status, processed}. Unlike the Interview Loop there is no
+// `bosh`'s Plan Loop (runPlanLoop): {status, processed}. Unlike the Interview Loop there is no
 // pause state: every unprocessed specification item is handed to the agent in one run.
 export function formatPlanLoopResult(res) {
   return `Plan complete: ${plural(res.processed, 'item')} processed this run.\n`;
 }
 
-// `podge`'s Build Loop (runBuildLoop): {status, processed}. Same shape and the same reasoning as
+// `bosh`'s Build Loop (runBuildLoop): {status, processed}. Same shape and the same reasoning as
 // formatPlanLoopResult above: every unprocessed plan.md item is handed to the agent in one run.
 export function formatBuildLoopResult(res) {
   if (res.status === 'failed') {
-    return `Build stopped after ${plural(res.processed, 'item')}: tests failed on "${res.item.phase}: ${res.item.task}" (unticked; run \`podge\` again to retry).\n${res.output}\n`;
+    return `Build stopped after ${plural(res.processed, 'item')}: tests failed on "${res.item.phase}: ${res.item.task}" (unticked; run \`bosh\` again to retry).\n${res.output}\n`;
   }
   return `Build complete: ${plural(res.processed, 'item')} processed this run.\n`;
 }
 
-// `hodge --reverse` (runReverse): {status, sha, reason?}.
+// `bish --reverse` (runReverse): {status, sha, reason?}.
 export function formatReverseResult(res) {
   const { status, sha, reason } = res;
   if (status === 'ok') return `Reverse-engineered specs and tests (commit ${short(sha)}).\n`;
   return `Reverse ${status}${reason ? `: ${reason}` : ''}.\n`;
 }
 
-// `hodgepodge spec-lint` (lintSpecs): {ok, problems}.
+// `bish-bash-bosh spec-lint` (lintSpecs): {ok, problems}.
 export function formatSpecLint(res) {
   if (res.ok) return 'spec-lint: ok\n';
   return `spec-lint: ${plural(res.problems.length, 'problem')}\n${bullets(res.problems)}\n`;
 }
 
-// `hodgepodge ready` (checkReadiness): {ready, gaps}.
+// `bish-bash-bosh ready` (checkReadiness): {ready, gaps}.
 export function formatReadiness(res) {
   if (res.ready) return 'ready: yes\n';
   return `ready: no (${plural(res.gaps.length, 'gap')})\n${bullets(res.gaps)}\n`;
 }
 
-// `hodgepodge sync` (syncArtifacts): {uploaded, skipped}.
+// `bish-bash-bosh sync` (syncArtifacts): {uploaded, skipped}.
 export function formatSync(res) {
   return `synced: ${plural(res.uploaded.length, 'file')} uploaded, ${plural(res.skipped.length, 'file')} already up to date\n`;
 }
 
-// `hodgepodge promote` (requestPromotion): {url}.
+// `bish-bash-bosh promote` (requestPromotion): {url}.
 export function formatPromote(res) {
   return `promotion PR opened: ${res.url}\n`;
 }
 
-// `hodgepodge clean-room` (exportBundle): {ok, sha?, files?, reason?}.
+// `bish-bash-bosh clean-room` (exportBundle): {ok, sha?, files?, reason?}.
 export function formatCleanRoom(res) {
   if (!res.ok) return `clean-room: failed: ${res.reason}\n`;
   return `clean-room: exported ${plural(res.files.length, 'file')} (commit ${short(res.sha)})\n`;
 }
 
-// `hodgepodge kill` (stopContainer): {stopped, name?, executionArn?, reason?}.
-export function formatKill(res) {
-  const target = res.name ?? res.executionArn;
-  if (res.stopped) return `stopped${target ? ` ${target}` : ''}\n`;
-  return `not stopped${target ? ` ${target}` : ''}${res.reason ? `: ${res.reason}` : ''}\n`;
-}
-
-// `hodgepodge control` (writeControl): {ok, reason?}.
+// `bish-bash-bosh control` (writeControl): {ok, reason?}.
 export function formatControlWrite(res) {
   return res.ok ? 'control updated\n' : `control update failed: ${res.reason}\n`;
 }
 
-// `hodgepodge proxy`: {port}.
+// `bish-bash-bosh proxy`: {port}.
 export function formatProxyListening(res) {
   return `listening on port ${res.port}\n`;
 }
 
-// `hodgepodge status` (readRunStatus, plus optional control state): {runId, iterations, lastStatus, totals, details?}, control?.
+// `bish-bash-bosh status` (readRunStatus, plus optional control state): {runId, iterations, lastStatus, totals, details?}, control?.
 export function formatStatus(status, control) {
   const lines = [`run ${status.runId}: ${status.lastStatus ?? 'no iterations yet'} (${plural(status.iterations, 'iteration')}, ${status.totals.seconds ?? 0}s)`];
   if (control) {

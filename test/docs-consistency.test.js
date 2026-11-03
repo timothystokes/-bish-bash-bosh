@@ -39,28 +39,25 @@ test('G-4: every CLI command is documented in README or a spec', () => {
   const cmds = helpCommands();
   assert.ok(cmds.length >= 14, `parsed commands: ${cmds.join(', ')}`);
   for (const c of cmds) {
-    const pattern = ['hodge', 'podge'].includes(c) ? new RegExp(`\\b${c}\\b`) : new RegExp(`hodgepodge ${c}\\b|\`${c}( step)?\``);
+    const pattern = ['bish', 'bosh'].includes(c) ? new RegExp(`\\b${c}\\b`) : new RegExp(`bish-bash-bosh ${c}\\b|\`${c}( step)?\``);
     assert.match(docs, pattern, `command '${c}' is in CLI help but undocumented`);
   }
 });
 
-test('G-4: every `hodgepodge <command>` in README exists in the CLI help', () => {
+test('G-4: every `bish-bash-bosh <command>` in README exists in the CLI help', () => {
   const known = new Set(helpCommands());
-  const used = [...read('README.md').matchAll(/(?:npx )?hodgepodge ([a-z][a-z-]*)/g)].map((m) => m[1]);
-  for (const c of used) assert.ok(known.has(c), `README uses 'hodgepodge ${c}', not in CLI help`);
+  const used = [...read('README.md').matchAll(/(?:npx )?bish-bash-bosh ([a-z][a-z-]*)/g)].map((m) => m[1]);
+  for (const c of used) assert.ok(known.has(c), `README uses 'bish-bash-bosh ${c}', not in CLI help`);
 });
 
-test('G-8: Dockerfile installs production dependencies, and every validator package src/formats.js imports is one', () => {
-  const docker = read('Dockerfile');
-  assert.match(docker, /COPY package\.json package-lock\.json/);
-  assert.match(docker, /npm ci --omit=dev/);
+test('G-8: every validator package src/formats.js imports is a production dependency', () => {
   const pkg = JSON.parse(read('package.json'));
   const src = read('src/formats.js');
   const imported = [...src.matchAll(/from '([^'./][^']*)'/g)].map((m) => m[1]).filter((p) => !p.startsWith('node:'));
   assert.ok(imported.length >= 5);
   for (const spec of imported) {
     const name = spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0];
-    assert.ok(pkg.dependencies[name], `${name} must be a runtime dependency to exist in the image`);
+    assert.ok(pkg.dependencies[name], `${name} must be a runtime dependency`);
   }
 });
 

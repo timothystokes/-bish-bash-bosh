@@ -61,7 +61,7 @@ test('parseCodexOutput extracts the session id a later call can resume with', ()
 });
 
 test('a caller that never passes session gets no session back (unchanged behaviour)', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cx-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-cx-'));
   try {
     const r = await make({ exitStatus: 0, transcript: 'ok', writes: {} }).run({ prompt: 'p', cwd, limits: {} });
     assert.equal('session' in r, false);
@@ -71,7 +71,7 @@ test('a caller that never passes session gets no session back (unchanged behavio
 });
 
 test('a caller opting into session tracking gets the thread id codex assigned, then resumes it', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cx-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-cx-'));
   try {
     const adapter = make({ exitStatus: 0, transcript: 'ok', writes: {} });
     const first = await adapter.run({ prompt: 'p', cwd, limits: {}, session: undefined });
@@ -85,7 +85,7 @@ test('a caller opting into session tracking gets the thread id codex assigned, t
 
 
 test('wall-clock limit kills the agent and reports non-zero exit', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cx-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-cx-'));
   try {
     const adapter = make(/** @type {any} */ ({ exitStatus: 0, transcript: '', writes: {}, hang: true }));
     const r = await adapter.run({ prompt: 'p', cwd, limits: { maxWallClockSeconds: 0.3 } });
@@ -96,7 +96,7 @@ test('wall-clock limit kills the agent and reports non-zero exit', async () => {
 });
 
 test('missing command yields exit 127, not a throw', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cx-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-cx-'));
   try {
     const r = await createCodexAdapter({ model: 'm', command: 'definitely-not-a-real-binary-xyz' }).run({ prompt: 'p', cwd, limits: {} });
     assert.equal(r.exitStatus, 127);

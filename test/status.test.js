@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { writeIterationRecord } from '../src/podge-run-record.js';
+import { writeIterationRecord } from '../src/bosh-run-record.js';
 import { createLocalStatusSource, readRunStatus } from '../src/status.js';
 import { main } from '../src/cli.js';
 import { writeProjectConfig, withCwd } from './support/project.js';
@@ -21,7 +21,7 @@ const rec = (status, seconds) => ({
 });
 
 function makeRun() {
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-status-'));
+  const dir = mkdtempSync(join(tmpdir(), 'bish-status-'));
   writeIterationRecord(dir, 'r1', 1, rec('ok', 10));
   writeIterationRecord(dir, 'r1', 2, rec('failed', 20));
   return dir;
@@ -35,12 +35,12 @@ test('readRunStatus totals seconds and iterations', () => {
 });
 
 test('readRunStatus on an unknown run is empty, not an error', () => {
-  const s = readRunStatus(createLocalStatusSource(mkdtempSync(join(tmpdir(), 'hodge-status-'))), 'none');
+  const s = readRunStatus(createLocalStatusSource(mkdtempSync(join(tmpdir(), 'bish-status-'))), 'none');
   assert.equal(s.iterations, 0);
   assert.equal(s.lastStatus, null);
 });
 
-test('hodgepodge status prints a plain summary and includes control state', async () => {
+test('bish-bash-bosh status prints a plain summary and includes control state', async () => {
   const dir = makeRun();
   writeProjectConfig(dir, { adapter: 'f', model: 'm' });
   const ctl = join(dir, 'control.json');
@@ -53,9 +53,9 @@ test('hodgepodge status prints a plain summary and includes control state', asyn
   assert.match(out, /control: paused/);
 });
 
-test('hodgepodge status needs a project config (.hodgepodge/config.yml)', async () => {
+test('bish-bash-bosh status needs a project config (.bish-bash-bosh/config.yml)', async () => {
   let e = '';
-  const missing = mkdtempSync(join(tmpdir(), 'hodge-status-missing-'));
+  const missing = mkdtempSync(join(tmpdir(), 'bish-status-missing-'));
   const code = await withCwd(missing, () => main(['status'], { stdout: () => {}, stderr: (/** @type {string} */ s) => (e += s) }));
   assert.equal(code, 2);
   assert.match(e, /config\.yml/);

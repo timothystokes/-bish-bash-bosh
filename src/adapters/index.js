@@ -10,8 +10,8 @@ export const defaultRegistry = {
   'openai-http': ({ model }) =>
     createOpenAiHttpAdapter({
       model,
-      baseUrl: process.env['HODGE_HTTP_BASE_URL'],
-      apiKeyEnv: 'HODGE_HTTP_API_KEY',
+      baseUrl: process.env['BISH_HTTP_BASE_URL'],
+      apiKeyEnv: 'BISH_HTTP_API_KEY',
     }),
 };
 

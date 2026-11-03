@@ -1,7 +1,9 @@
-# Implementation Plan: Hodgepodge Harness
+# Implementation Plan: Bish-Bash-Bosh Harness
 
 Goal: a harness for getting work done with loop-engineering patterns. Validation project (later, once a harness version exists): Punk, a functional language interpreted on Node. Punk is out of scope for harness planning.
 Approach: Ralph-style loops (one task per loop, fresh context, fixed stack), strong back-pressure, files as state.
+
+Current scope: direct local command-line execution only. Container images, container kill commands and cloud infrastructure scaffolding have been removed at the owner's request. This document preserves the original design rationale below; cloud execution remains deferred, not a requirement or an implemented feature. Current behaviour is defined in `../specs/`.
 
 ## Decisions captured
 
@@ -14,17 +16,17 @@ Approach: Ralph-style loops (one task per loop, fresh context, fixed stack), str
 | Gate | Per-step commits to a **sandbox repo/branch**; human reviews completed work before promotion out of sandbox |
 | Tests | Test plan required per objective; must exist and be red before build loops start |
 | Reverse specs | Specs constrained by standards: OpenAPI, JSON Schema, example-based conformance cases |
-| Sandbox | Docker locally; Fargate task in cloud |
+| Execution | Directly on the local host; cloud deferred |
 | Secrets | Small Node preflight-style proxy (regex rules, redact, audit) |
 | UI | Terminal TUI first (log tail, pause/resume/steer, kill, cost meter vs budget). No Slack |
-| State | Repo files only (in the target repo, never in hodgepodge) |
-| Repos | Hodgepodge = harness only. Every delivery uses a separate target repo |
+| State | Repo files only (in the target repo, never in bish-bash-bosh) |
+| Repos | Bish-Bash-Bosh = harness only. Every delivery uses a separate target repo |
 | Stack | Vanilla JS + JSDoc, `tsc --checkJs`, `node:test` |
 
 ## Repo layout (target)
 
 ```
-bin/hodge                 CLI entry
+bin/bish                 CLI entry
 src/loop/                 iteration runner, stack allocator, stop conditions
 src/adapters/             copilot.js claude.js codex.js openai-http.js (common interface)
 src/gates/                test-plan, anti-stub, budget, scope gates
@@ -33,7 +35,6 @@ src/tui/                  terminal UI + control channel
 src/modes/                interview, reverse, forward, brownfield, harden, cleanroom
 prompts/                  one loop prompt per mode (tuned "signs")
 templates/                project template: specs/ plan/ tests/ runs/
-infra/                    Dockerfile, compose, AWS CDK app
 docs/
 ```
 
@@ -50,9 +51,9 @@ Run record per objective: `runs/<id>/{plan.md, iterations/NNN/{prompt,transcript
    - Anti-stub gate: reject TODO/stub/"not implemented"/empty bodies in the diff.
    - Scope gate: changes confined to the objective's allowed paths.
    - Budget gate: tokens/cost/wall-clock/iteration caps.
-   - Repo gate: refuse to run if the target repo is the hodgepodge repo itself.
+   - Repo gate: refuse to run if the target repo is the bish-bash-bosh repo itself.
    - Fast-wheel rule: scoped tests per iteration; full suite on a schedule.
-5. **Control channel:** `control.json` (pause, resume, steer note injected into the next stack, stop). TUI writes it; the runner reads it between iterations; the kill switch terminates the container.
+5. **Control channel:** `control.json` remains available to the status/TUI tooling. The current Plan and Build Loops do not consume it; interrupt local commands with Ctrl-C.
 6. **Tune-the-guitar loop:** failure patterns seen in transcripts become signs in prompts or rules in `specs/stdlib`. Tests record *why* they exist.
 
 ## Modes
@@ -75,7 +76,7 @@ Run record per objective: `runs/<id>/{plan.md, iterations/NNN/{prompt,transcript
 
 **Phase 1: Loop + gates**
 - Loop runner, stack allocator, per-iteration commit to the sandbox branch, test-plan/type/anti-stub/budget gates.
-- Docker image + local run.
+- Direct local execution.
 - Exit: a toy objective completes unattended with red-to-green tests.
 
 **Phase 2: Spec modes**
@@ -90,18 +91,18 @@ Run record per objective: `runs/<id>/{plan.md, iterations/NNN/{prompt,transcript
 - Validate the round trip on a small project: code -> specs -> clean-room rebuild -> conformance suite passes.
 - After a harness version exists, run Punk as the first real test.
 
-**Phase 5: Cloud (future goal; Docker/local is the main goal for now)**
+**Phase 5: Cloud (deferred; direct local execution is the current scope)**
 - Image to ECR, Step Functions driver with Fargate Spot iterations, artifacts to S3, secrets from Secrets Manager, promotion review via PR.
 
 ## Cloud cost and the Lambda question
 
 - **Lambda** matches Ralph's "fresh context each iteration" shape, but has a hard 15-minute cap per invocation, no persistent workspace (clone every time), and is awkward for long builds and test runs. One agent iteration plus tests can approach or exceed the cap. Chaining iterations needs an external orchestrator (Step Functions), adding cost and complexity.
 - **Cheapest practical option: Fargate Spot**, one task per run. Billed per second, no duration cap, same container as local. Interruptions are tolerable because every iteration is committed, so a run resumes from the last commit.
-- **Recommendation:** local Docker first (no infra cost); cloud via Fargate Spot. Revisit Lambda only if iterations are reliably under ~5 minutes.
+- **Current decision:** direct local execution first; cloud execution remains deferred.
 
 ## Cloud loop driver: Step Functions (decided)
 
-- `podge step` is the single iteration unit: idempotent, reads git, runs one loop, commits, emits a small JSON status `{sha, iteration, cost, status}`. Designed in Phases 0-1.
+- `bosh step` is the single iteration unit: idempotent, reads git, runs one loop, commits, emits a small JSON status `{sha, iteration, cost, status}`. Designed in Phases 0-1.
 - Two thin drivers call it: a local Node `while` loop, and an AWS Step Functions state machine (Fargate `RunTask.sync` per iteration, fresh context each time).
 - Git and run records are the source of truth. Execution context holds pointers only (commit SHA, iteration, cumulative cost, last status, pause/stop flag) and must be rebuildable from git.
 - Pause/steer/approval via `waitForTaskToken` or a control record read by a Choice state; budget gate is a Choice on cumulative cost and iteration count.
@@ -133,4 +134,4 @@ Run record per objective: `runs/<id>/{plan.md, iterations/NNN/{prompt,transcript
 
 1. Promotion out of the sandbox: deferred. Expected to align with a traditional CD pipeline from sandbox forward.
 
-Decided: AWS infrastructure uses CDK. Delivery work always happens in a separate target repo, never in the hodgepodge (harness) repo. Hodgepodge only holds the harness; each objective points at its own target repo (with its own sandbox branch/repo for per-step commits).
+Decided: AWS infrastructure uses CDK. Delivery work always happens in a separate target repo, never in the bish-bash-bosh (harness) repo. Bish-Bash-Bosh only holds the harness; each objective points at its own target repo (with its own sandbox branch/repo for per-step commits).

@@ -3,11 +3,11 @@ import { join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { validateConfig } from './config.js';
 
-export const CONFIG_FILE = '.hodgepodge/config.yml';
+export const CONFIG_FILE = '.bish-bash-bosh/config.yml';
 
-// Load the project config: `<dir>/.hodgepodge/config.yml` (default dir: the current working directory) holds
+// Load the project config: `<dir>/.bish-bash-bosh/config.yml` (default dir: the current working directory) holds
 // adapter, model and the rest (`src/config.schema.json`). There is no separate sandbox or target repo:
-// hodgepodge always operates on this project directory directly.
+// bish-bash-bosh always operates on this project directory directly.
 export function loadProjectConfig(dir = '.') {
   const root = resolve(dir);
   const configPath = join(root, CONFIG_FILE);
@@ -15,7 +15,7 @@ export function loadProjectConfig(dir = '.') {
   try {
     raw = readFileSync(configPath, 'utf8');
   } catch (e) {
-    return { ok: false, error: `cannot read config '${configPath}' (run \`hodgepodge init\` first): ${e.message}` };
+    return { ok: false, error: `cannot read config '${configPath}' (run \`bish-bash-bosh init\` first): ${e.message}` };
   }
   let config;
   try {

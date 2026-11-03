@@ -34,7 +34,7 @@ test('buildCopilotArgs passes --session-id only when given one', () => {
 });
 
 test('a caller that never passes session gets no session flag and no session back (unchanged behaviour)', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cop-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-cop-'));
   try {
     const r = await make({ exitStatus: 0, transcript: 'ok', writes: {} }).run({ prompt: 'p', cwd, limits: {} });
     assert.equal('session' in r, false);
@@ -44,7 +44,7 @@ test('a caller that never passes session gets no session flag and no session bac
 });
 
 test('a caller opting into session tracking gets a generated session id back, then resumes it', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cop-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-cop-'));
   try {
     const adapter = make({ exitStatus: 0, transcript: 'ok', writes: {} });
     const first = await adapter.run({ prompt: 'p', cwd, limits: {}, session: undefined });
@@ -67,7 +67,7 @@ test('parseCopilotOutput joins assistant messages, keeps junk lines and ignores 
 });
 
 test('wall-clock limit kills the agent and reports non-zero exit', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cop-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-cop-'));
   try {
     const adapter = make(/** @type {any} */ ({ exitStatus: 0, transcript: '', writes: {}, hang: true }));
     const r = await adapter.run({ prompt: 'p', cwd, limits: { maxWallClockSeconds: 0.3 } });
@@ -78,7 +78,7 @@ test('wall-clock limit kills the agent and reports non-zero exit', async () => {
 });
 
 test('missing command yields a failed result, not a throw', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cop-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-cop-'));
   try {
     const adapter = createCopilotAdapter({ model: 'm', command: 'definitely-not-a-real-binary-xyz' });
     const r = await adapter.run({ prompt: 'p', cwd, limits: {} });
@@ -145,7 +145,7 @@ test('createReasoningSink is a no-op (undefined) when onReasoning is omitted', (
 });
 
 test('createCopilotAdapter calls onReasoning with live reasoning text independently of onOutput', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-cop-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-cop-'));
   try {
     const reasoningDelta = JSON.stringify({
       type: 'assistant.reasoning_delta',

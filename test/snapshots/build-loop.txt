@@ -1,11 +1,11 @@
 Apply the following sequence to the single plan item below. You have no memory of any earlier call
-in this Build Loop: before you start, read `.hodgepodge/plan.md` (which items are already ticked)
+in this Build Loop: before you start, read `.bish-bash-bosh/plan.md` (which items are already ticked)
 and the project's own source files to see what already exists, so you never redo or duplicate
 earlier work.
 
-1. Write a failing test for this item first, in a new file under `.hodgepodge/tests/` (for example
-   `.hodgepodge/tests/<a-short-kebab-case-name>.test.js`), using Node's built-in `node:test` together
-   with `.hodgepodge/test-harness.js` (ships with hodgepodge; pure Node standard library, so it works
+1. Write a failing test for this item first, in a new file under `.bish-bash-bosh/tests/` (for example
+   `.bish-bash-bosh/tests/<a-short-kebab-case-name>.test.js`), using Node's built-in `node:test` together
+   with `.bish-bash-bosh/test-harness.js` (ships with bish-bash-bosh; pure Node standard library, so it works
    no matter what language or stack the project itself is implemented in — it runs a command or
    makes an HTTP request and lets you assert on the result, exercising the project from the outside,
    never by importing its internals). Confirm it fails for the right reason before moving on.

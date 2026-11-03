@@ -6,11 +6,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { FORMATS } from '../src/formats.js';
 import { loadFormatSkill } from '../src/prompts.js';
-import { buildInterviewPrompt } from '../src/hodge-interview.js';
+import { buildInterviewPrompt } from '../src/bish-interview.js';
 
 /** @param {Record<string, string>} files */
 function makeRepo(files = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-skill-'));
+  const dir = mkdtempSync(join(tmpdir(), 'bish-skill-'));
   execFileSync('git', ['-C', dir, 'init', '-q', '-b', 'main']);
   for (const [f, text] of Object.entries(files)) {
     mkdirSync(join(dir, f, '..'), { recursive: true });

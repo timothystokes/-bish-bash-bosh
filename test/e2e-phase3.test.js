@@ -8,10 +8,10 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const bin = join(here, '..', 'bin', 'hodgepodge');
+const bin = join(here, '..', 'bin', 'bish-bash-bosh');
 const AWS = 'AKIAIOSFODNN7EXAMPLE';
 
-test('phase 3 exit: hodgepodge proxy (subprocess) redacts secrets, audits without values, and meters usage', async () => {
+test('phase 3 exit: bish-bash-bosh proxy (subprocess) redacts secrets, audits without values, and meters usage', async () => {
   /** @type {string[]} */
   const seen = [];
   const upstream = createServer((req, res) => {
@@ -26,7 +26,7 @@ test('phase 3 exit: hodgepodge proxy (subprocess) redacts secrets, audits withou
   await new Promise((r) => upstream.listen(0, '127.0.0.1', () => r(undefined)));
   const up = /** @type {import('node:net').AddressInfo} */ (upstream.address());
 
-  const tmp = mkdtempSync(join(tmpdir(), 'hodge-proxy-'));
+  const tmp = mkdtempSync(join(tmpdir(), 'bish-proxy-'));
   const audit = join(tmp, 'audit.jsonl');
   const meter = join(tmp, 'meter.jsonl');
   const child = spawn(process.execPath, [bin, 'proxy', '--upstream', `http://127.0.0.1:${up.port}`, '--audit', audit, '--meter', meter], {

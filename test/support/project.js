@@ -17,19 +17,19 @@ export function initGitRepo(dir) {
   return dir;
 }
 
-// Writes `<dir>/.hodgepodge/config.yml`: replaces the project config a sandbox's hodge.json used to hold.
+// Writes `<dir>/.bish-bash-bosh/config.yml`: replaces the project config a sandbox's bish.json used to hold.
 export function writeProjectConfig(dir, config) {
-  mkdirSync(join(dir, '.hodgepodge'), { recursive: true });
-  writeFileSync(join(dir, '.hodgepodge', 'config.yml'), stringifyYaml(config));
+  mkdirSync(join(dir, '.bish-bash-bosh'), { recursive: true });
+  writeFileSync(join(dir, '.bish-bash-bosh', 'config.yml'), stringifyYaml(config));
   return dir;
 }
 
-// Writes and commits .hodgepodge/config.yml: for fixtures where the repo gate's "working tree is clean" check
+// Writes and commits .bish-bash-bosh/config.yml: for fixtures where the repo gate's "working tree is clean" check
 // must pass (the config lives inside the project now, not in a separate sandbox dir).
 export function commitProjectConfig(dir, config) {
   writeProjectConfig(dir, config);
-  git(dir, 'add', join('.hodgepodge', 'config.yml'));
-  git(dir, 'commit', '-q', '-m', 'hodgepodge: config');
+  git(dir, 'add', join('.bish-bash-bosh', 'config.yml'));
+  git(dir, 'commit', '-q', '-m', 'bish-bash-bosh: config');
   return dir;
 }
 

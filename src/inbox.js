@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, readFileSync, renameSync, rmSync, writeFile
 import { join } from 'node:path';
 
 /** Outer-console files, kept in the sandbox (outside the target repo), one bullet per entry. */
-export const INBOX_FILE = { hodge: 'more-questions.md', podge: 'more-todos.md' };
+export const INBOX_FILE = { bish: 'more-questions.md', bosh: 'more-todos.md' };
 
 export function addEntry(dir, kind, text) {
   const line = text.replace(/\s+/g, ' ').trim();
@@ -31,11 +31,11 @@ export function consumeInbox(dir, kind, used) {
 }
 
 const INTRO = {
-  hodge: 'The owner added these while you ran. Assess each, add it to the open questions (.hodgepodge/), and ask it in the next batch unless it is already answered.',
-  podge: 'The owner added these while you ran. End-of-session checklist: add each to plan.md as an unchecked item before you assess the next best action.',
+  bish: 'The owner added these while you ran. Assess each, add it to the open questions (.bish-bash-bosh/), and ask it in the next batch unless it is already answered.',
+  bosh: 'The owner added these while you ran. End-of-session checklist: add each to plan.md as an unchecked item before you assess the next best action.',
 };
 
 export function inboxSection(kind, entries) {
   if (entries.trim() === '') return [];
-  return [`## ${kind === 'hodge' ? 'More questions' : 'More todos'}`, INTRO[kind], entries.trimEnd()];
+  return [`## ${kind === 'bish' ? 'More questions' : 'More todos'}`, INTRO[kind], entries.trimEnd()];
 }

@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runInterview, buildInterviewPrompt } from '../src/hodge-interview.js';
+import { runInterview, buildInterviewPrompt } from '../src/bish-interview.js';
 import { loadModePrompt } from '../src/prompts.js';
 import { main } from '../src/cli.js';
 import { lintSpecs } from '../src/spec-lint.js';
@@ -15,7 +15,7 @@ const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
 
 function makeRepo() {
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-int-'));
+  const dir = mkdtempSync(join(tmpdir(), 'bish-int-'));
   git(dir, 'init', '-q', '-b', 'main');
   git(dir, 'config', 'user.email', 't@example.com');
   git(dir, 'config', 'user.name', 'T');
@@ -31,7 +31,7 @@ const config = (/** @type {{adapter?: string, model?: string}} */ overrides = {}
   ...overrides,
 });
 
-const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
+const identity = { root: '/nonexistent/bish-bash-bosh', remotes: [] };
 
 const goodWrites = {
   'specs/greet.md': '# Spec: Greeter\nImplementation: none\n\n## Requirements\n- R-greet-1: must greet\n',
@@ -70,8 +70,8 @@ test('a single-shot interview (no question left) that is lint-clean is committed
   assert.equal(res.sha, git(dir, 'rev-parse', 'HEAD'));
   assert.equal(git(dir, 'status', '--porcelain'), '');
   assert.equal(lintSpecs(dir, { testPlan: false }).ok, true);
-  assert.ok(existsSync(join(dir, '.hodgepodge', 'runs', 'r1', 'interview', 'record.json')));
-  assert.equal(JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'ok');
+  assert.ok(existsSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'interview', 'record.json')));
+  assert.equal(JSON.parse(readFileSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'ok');
   assert.match(a.prompts[0], /Build a greeter/);
 });
 
@@ -88,7 +88,7 @@ test('spec-lint problems at the end of the interview keep the work and are repor
   assert.equal(res.status, 'incomplete');
   assert.match(res.reason ?? '', /must start with a "# Spec: <name>" title/);
   assert.equal(existsSync(join(dir, 'specs', 'bad.md')), true);
-  assert.equal(JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'incomplete');
+  assert.equal(JSON.parse(readFileSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'interview', 'record.json'), 'utf8')).status, 'incomplete');
   assert.equal(git(dir, 'status', '--porcelain'), '');
 });
 
@@ -101,7 +101,7 @@ test('the test-plan mapping is not an interview check: specs without tests/PLAN.
   assert.equal(lintSpecs(dir, { testPlan: false }).ok, true);
 });
 
-test('refuses when the agent writes outside specs/ and .hodgepodge/ (tests are the plan stage)', async () => {
+test('refuses when the agent writes outside specs/ and .bish-bash-bosh/ (tests are the plan stage)', async () => {
   const dir = makeRepo();
   const res = await runInterview({
     config: config(),
@@ -144,7 +144,7 @@ test('gates: empty objective, dirty tree, harness repo, missing role make no age
   assert.equal(a.prompts.length, 0);
 });
 
-test('hodge on a fresh repo first seeds the interview store from its template; once committed, the Interview Loop asks each unanswered question, hands each round to the agent, and ticks both checkboxes until it pauses or completes', async () => {
+test('bish on a fresh repo first seeds the interview store from its template; once committed, the Interview Loop asks each unanswered question, hands each round to the agent, and ticks both checkboxes until it pauses or completes', async () => {
   const dir = makeRepo();
   commitProjectConfig(dir, config({ adapter: 'iv' }));
   const a = agent({});
@@ -152,58 +152,58 @@ test('hodge on a fresh repo first seeds the interview store from its template; o
   const out = /** @type {string[]} */ ([]);
   // the very first run only seeds the store from the template: no agent call, no run folder
   const seedCode = await withCwd(dir, () =>
-    main(['hodge'], { registry: {}, identity, stdout: (s) => { out.push(s); }, stderr: () => {} }));
+    main(['bish'], { registry: {}, identity, stdout: (s) => { out.push(s); }, stderr: () => {} }));
   assert.equal(seedCode, 0);
-  assert.ok(existsSync(join(dir, '.hodgepodge', 'interview.md')), 'store seeded from the template');
+  assert.ok(existsSync(join(dir, '.bish-bash-bosh', 'interview.md')), 'store seeded from the template');
   assert.equal(
-    readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8'),
+    readFileSync(join(dir, '.bish-bash-bosh', 'interview.md'), 'utf8'),
     readFileSync(join(process.cwd(), 'templates', 'interview-template.md'), 'utf8'),
   );
-  assert.match(out.join(''), /Wrote \.hodgepodge\/interview\.md and \.hodgepodge\/specification\.md from their templates/);
-  assert.ok(existsSync(join(dir, '.hodgepodge', 'specification.md')), 'spec seeded from the template');
+  assert.match(out.join(''), /Wrote \.bish-bash-bosh\/interview\.md and \.bish-bash-bosh\/specification\.md from their templates/);
+  assert.ok(existsSync(join(dir, '.bish-bash-bosh', 'specification.md')), 'spec seeded from the template');
   assert.equal(
-    readFileSync(join(dir, '.hodgepodge', 'specification.md'), 'utf8'),
+    readFileSync(join(dir, '.bish-bash-bosh', 'specification.md'), 'utf8'),
     readFileSync(join(process.cwd(), 'templates', 'specification-template.md'), 'utf8'),
   );
-  assert.equal(readFileSync(join(dir, '.hodgepodge', 'hodge-log.md'), 'utf8'), '', 'hodge-log.md is created empty on the very first run, before any prompt is ever sent');
-  assert.ok(!existsSync(join(dir, '.hodgepodge', 'runs')), 'no run folder on the seed-only run');
+  assert.equal(readFileSync(join(dir, '.bish-bash-bosh', 'bish-log.md'), 'utf8'), '', 'bish-log.md is created empty on the very first run, before any prompt is ever sent');
+  assert.ok(!existsSync(join(dir, '.bish-bash-bosh', 'runs')), 'no run folder on the seed-only run');
   // a second, custom question with a pre-filled default so the loop's resume/default behaviour can be exercised
   writeFileSync(
-    join(dir, '.hodgepodge', 'interview.md'),
-    `${readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8')}\n2. [ ] Q: Who uses the greeter? A: Developers\n`,
+    join(dir, '.bish-bash-bosh', 'interview.md'),
+    `${readFileSync(join(dir, '.bish-bash-bosh', 'interview.md'), 'utf8')}\n2. [ ] Q: Who uses the greeter? A: Developers\n`,
   );
   git(dir, 'add', '-A');
   git(dir, 'commit', '-qm', 'seed interview store');
   out.length = 0;
   const paused = await withCwd(dir, () =>
-    main(['hodge'], { registry, identity, input: Readable.from(['Build a greeter\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
+    main(['bish'], { registry, identity, input: Readable.from(['Build a greeter\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
   assert.equal(paused, 1, 'paused at EOF, not ok');
   assert.match(out.join(''), /What is the objective\?/);
-  assert.match(out.join(''), /Paused after 1 question: 1 question left\. Run `hodge` again to continue\./);
+  assert.match(out.join(''), /Paused after 1 question: 1 question left\. Run `bish` again to continue\./);
   assert.equal(a.prompts.length, 1, 'one agent round for the one question answered before EOF');
   assert.match(a.prompts[0], /## Question\n\nWhat is the objective\?\n\n## Answer\n\nBuild a greeter/);
-  const afterFirst = readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8');
+  const afterFirst = readFileSync(join(dir, '.bish-bash-bosh', 'interview.md'), 'utf8');
   assert.match(afterFirst, /1\. \[x\] Q: What is the objective\? A: Build a greeter/, 'checked, and the answer is written back, once handed to and processed by the agent');
   assert.match(afterFirst, /2\. \[ \] Q: Who uses the greeter\? A: Developers/, 'the second question is untouched, not yet asked');
-  const logAfterFirst = readFileSync(join(dir, '.hodgepodge', 'hodge-log.md'), 'utf8');
-  assert.match(logAfterFirst, /^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] hodge: .*## Answer\n\nBuild a greeter/s, 'the full prompt sent to the agent is logged, plain text with a timestamp');
+  const logAfterFirst = readFileSync(join(dir, '.bish-bash-bosh', 'bish-log.md'), 'utf8');
+  assert.match(logAfterFirst, /^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] bish: .*## Answer\n\nBuild a greeter/s, 'the full prompt sent to the agent is logged, plain text with a timestamp');
   out.length = 0;
   const done = await withCwd(dir, () =>
-    main(['hodge'], { registry, identity, input: Readable.from(['\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
+    main(['bish'], { registry, identity, input: Readable.from(['\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
   assert.equal(done, 0);
   assert.match(out.join(''), /Who uses the greeter\?/);
   assert.match(out.join(''), /Interview complete: 1 question answered this run\./);
   assert.equal(a.prompts.length, 2, 'the second run handed its round to the agent too');
-  const afterSecond = readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8');
+  const afterSecond = readFileSync(join(dir, '.bish-bash-bosh', 'interview.md'), 'utf8');
   assert.match(afterSecond, /2\. \[x\] Q: Who uses the greeter\? A: Developers/, 'Enter alone accepted the pre-filled default, and the line is checked once handed to and processed by the agent');
   assert.equal(readFileSync(join(dir, 'README.md'), 'utf8'), '# target\n');
 });
 
-test('the agent session is persisted in .hodgepodge/config.yml, not a separate file, and carries across hodge invocations', async () => {
+test('the agent session is persisted in .bish-bash-bosh/config.yml, not a separate file, and carries across bish invocations', async () => {
   const dir = makeRepo();
   commitProjectConfig(dir, config({ adapter: 'sess' }));
   writeFileSync(
-    join(dir, '.hodgepodge', 'interview.md'),
+    join(dir, '.bish-bash-bosh', 'interview.md'),
     `${readFileSync(join(process.cwd(), 'templates', 'interview-template.md'), 'utf8')}\n2. [ ] Q: Who uses the greeter? A: Developers\n`,
   );
   git(dir, 'add', '-A');
@@ -217,35 +217,35 @@ test('the agent session is persisted in .hodgepodge/config.yml, not a separate f
     },
   };
   const registry = { sess: () => sessioned };
-  await withCwd(dir, () => main(['hodge'], { registry, identity, input: Readable.from(['Build a greeter\n']), stdout: () => {}, stderr: () => {} }));
+  await withCwd(dir, () => main(['bish'], { registry, identity, input: Readable.from(['Build a greeter\n']), stdout: () => {}, stderr: () => {} }));
   assert.equal(seen[0], undefined, 'no session yet on the very first round');
-  let cfg = readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8');
-  assert.match(cfg, /hodgeSession: s1/);
-  assert.ok(!existsSync(join(dir, '.hodgepodge', 'interview-session.json')), 'no separate session file is written');
-  await withCwd(dir, () => main(['hodge'], { registry, identity, input: Readable.from(['\n']), stdout: () => {}, stderr: () => {} }));
+  let cfg = readFileSync(join(dir, '.bish-bash-bosh', 'config.yml'), 'utf8');
+  assert.match(cfg, /bishSession: s1/);
+  assert.ok(!existsSync(join(dir, '.bish-bash-bosh', 'interview-session.json')), 'no separate session file is written');
+  await withCwd(dir, () => main(['bish'], { registry, identity, input: Readable.from(['\n']), stdout: () => {}, stderr: () => {} }));
   assert.equal(seen[1], 's1', 'the second round resumes the session the first round returned');
-  cfg = readFileSync(join(dir, '.hodgepodge', 'config.yml'), 'utf8');
-  assert.match(cfg, /hodgeSession: s2/);
+  cfg = readFileSync(join(dir, '.bish-bash-bosh', 'config.yml'), 'utf8');
+  assert.match(cfg, /bishSession: s2/);
 });
 
-test('hodge usage errors exit 2', async () => {
+test('bish usage errors exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
   const e = (/** @type {string} */ s) => { err.push(s); };
-  const missing = mkdtempSync(join(tmpdir(), 'hodge-int-missing-'));
-  assert.equal(await withCwd(missing, () => main(['hodge'], { stdout: () => {}, stderr: e })), 2);
+  const missing = mkdtempSync(join(tmpdir(), 'bish-int-missing-'));
+  assert.equal(await withCwd(missing, () => main(['bish'], { stdout: () => {}, stderr: e })), 2);
   assert.match(err.join(''), /config\.yml/);
 
-  const norole = mkdtempSync(join(tmpdir(), 'hodge-int-norole-'));
+  const norole = mkdtempSync(join(tmpdir(), 'bish-int-norole-'));
   writeProjectConfig(norole, config({ adapter: 'missing' }));
-  mkdirSync(join(norole, '.hodgepodge'), { recursive: true });
-  writeFileSync(join(norole, '.hodgepodge', 'interview.md'), '# Interview\n');
+  mkdirSync(join(norole, '.bish-bash-bosh'), { recursive: true });
+  writeFileSync(join(norole, '.bish-bash-bosh', 'interview.md'), '# Interview\n');
   err.length = 0;
   // the Interview Loop itself never resolves an adapter; only --reverse still does
-  assert.equal(await withCwd(norole, () => main(['hodge', '--reverse'], { registry: { f: () => agent({}).adapter }, stdout: () => {}, stderr: e })), 2);
+  assert.equal(await withCwd(norole, () => main(['bish', '--reverse'], { registry: { f: () => agent({}).adapter }, stdout: () => {}, stderr: e })), 2);
   assert.match(err.join(''), /unknown adapter 'missing'/);
 
   err.length = 0;
-  assert.equal(await withCwd(norole, () => main(['podge', 'step', '--objective', 'x'], { stdout: () => {}, stderr: e })), 2);
+  assert.equal(await withCwd(norole, () => main(['bosh', 'step', '--objective', 'x'], { stdout: () => {}, stderr: e })), 2);
 });
 
 test('readlineOptions: a TTY input gets terminal mode so Enter submits; piped input stays plain', async () => {

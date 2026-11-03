@@ -1,14 +1,14 @@
 {
-  "name": "hodgepodge",
+  "name": "bish-bash-bosh",
   "version": "1.0.0",
   "private": true,
   "description": "Model-agnostic harness for loop-engineered software delivery",
   "type": "module",
   "bin": {
-    "hodgepodge": "bin/hodgepodge",
-    "hodge": "bin/hodge",
-    "gepo": "bin/gepo",
-    "podge": "bin/podge"
+    "bish-bash-bosh": "bin/bish-bash-bosh",
+    "bish": "bin/bish",
+    "bash": "bin/bash",
+    "bosh": "bin/bosh"
   },
   "engines": {
     "node": ">=20"
@@ -30,8 +30,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "aws-cdk-lib": "^2.274.0",
-    "constructs": "^10.8.1",
     "typescript": "^5.6.0"
   }
 }

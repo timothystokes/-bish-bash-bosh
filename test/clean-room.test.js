@@ -11,7 +11,7 @@ const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, '-c', 'commit.gpgsign=false', ...a], { encoding: 'utf8' }).trim();
 
 function makeSource() {
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-cr-src-'));
+  const dir = mkdtempSync(join(tmpdir(), 'bish-cr-src-'));
   git(dir, 'init', '-q', '-b', 'main');
   git(dir, 'config', 'user.email', 't@example.com');
   git(dir, 'config', 'user.name', 'T');
@@ -27,7 +27,7 @@ function makeSource() {
   return dir;
 }
 
-const builderDir = () => join(mkdtempSync(join(tmpdir(), 'hodge-cr-b-')), 'builder');
+const builderDir = () => join(mkdtempSync(join(tmpdir(), 'bish-cr-b-')), 'builder');
 
 test('exportBundle copies specs/ and tests/ only, in a fresh builder repo', () => {
   const src = makeSource();
@@ -60,7 +60,7 @@ test('exportBundle refuses a source without specs or tests', () => {
   assert.match(res.reason ?? '', /tests/);
 });
 
-test('hodgepodge clean-room CLI exports the bundle and prints a summary', async () => {
+test('bish-bash-bosh clean-room CLI exports the bundle and prints a summary', async () => {
   const src = makeSource();
   const dest = builderDir();
   let out = '';

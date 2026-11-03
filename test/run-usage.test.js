@@ -4,7 +4,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sumRunUsage } from '../src/run-usage.js';
-import { writeIterationRecord } from '../src/podge-run-record.js';
+import { writeIterationRecord } from '../src/bosh-run-record.js';
 
 /**
  * @param {string} dir
@@ -17,12 +17,12 @@ const rec = (dir, n, seconds) =>
   });
 
 test('sumRunUsage of an empty run is zero', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-usage-'));
+  const dir = mkdtempSync(join(tmpdir(), 'bish-usage-'));
   assert.deepEqual(sumRunUsage(dir, 'r1'), { seconds: 0, iterations: 0 });
 });
 
 test('sumRunUsage sums records of one run only', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-usage-'));
+  const dir = mkdtempSync(join(tmpdir(), 'bish-usage-'));
   rec(dir, 1, 5);
   rec(dir, 2, 2);
   writeIterationRecord(dir, 'other', 1, {
@@ -33,11 +33,11 @@ test('sumRunUsage sums records of one run only', () => {
 
 test('sumRunUsage counts interview seconds without counting it as an iteration', async () => {
   const { mkdirSync, writeFileSync } = await import('node:fs');
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-usage-'));
+  const dir = mkdtempSync(join(tmpdir(), 'bish-usage-'));
   rec(dir, 1, 5);
-  mkdirSync(join(dir, '.hodgepodge', 'runs', 'r1', 'interview'), { recursive: true });
+  mkdirSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'interview'), { recursive: true });
   writeFileSync(
-    join(dir, '.hodgepodge', 'runs', 'r1', 'interview', 'record.json'),
+    join(dir, '.bish-bash-bosh', 'runs', 'r1', 'interview', 'record.json'),
     JSON.stringify({ status: 'ok', usage: { seconds: 7 } }),
   );
   assert.deepEqual(sumRunUsage(dir, 'r1'), { seconds: 12, iterations: 1 });

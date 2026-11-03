@@ -14,17 +14,17 @@ const control = /** @type {const} */ ({ ok: true, paused: false, stop: false });
 const diagnosis = { rootCause: 'rc', evidence: 'ev', fix: 'fx', test: 't', prevention: 'pv' };
 const finding = { classification: 'violated-decision', severity: 'high', spec: 'specs/a.md', consequence: 'bad', diagnosis };
 
-// The old build loop's `writeDoneReport` (src/podge-done.js, removed with it) wrote exactly this: the
+// The old build loop's `writeDoneReport` (src/bosh-done.js, removed with it) wrote exactly this: the
 // shape is still live (status.js/tui.js still read done.json off disk), so this fixture-writer is
 // reproduced here rather than reviving the module just for it.
 function writeDoneReport(repoDir, runId, report) {
-  const path = join(repoDir, '.hodgepodge', 'runs', runId, 'done.json');
+  const path = join(repoDir, '.bish-bash-bosh', 'runs', runId, 'done.json');
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(report, null, 2)}\n`);
 }
 
 function makeRepo() {
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-details-'));
+  const dir = mkdtempSync(join(tmpdir(), 'bish-details-'));
   mkdirSync(join(dir, 'specs'));
   writeFileSync(
     join(dir, 'specs', 'a.md'),
@@ -43,12 +43,12 @@ function makeRepo() {
     ].join('\n'),
   );
   writeFileSync(join(dir, 'specs', 'b.md'), '# B\n## Requirements\n- R-b-1: it must work\n');
-  mkdirSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-1'), { recursive: true });
-  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-1', 'record.json'), JSON.stringify({ status: 'findings', cycle: 1, usage: { seconds: 1 } }));
-  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-1', 'findings.json'), JSON.stringify([finding]));
-  mkdirSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-2'), { recursive: true });
-  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-2', 'record.json'), JSON.stringify({ status: 'clean', cycle: 2, usage: { seconds: 1 } }));
-  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-2', 'findings.json'), '[]');
+  mkdirSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'qa-1'), { recursive: true });
+  writeFileSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'qa-1', 'record.json'), JSON.stringify({ status: 'findings', cycle: 1, usage: { seconds: 1 } }));
+  writeFileSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'qa-1', 'findings.json'), JSON.stringify([finding]));
+  mkdirSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'qa-2'), { recursive: true });
+  writeFileSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'qa-2', 'record.json'), JSON.stringify({ status: 'clean', cycle: 2, usage: { seconds: 1 } }));
+  writeFileSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'qa-2', 'findings.json'), '[]');
   writeDoneReport(dir, 'r1', {
     ok: false,
     suite: { ok: true },
@@ -97,7 +97,7 @@ test('readRunDetails reads done evidence from runs/<id>/done.json', () => {
 });
 
 test('readRunDetails on an empty repo has no formats, QA or done evidence', () => {
-  const d = readRunDetails(mkdtempSync(join(tmpdir(), 'hodge-details-')), 'none');
+  const d = readRunDetails(mkdtempSync(join(tmpdir(), 'bish-details-')), 'none');
   assert.deepEqual(d.formats, []);
   assert.deepEqual(d.qa, []);
   assert.equal(d.done, null);
@@ -105,8 +105,8 @@ test('readRunDetails on an empty repo has no formats, QA or done evidence', () =
 
 test('readRunDetails ignores unreadable done.json and qa-N records', () => {
   const dir = makeRepo();
-  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'done.json'), '{not json');
-  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'qa-2', 'record.json'), '{not json');
+  writeFileSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'done.json'), '{not json');
+  writeFileSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'qa-2', 'record.json'), '{not json');
   const d = readRunDetails(dir, 'r1');
   assert.equal(d.done, null);
   assert.deepEqual(d.qa.map((c) => c.cycle), [1]);
@@ -135,7 +135,7 @@ test('renderFrame shows formats, readiness dimensions, QA findings and done evid
 });
 
 test('renderFrame says so when nothing is declared, no QA ran and there is no done report', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-details-'));
+  const dir = mkdtempSync(join(tmpdir(), 'bish-details-'));
   const status = readRunStatus(createLocalStatusSource(dir), 'r1');
   const frame = renderFrame({ status, control, tail: [], prompt: null });
   assert.match(frame, /formats\s+none declared/);
@@ -143,7 +143,7 @@ test('renderFrame says so when nothing is declared, no QA ran and there is no do
   assert.match(frame, /done\s+no report/);
 });
 
-test('hodgepodge status prints formats, readiness, qa and done in plain text', async () => {
+test('bish-bash-bosh status prints formats, readiness, qa and done in plain text', async () => {
   const repo = makeRepo();
   const cfg = { adapter: 'f', model: 'm' };
   writeProjectConfig(repo, cfg);

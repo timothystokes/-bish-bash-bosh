@@ -27,7 +27,7 @@ export function readRunDetails(repoDir, runId) {
   }
   const { ready, gaps } = checkReadiness(repoDir);
 
-  const runDir = join(repoDir, '.hodgepodge', 'runs', runId);
+  const runDir = join(repoDir, '.bish-bash-bosh', 'runs', runId);
   const qa = [];
   const cycles = existsSync(runDir)
     ? readdirSync(runDir).map((d) => /^qa-(\d+)$/.exec(d)?.[1]).filter((n) => n !== undefined).map(Number).sort((a, b) => a - b)

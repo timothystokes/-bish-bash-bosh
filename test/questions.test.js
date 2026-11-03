@@ -6,8 +6,8 @@ import { join } from 'node:path';
 import {
   parseQuestions, formatQuestions, nextBatch, renderBatch, resolveAnswer, recordAnswers,
   parseResponse, applyResponse, pendingAnswers, unanswered, STORE_HEADER,
-} from '../src/hodge-questions.js';
-import { runObjective } from '../src/hodge-objective.js';
+} from '../src/bish-questions.js';
+import { runObjective } from '../src/bish-objective.js';
 import { freshDir, seedObjectiveProject, writeProjectConfig } from './support/project.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
@@ -98,7 +98,7 @@ test('Q-7: a round is driven by code: the agent gets only the answers by id, nev
   const adapter = {
     async run(req) {
       prompts.push(req.prompt);
-      if (prompts.length === 1) writeFileSync(join(req.cwd, '.hodgepodge', 'response.json'), JSON.stringify(batch));
+      if (prompts.length === 1) writeFileSync(join(req.cwd, '.bish-bash-bosh', 'response.json'), JSON.stringify(batch));
       return { transcript: 't', exitStatus: 0, changedFiles: [] };
     },
   };
@@ -108,12 +108,12 @@ test('Q-7: a round is driven by code: the agent gets only the answers by id, nev
   await runObjective({
     config, repoDir: repo, runId: 'r', adapter, maxRounds: 2,
     ask: async () => replies.shift() ?? null, say: (t) => said.push(t),
-    identity: { root: '/nonexistent/hodgepodge', remotes: [] },
+    identity: { root: '/nonexistent/bish-bash-bosh', remotes: [] },
   });
   assert.match(said[0], /## Greeting\n2\. Print to stdout\? Default: yes[\s\S]*## Errors\n3\. Exit code on bad input\? Default: 2/);
   assert.match(said[0], /ok when ready to continue/i);
-  assert.match(readFileSync(join(repo, '.hodgepodge', 'interview.md'), 'utf8'), /Default: yes[\s\S]*Default: 64|Default: 64[\s\S]*Default: yes/, 'answered-but-unresolved questions keep the owner\'s answer as their new default');
+  assert.match(readFileSync(join(repo, '.bish-bash-bosh', 'interview.md'), 'utf8'), /Default: yes[\s\S]*Default: 64|Default: 64[\s\S]*Default: yes/, 'answered-but-unresolved questions keep the owner\'s answer as their new default');
   assert.match(prompts[1], /Q2 \[Greeting\] Print to stdout\?: yes/);
   assert.match(prompts[1], /Q3 \[Errors\] Exit code on bad input\?: 64/);
-  for (const p of prompts) assert.doesNotMatch(p, /## \.hodgepodge\/interview/, 'the question store is never shown');
+  for (const p of prompts) assert.doesNotMatch(p, /## \.bish-bash-bosh\/interview/, 'the question store is never shown');
 });

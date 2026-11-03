@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import Ajv from 'ajv';
-import { writeIterationRecord } from '../src/podge-run-record.js';
+import { writeIterationRecord } from '../src/bosh-run-record.js';
 
 const SCHEMAS = ['config', 'record', 'usage', 'diagnosis', 'done'];
 
@@ -23,11 +23,11 @@ const check = (name, data) => {
 /** @type {Record<string, string>} */
 const diagnosis = { rootCause: 'r', evidence: 'e', fix: 'f', test: 't', prevention: 'p' };
 
-// The old build loop's `writeDoneReport` (src/podge-done.js, removed with it) wrote exactly this: the
+// The old build loop's `writeDoneReport` (src/bosh-done.js, removed with it) wrote exactly this: the
 // shape is still live (status.js/tui.js still read done.json off disk), so this fixture-writer is
 // reproduced here rather than reviving the module just for it.
 function writeDoneReport(repoDir, runId, report) {
-  const path = join(repoDir, '.hodgepodge', 'runs', runId, 'done.json');
+  const path = join(repoDir, '.bish-bash-bosh', 'runs', runId, 'done.json');
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(report, null, 2)}\n`);
 }
@@ -47,7 +47,7 @@ test('config schema accepts a single adapter/model', () => {
 });
 
 test('files written by writeIterationRecord conform (with and without diagnosis)', () => {
-  const repo = mkdtempSync(join(tmpdir(), 'hodge-schema-'));
+  const repo = mkdtempSync(join(tmpdir(), 'bish-schema-'));
   try {
     const base = { status: 'ok', usage: { seconds: 2 }, changedFiles: ['a.js'], gates: [{ name: 'scope', ok: true }], prompt: 'p', transcript: 't', diff: 'd', test: { exitStatus: 0 } };
     const d1 = writeIterationRecord(repo, 'run1', 1, /** @type {any} */ (base));
@@ -92,7 +92,7 @@ test('diagnosis schema requires all five non-blank fields', () => {
 });
 
 test('done.json written by writeDoneReport conforms; bad shapes do not', () => {
-  const repo = mkdtempSync(join(tmpdir(), 'hodge-schema-'));
+  const repo = mkdtempSync(join(tmpdir(), 'bish-schema-'));
   try {
     const report = {
       ok: false,
@@ -102,7 +102,7 @@ test('done.json written by writeDoneReport conforms; bad shapes do not', () => {
       gaps: ['R-x-1: no passing test names it'],
     };
     writeDoneReport(repo, 'run1', report);
-    const r = check('done', JSON.parse(readFileSync(join(repo, '.hodgepodge', 'runs', 'run1', 'done.json'), 'utf8')));
+    const r = check('done', JSON.parse(readFileSync(join(repo, '.bish-bash-bosh', 'runs', 'run1', 'done.json'), 'utf8')));
     assert.equal(r.ok, true, r.errors.join('; '));
     assert.equal(check('done', { ...report, requirements: [{ ...report.requirements[0], status: 'maybe' }] }).ok, false);
     assert.equal(check('done', { ...report, gaps: 'none' }).ok, false);

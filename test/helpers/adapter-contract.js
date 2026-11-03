@@ -16,7 +16,7 @@ export function adapterContract(name, makeAdapter) {
    * @param {(cwd: string) => Promise<void>} fn
    */
   const withDir = async (fn) => {
-    const cwd = mkdtempSync(join(tmpdir(), 'hodge-adapter-'));
+    const cwd = mkdtempSync(join(tmpdir(), 'bish-adapter-'));
     try {
       return await fn(cwd);
     } finally {

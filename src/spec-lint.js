@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseTestPlan } from './podge-test-plan-gate.js';
+import { parseTestPlan } from './bosh-test-plan-gate.js';
 
 // Titles are the `# ` lines outside code fences.
 function titles(text) {

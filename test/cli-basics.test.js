@@ -63,9 +63,9 @@ test('debugAdapter wraps run() with prompt/exit/transcript logging when debug is
   assert.equal(debugAdapter(inner, 'build', false, capture(out)), inner, 'debug off: the adapter is returned unwrapped');
 });
 
-test('hodgepodge control writes pause/resume/steer/stop to the control file', async () => {
+test('bish-bash-bosh control writes pause/resume/steer/stop to the control file', async () => {
   const { readFileSync } = await import('node:fs');
-  const f = join(mkdtempSync(join(tmpdir(), 'hodge-ctl-')), 'control.json');
+  const f = join(mkdtempSync(join(tmpdir(), 'bish-ctl-')), 'control.json');
   const run = async (/** @type {string[]} */ ...a) => {
     const o = /** @type {string[]} */ ([]);
     const e = /** @type {string[]} */ ([]);
@@ -84,7 +84,7 @@ test('hodgepodge control writes pause/resume/steer/stop to the control file', as
   assert.equal(s.o, 'control updated\n');
 });
 
-test('hodgepodge control rejects bad usage', async () => {
+test('bish-bash-bosh control rejects bad usage', async () => {
   const e = /** @type {string[]} */ ([]);
   assert.equal(await main(['control', 'pause'], { stderr: capture(e) }), 2);
   assert.equal(await main(['control', '--file', '/tmp/x.json', 'bogus'], { stderr: capture(e) }), 2);

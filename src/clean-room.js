@@ -26,7 +26,7 @@ export function exportBundle({ sourceDir, builderDir }) {
   git(dest, 'init', '-q', '-b', 'main');
   for (const d of BUNDLE) cpSync(join(src, d), join(dest, d), { recursive: true });
   git(dest, 'add', '-A');
-  git(dest, '-c', 'user.name=hodge', '-c', 'user.email=hodge@localhost', 'commit', '-q', '-m', 'clean-room bundle: specs + tests only');
+  git(dest, '-c', 'user.name=bish', '-c', 'user.email=bish@localhost', 'commit', '-q', '-m', 'clean-room bundle: specs + tests only');
   return { ok: true, sha: git(dest, 'rev-parse', 'HEAD').trim(), files: git(dest, 'ls-files').split('\n').filter(Boolean) };
 }
 

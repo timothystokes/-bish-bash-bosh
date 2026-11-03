@@ -30,11 +30,11 @@ async function runCli(args) {
   return { ac, done, outs, errs, portP };
 }
 
-test('help documents hodgepodge proxy', () => {
-  assert.match(helpText(), /hodgepodge proxy --upstream/);
+test('help documents bish-bash-bosh proxy', () => {
+  assert.match(helpText(), /bish-bash-bosh proxy --upstream/);
 });
 
-test('hodgepodge proxy requires --upstream and rejects unknown args (exit 2)', async () => {
+test('bish-bash-bosh proxy requires --upstream and rejects unknown args (exit 2)', async () => {
   /** @type {string[]} */
   const errs = [];
   assert.equal(await main(['proxy'], { stderr: (s) => errs.push(s) }), 2);
@@ -44,7 +44,7 @@ test('hodgepodge proxy requires --upstream and rejects unknown args (exit 2)', a
   assert.equal(await main(['proxy', '--upstream', 'not a url'], { stderr: (s) => errs.push(s) }), 2);
 });
 
-test('hodgepodge proxy prints its port, redacts, audits, meters, and stops on abort', async () => {
+test('bish-bash-bosh proxy prints its port, redacts, audits, meters, and stops on abort', async () => {
   /** @type {string[]} */
   const seen = [];
   const upstream = createServer((req, res) => {
@@ -58,7 +58,7 @@ test('hodgepodge proxy prints its port, redacts, audits, meters, and stops on ab
   });
   await new Promise((r) => upstream.listen(0, '127.0.0.1', () => r(undefined)));
   const upPort = /** @type {import('node:net').AddressInfo} */ (upstream.address()).port;
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-proxy-'));
+  const dir = mkdtempSync(join(tmpdir(), 'bish-proxy-'));
   const audit = join(dir, 'audit.jsonl');
   const meter = join(dir, 'meter.jsonl');
 

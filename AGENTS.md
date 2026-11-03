@@ -1,8 +1,8 @@
 # AGENTS.md
 
-Hodgepodge is a model-agnostic harness for loop-engineering (Ralph-style) delivery. It holds the harness only, never delivered work (see `specs/repos.md`).
+Bish-Bash-Bosh is a model-agnostic harness for loop-engineering (Ralph-style) delivery. It holds the harness only, never delivered work (see `specs/repos.md`).
 
-**Focus:** the Docker implementation (local driver + per-run container). AWS (`specs/cloud-driver.md`, plan Phase 5) is a future goal: don't pick it or add AWS requirements until the owner promotes it. Punk is a later validation project: don't plan around it.
+**Focus:** local command-line execution in the current project. Docker/container support has been removed. AWS (`specs/cloud-driver.md`, plan Phase 5) is a future goal: don't pick it or add infrastructure until the owner promotes it. Punk is a later validation project: don't plan around it.
 
 **Read:** this file, then `plan.md` ">>> Next best action" (do that unless told otherwise), then only the `specs/*.md` the task needs. `docs/PLAN.md` is background.
 
@@ -10,12 +10,12 @@ Hodgepodge is a model-agnostic harness for loop-engineering (Ralph-style) delive
 - One item per session: do it, update `plan.md`, stop. Search the repo before assuming something is missing.
 - Tests first: they must exist, fail, then pass. No stubs or partial implementations.
 - Vanilla JS, no JSDoc; `tsc --checkJs` is a lint-only check (`strict:false`). Tests use `node:test`. No model or vendor names in harness logic (config only, `specs/adapters.md`).
-- Keep per-loop context small: loops get one plan item plus spec pointers, never whole files. Shrink prompts, don't grow them. (No test currently enforces a byte budget on this — `test/next-item.test.js` did, for the old build loop, and was removed with it; a future request could add an equivalent check for `gepo`/`podge`'s prompts.)
+- Keep per-loop context small: loops get one plan item plus spec pointers, never whole files. Shrink prompts, don't grow them. (No test currently enforces a byte budget on this — `test/next-item.test.js` did, for the old build loop, and was removed with it; a future request could add an equivalent check for `bash`/`bosh`'s prompts.)
 - Missing tools or packages are never a blocker: install them. Only a missing credential is, and say which. `implement later` tasks in `plan.md` are deferred: never pick them or check for their CLIs/keys.
 - On failure tune prompts/specs/gates ("add a sign"); don't just retry.
 - Pre-release: no compatibility code, aliases, deprecation notes or migrations.
-- State the claim boundary for "done" (scripted adapter, live adapter, Docker). A structural check is not proof of runtime behaviour.
-- Don't run a full loop (hodge and podge end to end) to test; run single steps, unit tests, scripted fixtures, type checks, or read rendered prompts. Say the full loop was not run. Run one only if the user asks.
+- State the claim boundary for "done" (scripted adapter or live adapter). A structural check is not proof of runtime behaviour.
+- Don't run a full loop (bish and bosh end to end) to test; run single steps, unit tests, scripted fixtures, type checks, or read rendered prompts. Say the full loop was not run. Run one only if the user asks.
 - Reconcile, don't rewrite: fix code that violates a spec, or change the spec with a stated rationale. Never edit a spec to match accidental behaviour.
 - Never `git stash`; compare baselines with a detached `git worktree`.
 - Docs are part of done: changes to commands, config, prompts, templates or behaviour update `README.md`, the affected `specs/*.md`, CLI help and the objective kit.

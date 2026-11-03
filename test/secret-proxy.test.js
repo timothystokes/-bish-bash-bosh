@@ -61,7 +61,7 @@ async function startProxy(/** @type {any} */ opts) {
 
 test('proxy redacts the request before forwarding and the response before returning', async () => {
   const up = await startUpstream(() => ({ body: `echo ${GH}` }));
-  const auditFile = join(mkdtempSync(join(tmpdir(), 'hodge-proxy-')), 'audit.jsonl');
+  const auditFile = join(mkdtempSync(join(tmpdir(), 'bish-proxy-')), 'audit.jsonl');
   const { proxy, url } = await startProxy({ upstream: up.url, auditFile });
   try {
     const res = await fetch(`${url}/v1/chat`, { method: 'POST', body: `use ${AWS}` });
@@ -94,7 +94,7 @@ test('proxy forwards method, path and query', async () => {
 
 test('a request over the inspection limit is rejected and never forwarded', async () => {
   const up = await startUpstream(() => ({ body: 'ok' }));
-  const auditFile = join(mkdtempSync(join(tmpdir(), 'hodge-proxy-')), 'audit.jsonl');
+  const auditFile = join(mkdtempSync(join(tmpdir(), 'bish-proxy-')), 'audit.jsonl');
   const { proxy, url } = await startProxy({ upstream: up.url, maxBodyBytes: 10, auditFile });
   try {
     const res = await fetch(`${url}/x`, { method: 'POST', body: 'x'.repeat(100) });
@@ -122,7 +122,7 @@ test('a response over the inspection limit is withheld', async () => {
 });
 
 test('an unreachable upstream yields 502 and an audit entry, no crash', async () => {
-  const auditFile = join(mkdtempSync(join(tmpdir(), 'hodge-proxy-')), 'audit.jsonl');
+  const auditFile = join(mkdtempSync(join(tmpdir(), 'bish-proxy-')), 'audit.jsonl');
   const { proxy, url } = await startProxy({ upstream: 'http://127.0.0.1:1', auditFile });
   try {
     const res = await fetch(`${url}/x`, { method: 'POST', body: 'hi' });
@@ -135,7 +135,7 @@ test('an unreachable upstream yields 502 and an audit entry, no crash', async ()
 
 test('if the audit log cannot be written the request is not forwarded (fail closed)', async () => {
   const up = await startUpstream(() => ({ body: 'ok' }));
-  const bad = join(mkdtempSync(join(tmpdir(), 'hodge-proxy-')), 'no-such-dir', 'audit.jsonl');
+  const bad = join(mkdtempSync(join(tmpdir(), 'bish-proxy-')), 'no-such-dir', 'audit.jsonl');
   const { proxy, url } = await startProxy({ upstream: up.url, auditFile: bad });
   try {
     const res = await fetch(`${url}/x`, { method: 'POST', body: 'hi' });
@@ -156,7 +156,7 @@ test('proxy meters token usage from OpenAI and Anthropic shaped responses', asyn
     JSON.stringify({ choices: [] }),
   ];
   const up = await startUpstream(() => ({ body: /** @type {string} */ (bodies.shift()) }));
-  const meterFile = join(mkdtempSync(join(tmpdir(), 'hodge-proxy-')), 'meter.jsonl');
+  const meterFile = join(mkdtempSync(join(tmpdir(), 'bish-proxy-')), 'meter.jsonl');
   const { proxy, url } = await startProxy({
     upstream: up.url,
     meterFile,
@@ -173,7 +173,7 @@ test('proxy meters token usage from OpenAI and Anthropic shaped responses', asyn
 
 test('proxy without rates meters tokens at zero cost; missing meter file reads as zero', async () => {
   const up = await startUpstream(() => ({ body: JSON.stringify({ usage: { total_tokens: 9 } }) }));
-  const meterFile = join(mkdtempSync(join(tmpdir(), 'hodge-proxy-')), 'meter.jsonl');
+  const meterFile = join(mkdtempSync(join(tmpdir(), 'bish-proxy-')), 'meter.jsonl');
   assert.deepEqual(readProxyUsage(meterFile), { tokens: 0, cost: 0, requests: 0 });
   const { proxy, url } = await startProxy({ upstream: up.url, meterFile });
   try {
@@ -187,7 +187,7 @@ test('proxy without rates meters tokens at zero cost; missing meter file reads a
 
 test('proxy blocks the response when the meter file is unwritable', async () => {
   const up = await startUpstream(() => ({ body: JSON.stringify({ usage: { total_tokens: 9 } }) }));
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-proxy-'));
+  const dir = mkdtempSync(join(tmpdir(), 'bish-proxy-'));
   const { proxy, url } = await startProxy({ upstream: up.url, meterFile: join(dir, 'no', 'such', 'm.jsonl') });
   try {
     const res = await fetch(`${url}/x`, { method: 'POST', body: 'hi' });

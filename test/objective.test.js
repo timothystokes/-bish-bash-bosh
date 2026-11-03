@@ -4,12 +4,12 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { Readable } from 'node:stream';
-import { runObjective } from '../src/hodge-objective.js';
+import { runObjective } from '../src/bish-objective.js';
 import { sumRunUsage } from '../src/run-usage.js';
 import { main } from '../src/cli.js';
 import { freshDir, initGitRepo, seedObjectiveProject, withCwd, writeProjectConfig } from './support/project.js';
 
-const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
+const identity = { root: '/nonexistent/bish-bash-bosh', remotes: [] };
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
 const buildConfig = { adapter: 'a', model: 'm' };
 
@@ -98,9 +98,9 @@ const resp = (/** @type {number[]} */ resolved, /** @type {string[]} */ gaps = [
 
 /** @type {Record<string, string | null>[]} */
 const fullRounds = [
-  { '.hodgepodge/response.json': resp([], ['Who uses the greeter?']), '.hodgepodge/notes.md': 'n\n' },
-  { 'specs/greet.md': coarse, '.hodgepodge/response.json': resp([2], ['Should names be trimmed?']) },
-  { 'specs/greet.md': goodSpec, '.hodgepodge/response.json': resp([3]) },
+  { '.bish-bash-bosh/response.json': resp([], ['Who uses the greeter?']), '.bish-bash-bosh/notes.md': 'n\n' },
+  { 'specs/greet.md': coarse, '.bish-bash-bosh/response.json': resp([2], ['Should names be trimmed?']) },
+  { 'specs/greet.md': goodSpec, '.bish-bash-bosh/response.json': resp([3]) },
 ];
 
 test('asks for the description first, then alternates rounds and answers broad to fine until ready', async () => {
@@ -112,9 +112,9 @@ test('asks for the description first, then alternates rounds and answers broad t
   assert.match(o.asked[0], /Describe the objective/);
   assert.match(o.said[0], /2\. Who uses the greeter\?/);
   assert.match(o.said[1], /3\. Should names be trimmed\?/);
-  const store0 = readFileSync(join(repo, '.hodgepodge', 'interview.md'), 'utf8');
+  const store0 = readFileSync(join(repo, '.bish-bash-bosh', 'interview.md'), 'utf8');
   assert.match(store0, /1 - Answered: \[x\]; Specified: \[x\]; Topic: objective; Q: Describe the objective.*; A: A greeter library for Ann/);
-  const store = readFileSync(join(repo, '.hodgepodge', 'interview.md'), 'utf8');
+  const store = readFileSync(join(repo, '.bish-bash-bosh', 'interview.md'), 'utf8');
   assert.match(store, /2 - Answered: \[x\]; Specified: \[x\]; Topic: Greeter; Q: Who uses the greeter\?; A: Developers; Spec: specs\/greet\.md/);
   assert.match(store, /3 - Answered: \[x\]; Specified: \[x\];.*A: Yes, trim/, 'statuses are updated by code from the response');
   assert.equal(git(repo, 'status', '--porcelain'), '');
@@ -136,7 +136,7 @@ test('"ok" accepts the proposed defaults; the log and the agent see the default 
   const o = owner(['desc', 'ok', 'ok']);
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ask: o.ask, say: o.say, identity });
   assert.equal(res.status, 'ok');
-  assert.match(readFileSync(join(repo, '.hodgepodge', 'interview.md'), 'utf8'), /A: Yes/);
+  assert.match(readFileSync(join(repo, '.bish-bash-bosh', 'interview.md'), 'utf8'), /A: Yes/);
   assert.match(a.prompts[1], /Q2 \[Greeter\] Who uses the greeter\?: Yes/);
   assert.match(o.said[0], /ok when ready to continue/i);
 });
@@ -144,7 +144,7 @@ test('"ok" accepts the proposed defaults; the log and the agent see the default 
 test('each round has its own record and all rounds count toward usage totals', async () => {
   const { repo, config } = sandbox();
   await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted(fullRounds).adapter, ...owner(['d', '2: a', 'ok', '3: b', 'ok']), identity });
-  for (const d of ['interview', 'interview-2', 'interview-3']) assert.ok(existsSync(join(repo, '.hodgepodge', 'runs', 'r1', d, 'record.json')), d);
+  for (const d of ['interview', 'interview-2', 'interview-3']) assert.ok(existsSync(join(repo, '.bish-bash-bosh', 'runs', 'r1', d, 'record.json')), d);
   const t = sumRunUsage(repo, 'r1');
   assert.ok(t.seconds >= 0);
   assert.equal(t.iterations, 0, 'interview rounds are not iterations');
@@ -155,14 +155,14 @@ test('an empty answer pauses; rerunning re-asks the pending question and resumes
   const a = scripted(fullRounds);
   const first = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc', '']), identity });
   assert.equal(first.status, 'paused');
-  assert.match(readFileSync(join(repo, '.hodgepodge', 'interview.md'), 'utf8'), /2 - Answered: \[ \]; Specified: \[ \];.*Who uses the greeter\?/, 'question kept for resume');
+  assert.match(readFileSync(join(repo, '.bish-bash-bosh', 'interview.md'), 'utf8'), /2 - Answered: \[ \]; Specified: \[ \];.*Who uses the greeter\?/, 'question kept for resume');
   assert.equal(git(repo, 'status', '--porcelain'), '');
   const o = owner(['2: Developers', 'ok', '3: Yes', 'ok']);
   const second = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ask: o.ask, say: o.say, identity });
   assert.deepEqual(second, { status: 'ok', rounds: 2 });
   assert.ok(!o.asked.some((p) => /Describe the objective/.test(p)), 'the objective is not asked twice');
   assert.match(o.said[0], /Who uses the greeter/);
-  assert.ok(existsSync(join(repo, '.hodgepodge', 'runs', 'r1', 'interview-3', 'record.json')));
+  assert.ok(existsSync(join(repo, '.bish-bash-bosh', 'runs', 'r1', 'interview-3', 'record.json')));
 });
 
 test('no description given is gated and calls no agent', async () => {
@@ -180,15 +180,15 @@ test('a target with no prior interview self-bootstraps: Q1 is asked and the stor
   writeProjectConfig(dir, buildConfig);
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', 'seed');
-  const a = scripted([{ '.hodgepodge/response.json': resp([], ['Who uses the greeter?']) }]);
+  const a = scripted([{ '.bish-bash-bosh/response.json': resp([], ['Who uses the greeter?']) }]);
   const res = await runObjective({ config: buildConfig, repoDir: dir, runId: 'r1', adapter: a.adapter, ...owner(['x']), identity });
   assert.notEqual(res.status, 'gated', JSON.stringify(res));
-  assert.ok(existsSync(join(dir, '.hodgepodge', 'interview.md')));
+  assert.ok(existsSync(join(dir, '.bish-bash-bosh', 'interview.md')));
 });
 
 test('gaps but no question is stalled, not an endless loop', async () => {
   const { repo, config } = sandbox();
-  const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted([{ '.hodgepodge/notes.md': 'n\n' }, { '.hodgepodge/notes.md': 'm\n' }]).adapter, ...owner(['desc']), identity });
+  const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted([{ '.bish-bash-bosh/notes.md': 'n\n' }, { '.bish-bash-bosh/notes.md': 'm\n' }]).adapter, ...owner(['desc']), identity });
   assert.equal(res.status, 'stalled');
   assert.equal(res.rounds, 2);
 });
@@ -209,7 +209,7 @@ test('gaps but no question retries once with the gaps in the prompt and can reac
 
 test('stops after maxRounds', async () => {
   const { repo, config } = sandbox();
-  const rounds = [1, 2, 3, 4].map((n) => ({ '.hodgepodge/response.json': resp(n > 1 ? [n - 1] : [], [`q${n}?`]) }));
+  const rounds = [1, 2, 3, 4].map((n) => ({ '.bish-bash-bosh/response.json': resp(n > 1 ? [n - 1] : [], [`q${n}?`]) }));
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: scripted(rounds).adapter, ...owner(['desc', '2: a', 'ok']), maxRounds: 2, identity });
   assert.equal(res.status, 'max-rounds');
   assert.equal(res.rounds, 2);
@@ -233,8 +233,8 @@ test('writing tests during the interview fails the round: tests belong to the pl
 test('rounds with a question never run readiness; "done" ends the interview and lists the gaps', async () => {
   const { repo, config } = sandbox();
   const a = scripted([
-    { 'specs/greet.md': coarse, '.hodgepodge/response.json': resp([], ['Should names be trimmed?']) },
-    { 'specs/greet.md': goodSpec, '.hodgepodge/response.json': resp([2]) },
+    { 'specs/greet.md': coarse, '.bish-bash-bosh/response.json': resp([], ['Should names be trimmed?']) },
+    { 'specs/greet.md': goodSpec, '.bish-bash-bosh/response.json': resp([2]) },
   ]);
   const o = owner(['desc', 'done']);
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ask: o.ask, say: o.say, identity });
@@ -243,20 +243,20 @@ test('rounds with a question never run readiness; "done" ends the interview and 
   assert.match(a.prompts[1], /Q2 \[Greeter\] Should names be trimmed\?: Yes/, 'done accepts the defaults');
   assert.doesNotMatch(a.prompts[0], /## Readiness gaps/);
   assert.match(a.prompts[1], /## Readiness gaps[\s\S]*2 requirements/);
-  const rec = JSON.parse(readFileSync(join(repo, '.hodgepodge', 'runs', 'r1', 'interview', 'record.json'), 'utf8'));
+  const rec = JSON.parse(readFileSync(join(repo, '.bish-bash-bosh', 'runs', 'r1', 'interview', 'record.json'), 'utf8'));
   assert.equal(rec.status, 'incomplete');
   assert.match(rec.reason, /waiting for the owner/);
 });
 
 test('a resumed conversation reaches ready without saying "done" again, once no question is left', async () => {
-  // Closing is not persisted across a pause (only remembered for the current `hodge` invocation): a resumed
+  // Closing is not persisted across a pause (only remembered for the current `bish` invocation): a resumed
   // conversation starts assuming it is not yet closing, but still reaches `ok` as soon as the round leaves no
   // question, so a stray resume never needs the owner to repeat "done".
   const { repo, config } = sandbox();
   const a = scripted([
-    { 'specs/greet.md': coarse, '.hodgepodge/response.json': resp([], ['Should names be trimmed?']) },
-    { 'specs/greet.md': coarse, '.hodgepodge/response.json': resp([2], ['Trim names?']) },
-    { 'specs/greet.md': goodSpec, '.hodgepodge/response.json': resp([3]) },
+    { 'specs/greet.md': coarse, '.bish-bash-bosh/response.json': resp([], ['Should names be trimmed?']) },
+    { 'specs/greet.md': coarse, '.bish-bash-bosh/response.json': resp([2], ['Trim names?']) },
+    { 'specs/greet.md': goodSpec, '.bish-bash-bosh/response.json': resp([3]) },
   ]);
   const first = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc', 'done', '']), identity });
   assert.equal(first.status, 'paused');
@@ -265,20 +265,20 @@ test('a resumed conversation reaches ready without saying "done" again, once no 
   assert.doesNotMatch(a.prompts[2], /## Readiness gaps/, 'closing is not remembered across the resume, only re-derived once no question is left');
 });
 
-test('hodge drives the Interview Loop from stdin, operating on cwd, and hands each answered round to the agent', async () => {
+test('bish drives the Interview Loop from stdin, operating on cwd, and hands each answered round to the agent', async () => {
   const dir = freshDir('obj-');
   seedObjectiveProject(dir);
   writeProjectConfig(dir, buildConfig);
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', 'seed');
-  // first run only seeds .hodgepodge/interview.md from the template; commit it so the next run isn't gated
+  // first run only seeds .bish-bash-bosh/interview.md from the template; commit it so the next run isn't gated
   const seedOuts = /** @type {string[]} */ ([]);
   const seedCode = await withCwd(dir, () =>
-    main(['hodge'], { stdout: (s) => seedOuts.push(s), stderr: (s) => seedOuts.push(s), registry: {}, identity }));
+    main(['bish'], { stdout: (s) => seedOuts.push(s), stderr: (s) => seedOuts.push(s), registry: {}, identity }));
   assert.equal(seedCode, 0, seedOuts.join(''));
   writeFileSync(
-    join(dir, '.hodgepodge', 'interview.md'),
-    `${readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8')}\n2. [ ] Q: Who uses the greeter? A: \n`,
+    join(dir, '.bish-bash-bosh', 'interview.md'),
+    `${readFileSync(join(dir, '.bish-bash-bosh', 'interview.md'), 'utf8')}\n2. [ ] Q: Who uses the greeter? A: \n`,
   );
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', 'seed interview store');
@@ -287,7 +287,7 @@ test('hodge drives the Interview Loop from stdin, operating on cwd, and hands ea
   /** @type {string[]} */
   const prompts = [];
   const code = await withCwd(dir, () =>
-    main(['hodge'], {
+    main(['bish'], {
       stdout: (s) => outs.push(s),
       stderr: (s) => outs.push(s),
       input: Readable.from(['A greeter\n', 'Developers\n']),
@@ -301,32 +301,32 @@ test('hodge drives the Interview Loop from stdin, operating on cwd, and hands ea
   assert.match(text, /Who uses the greeter\?/);
   assert.match(text, /Interview complete: 2 questions answered this run\./);
   assert.equal(prompts.length, 2, 'both answered rounds were handed to the agent');
-  const afterLoop = readFileSync(join(dir, '.hodgepodge', 'interview.md'), 'utf8');
+  const afterLoop = readFileSync(join(dir, '.bish-bash-bosh', 'interview.md'), 'utf8');
   assert.match(afterLoop, /2\. \[x\] Q: Who uses the greeter\? A: Developers/, 'both rounds checked, with the answer written back, once handed to and processed by the agent');
 });
 
-test('code owns the store: agent edits to .hodgepodge/interview.md are discarded', async () => {
+test('code owns the store: agent edits to .bish-bash-bosh/interview.md are discarded', async () => {
   const { repo, config } = sandbox();
   const a = scripted([
-    { '.hodgepodge/response.json': resp([], ['Who uses the greeter?']), '.hodgepodge/interview.md': '# hacked\n' },
-    { 'specs/greet.md': goodSpec, '.hodgepodge/response.json': resp([2]) },
+    { '.bish-bash-bosh/response.json': resp([], ['Who uses the greeter?']), '.bish-bash-bosh/interview.md': '# hacked\n' },
+    { 'specs/greet.md': goodSpec, '.bish-bash-bosh/response.json': resp([2]) },
   ]);
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc', 'ok']), identity });
   assert.equal(res.status, 'ok');
-  assert.ok(!existsSync(join(repo, '.hodgepodge', 'response.json')), 'the response is consumed, not committed');
-  assert.doesNotMatch(readFileSync(join(repo, '.hodgepodge', 'interview.md'), 'utf8'), /hacked/);
+  assert.ok(!existsSync(join(repo, '.bish-bash-bosh', 'response.json')), 'the response is consumed, not committed');
+  assert.doesNotMatch(readFileSync(join(repo, '.bish-bash-bosh', 'interview.md'), 'utf8'), /hacked/);
 });
 
 test('an invalid response keeps the round, leaves the answers pending and is reported to the next round', async () => {
   const { repo, config } = sandbox();
   const a = scripted([
-    { '.hodgepodge/response.json': resp([], ['Who uses the greeter?']) },
-    { 'specs/greet.md': goodSpec, '.hodgepodge/response.json': '{"resolved":[{"id":7,"spec":"s"}],"gaps":[]}' },
-    { '.hodgepodge/response.json': resp([2]) },
+    { '.bish-bash-bosh/response.json': resp([], ['Who uses the greeter?']) },
+    { 'specs/greet.md': goodSpec, '.bish-bash-bosh/response.json': '{"resolved":[{"id":7,"spec":"s"}],"gaps":[]}' },
+    { '.bish-bash-bosh/response.json': resp([2]) },
   ]);
   const res = await runObjective({ config, repoDir: repo, runId: 'r1', adapter: a.adapter, ...owner(['desc', 'ok']), identity });
   assert.equal(res.status, 'ok', JSON.stringify(res));
-  assert.match(a.prompts[2], /invalid \.hodgepodge\/response\.json: resolved id 7 was not answered/);
+  assert.match(a.prompts[2], /invalid \.bish-bash-bosh\/response\.json: resolved id 7 was not answered/);
   assert.match(a.prompts[2], /Q2 \[Greeter\] Who uses the greeter\?: Yes/, 'the answers are sent again');
   assert.ok(existsSync(join(repo, 'specs', 'greet.md')), 'work is kept');
 });

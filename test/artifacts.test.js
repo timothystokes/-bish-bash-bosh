@@ -27,11 +27,11 @@ function fakeS3() {
 }
 
 function runsDir() {
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-art-'));
-  mkdirSync(join(dir, '.hodgepodge', 'runs', 'r1', 'iterations', '001'), { recursive: true });
-  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'iterations', '001', 'record.json'), '{"a":1}');
-  writeFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'summary.json'), '{"b":2}');
-  writeFileSync(join(dir, '.hodgepodge', 'runs', 'other.json'), 'x');
+  const dir = mkdtempSync(join(tmpdir(), 'bish-art-'));
+  mkdirSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'iterations', '001'), { recursive: true });
+  writeFileSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'iterations', '001', 'record.json'), '{"a":1}');
+  writeFileSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'summary.json'), '{"b":2}');
+  writeFileSync(join(dir, '.bish-bash-bosh', 'runs', 'other.json'), 'x');
   return dir;
 }
 
@@ -50,7 +50,7 @@ test('syncArtifacts is idempotent: unchanged files are skipped, changed files re
   const again = await syncArtifacts({ client, bucket: 'b', repoDir, runId: 'r1' });
   assert.equal(again.uploaded.length, 0);
   assert.equal(again.skipped.length, 2);
-  writeFileSync(join(repoDir, '.hodgepodge', 'runs', 'r1', 'summary.json'), '{"b":3}');
+  writeFileSync(join(repoDir, '.bish-bash-bosh', 'runs', 'r1', 'summary.json'), '{"b":3}');
   const third = await syncArtifacts({ client, bucket: 'b', repoDir, runId: 'r1' });
   assert.deepEqual(third.uploaded, ['runs/r1/summary.json']);
 });
@@ -72,10 +72,10 @@ test('requestPromotion opens a PR from the sandbox branch and never merges', asy
       return { url: 'https://example.test/pr/1' };
     },
   };
-  const r = await requestPromotion({ opener, runId: 'r1', head: 'hodge/r1', base: 'main', artifactsUri: 's3://b/runs/r1/', sha: 'abc123' });
+  const r = await requestPromotion({ opener, runId: 'r1', head: 'bish/r1', base: 'main', artifactsUri: 's3://b/runs/r1/', sha: 'abc123' });
   assert.deepEqual(r, { url: 'https://example.test/pr/1' });
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].head, 'hodge/r1');
+  assert.equal(calls[0].head, 'bish/r1');
   assert.equal(calls[0].base, 'main');
   assert.match(calls[0].title, /r1/);
   assert.match(calls[0].body, /abc123/);

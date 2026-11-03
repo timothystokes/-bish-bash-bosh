@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runReverse, buildReversePrompt } from '../src/hodge-reverse.js';
+import { runReverse, buildReversePrompt } from '../src/bish-reverse.js';
 import { loadModePrompt } from '../src/prompts.js';
 import { main } from '../src/cli.js';
 import { lintSpecs } from '../src/spec-lint.js';
@@ -14,7 +14,7 @@ const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
 
 function makeRepo() {
-  const dir = mkdtempSync(join(tmpdir(), 'hodge-rev-'));
+  const dir = mkdtempSync(join(tmpdir(), 'bish-rev-'));
   git(dir, 'init', '-q', '-b', 'main');
   git(dir, 'config', 'user.email', 't@example.com');
   git(dir, 'config', 'user.name', 'T');
@@ -31,7 +31,7 @@ const config = (/** @type {{adapter?: string, model?: string}} */ overrides = {}
   ...overrides,
 });
 
-const identity = { root: '/nonexistent/hodgepodge', remotes: [] };
+const identity = { root: '/nonexistent/bish-bash-bosh', remotes: [] };
 
 const goodWrites = {
   'specs/greet.md': '# Spec: Greeter\nImplementation: none\n\n## Requirements\n- R-greet-1: greet returns "hello <name>"\n',
@@ -77,7 +77,7 @@ test('lint-clean spec with green characterization suite is committed with a reco
   assert.equal(res.sha, git(dir, 'rev-parse', 'HEAD'));
   assert.equal(git(dir, 'status', '--porcelain'), '');
   assert.equal(lintSpecs(dir).ok, true);
-  assert.equal(JSON.parse(readFileSync(join(dir, '.hodgepodge', 'runs', 'r1', 'reverse', 'record.json'), 'utf8')).status, 'ok');
+  assert.equal(JSON.parse(readFileSync(join(dir, '.bish-bash-bosh', 'runs', 'r1', 'reverse', 'record.json'), 'utf8')).status, 'ok');
   assert.ok(existsSync(join(dir, 'specs', 'greet.md')));
 });
 
@@ -130,13 +130,13 @@ test('gates: dirty tree and harness repo make no agent call', async () => {
   assert.equal(a.prompts.length, 0);
 });
 
-test('hodge --reverse uses the configured adapter; usage errors exit 2', async () => {
+test('bish --reverse uses the configured adapter; usage errors exit 2', async () => {
   const dir = makeRepo();
   commitProjectConfig(dir, config({ adapter: 'rv' }));
   const out = /** @type {string[]} */ ([]);
   const registry = { rv: () => agent(goodWrites).adapter };
   const code = await withCwd(dir, () =>
-    main(['hodge', '--reverse'], {
+    main(['bish', '--reverse'], {
       registry, identity, testCommand: pass, stdout: (s) => { out.push(s); }, stderr: () => {},
     }));
   assert.equal(code, 0);
@@ -145,14 +145,14 @@ test('hodge --reverse uses the configured adapter; usage errors exit 2', async (
   const dir2 = makeRepo();
   commitProjectConfig(dir2, config({ adapter: 'rv' }));
   const bad = await withCwd(dir2, () =>
-    main(['hodge', '--reverse'], {
+    main(['bish', '--reverse'], {
       registry, identity, testCommand: fail, stdout: () => {}, stderr: () => {},
     }));
   assert.equal(bad, 1);
 
   const err = /** @type {string[]} */ ([]);
-  const noRoleDir = mkdtempSync(join(tmpdir(), 'hodge-rev-norole-'));
+  const noRoleDir = mkdtempSync(join(tmpdir(), 'bish-rev-norole-'));
   writeProjectConfig(noRoleDir, config({ adapter: 'missing' }));
-  assert.equal(await withCwd(noRoleDir, () => main(['hodge', '--reverse'], { registry, stdout: () => {}, stderr: (s) => { err.push(s); } })), 2);
+  assert.equal(await withCwd(noRoleDir, () => main(['bish', '--reverse'], { registry, stdout: () => {}, stderr: (s) => { err.push(s); } })), 2);
   assert.match(err.join(''), /unknown adapter 'missing'/);
 });

@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "hodgepodge-done",
+  "$id": "bish-bash-bosh-done",
   "type": "object",
   "additionalProperties": false,
   "required": ["ok", "suite", "types", "requirements", "gaps"],

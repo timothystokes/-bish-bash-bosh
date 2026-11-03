@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { validateDiagnosis } from '../src/podge-diagnosis.js';
-import { writeIterationRecord } from '../src/podge-run-record.js';
+import { validateDiagnosis } from '../src/bosh-diagnosis.js';
+import { writeIterationRecord } from '../src/bosh-run-record.js';
 
 const full = { rootCause: 'rc', evidence: 'ev', fix: 'fx', test: 'ts', prevention: 'pv' };
 
@@ -17,7 +17,7 @@ test('validateDiagnosis requires the five non-empty string fields', () => {
 });
 
 test('writeIterationRecord writes diagnosis.json and rejects an invalid diagnosis', () => {
-  const repo = mkdtempSync(join(tmpdir(), 'hodge-dg-'));
+  const repo = mkdtempSync(join(tmpdir(), 'bish-dg-'));
   const rec = {
     status: /** @type {const} */ ('failed'), usage: { seconds: 1 }, changedFiles: [], gates: [],
     prompt: 'p', transcript: 't', diff: '', test: null,

@@ -25,7 +25,7 @@ export function createAwsCliS3Client({ run = defaultRun } = {}) {
       const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
       const { tmpdir } = await import('node:os');
       const { join } = await import('node:path');
-      const dir = mkdtempSync(join(tmpdir(), 'hodge-s3-'));
+      const dir = mkdtempSync(join(tmpdir(), 'bish-s3-'));
       try {
         const file = join(dir, 'body');
         writeFileSync(file, body);

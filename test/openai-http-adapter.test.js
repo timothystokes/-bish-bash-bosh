@@ -75,7 +75,7 @@ test('sends bearer key from the named env var, model and prompt', async () => {
     seen = r;
     return { json: completion('ok') };
   });
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-http-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-http-'));
   try {
     const a = createOpenAiHttpAdapter({ model: 'mm', baseUrl: s.baseUrl, apiKeyEnv: 'K', env: { K: 'secret' } });
     const r = await a.run({ prompt: 'do it', cwd, limits: {} });
@@ -90,17 +90,17 @@ test('sends bearer key from the named env var, model and prompt', async () => {
 });
 
 test('paths escaping cwd are rejected and not written', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-http-'));
-  const outside = join(cwd, '..', 'hodge-escape.txt');
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-http-'));
+  const outside = join(cwd, '..', 'bish-escape.txt');
   const s = await startServer(() => ({
-    json: completion(blocks('x', { '../hodge-escape.txt': 'bad', '/tmp/hodge-abs.txt': 'bad', 'ok.txt': 'fine' })),
+    json: completion(blocks('x', { '../bish-escape.txt': 'bad', '/tmp/bish-abs.txt': 'bad', 'ok.txt': 'fine' })),
   }));
   try {
     const r = await createOpenAiHttpAdapter({ model: 'm', baseUrl: s.baseUrl }).run({ prompt: 'p', cwd, limits: {} });
     assert.notEqual(r.exitStatus, 0);
     assert.deepEqual(r.changedFiles, ['ok.txt']);
     assert.equal(existsSync(outside), false);
-    assert.equal(existsSync('/tmp/hodge-abs.txt'), false);
+    assert.equal(existsSync('/tmp/bish-abs.txt'), false);
   } finally {
     s.close();
     rmSync(cwd, { recursive: true, force: true });
@@ -109,7 +109,7 @@ test('paths escaping cwd are rejected and not written', async () => {
 
 test('wall-clock limit aborts the request with exit 124', async () => {
   const s = await startServer(() => ({ delayMs: 2000, json: completion('late') }));
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-http-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-http-'));
   try {
     const r = await createOpenAiHttpAdapter({ model: 'm', baseUrl: s.baseUrl }).run({ prompt: 'p', cwd, limits: { maxWallClockSeconds: 0.2 } });
     assert.equal(r.exitStatus, 124);
@@ -120,7 +120,7 @@ test('wall-clock limit aborts the request with exit 124', async () => {
 });
 
 test('unreachable server yields exit 127, not a throw', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-http-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-http-'));
   try {
     const r = await createOpenAiHttpAdapter({ model: 'm', baseUrl: 'http://127.0.0.1:1/v1' }).run({ prompt: 'p', cwd, limits: {} });
     assert.equal(r.exitStatus, 127);
@@ -140,7 +140,7 @@ test('a caller that never passes session gets a single user turn and no session 
     seen = r;
     return { json: completion('ok') };
   });
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-http-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-http-'));
   try {
     const r = await createOpenAiHttpAdapter({ model: 'm', baseUrl: s.baseUrl }).run({ prompt: 'hi', cwd, limits: {} });
     assert.equal('session' in r, false);
@@ -158,7 +158,7 @@ test('a caller opting into session tracking gets prior turns resent as message h
     seen = r;
     return { json: completion('second reply') };
   });
-  const cwd = mkdtempSync(join(tmpdir(), 'hodge-http-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bish-http-'));
   try {
     const adapter = createOpenAiHttpAdapter({ model: 'm', baseUrl: s.baseUrl });
     const first = await adapter.run({ prompt: 'first', cwd, limits: {}, session: undefined });

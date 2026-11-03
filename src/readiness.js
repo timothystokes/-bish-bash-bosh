@@ -27,7 +27,7 @@ export const DIMENSIONS = [
 const PLACEHOLDER = /\b(TBD|TODO|FIXME)\b|\?\?|<[^>\n]+>/;
 
 export function hasObjectiveKit(repoDir) {
-  return existsSync(join(repoDir, '.hodgepodge', 'interview.md'));
+  return existsSync(join(repoDir, '.bish-bash-bosh', 'interview.md'));
 }
 
 // Text with fenced blocks and inline code removed.
@@ -120,7 +120,7 @@ export function checkReadiness(repoDir) {
 
   gaps.push(...checkFormats(repoDir));
 
-  const oq = join(repoDir, '.hodgepodge', 'interview.md');
+  const oq = join(repoDir, '.bish-bash-bosh', 'interview.md');
   if (existsSync(oq)) {
     for (const line of readFileSync(oq, 'utf8').split('\n')) {
       const m = /^\d+ - Answered: \[[ x]\]; Specified: \[ \]; (.+)$/.exec(line);

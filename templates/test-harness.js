@@ -1,7 +1,7 @@
-// Shipped by hodgepodge (`podge` writes this file once, if missing) as
-// `.hodgepodge/test-harness.js`: a few generic, black-box verification helpers built only on
+// Shipped by bish-bash-bosh (`bosh` writes this file once, if missing) as
+// `.bish-bash-bosh/test-harness.js`: a few generic, black-box verification helpers built only on
 // Node's own standard library (no extra dependency, so it works no matter what language or stack
-// the project itself is built in). Pair it with `node:test` in files under `.hodgepodge/tests/`:
+// the project itself is built in). Pair it with `node:test` in files under `.bish-bash-bosh/tests/`:
 // each test should exercise the project from the outside — run the command or server a user would
 // actually run, then check its exit status, output, or an HTTP response — never import the
 // project's internals directly.
