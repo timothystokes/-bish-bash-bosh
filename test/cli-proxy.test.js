@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main, helpText } from '../src/cli.js';
 
-const AWS = 'AKIAIOSFODNN7EXAMPLE';
+const KEY = 'sk-' + 'a'.repeat(24);
 
 /** @param {string[]} args */
 async function runCli(args) {
@@ -65,13 +65,13 @@ test('bish-bash-bosh proxy prints its port, redacts, audits, meters, and stops o
   const cli = await runCli(['proxy', '--upstream', `http://127.0.0.1:${upPort}`, '--audit', audit, '--meter', meter]);
   const port = await cli.portP;
   assert.equal(typeof port, 'number');
-  const res = await fetch(`http://127.0.0.1:${port}/v1/chat`, { method: 'POST', body: `key ${AWS}` });
+  const res = await fetch(`http://127.0.0.1:${port}/v1/chat`, { method: 'POST', body: `key ${KEY}` });
   assert.equal(res.status, 200);
   await res.text();
-  assert.equal(seen[0].includes(AWS), false);
-  assert.match(seen[0], /\[REDACTED:aws-access-key-id\]/);
-  assert.equal(readFileSync(audit, 'utf8').includes(AWS), false);
-  assert.match(readFileSync(audit, 'utf8'), /aws-access-key-id/);
+  assert.equal(seen[0].includes(KEY), false);
+  assert.match(seen[0], /\[REDACTED:api-key\]/);
+  assert.equal(readFileSync(audit, 'utf8').includes(KEY), false);
+  assert.match(readFileSync(audit, 'utf8'), /api-key/);
   assert.match(readFileSync(meter, 'utf8'), /"tokens":5/);
 
   cli.ac.abort();

@@ -6,7 +6,7 @@ import { runBishBashBosh } from './bish-bash-bosh.js';
 
 export { helpText, parseStepArgs, readlineOptions, LOGO };
 
-const BISH_BASH_BOSH_COMMANDS = ['spec-lint', 'ready', 'sync', 'promote', 'clean-room', 'proxy', 'control', 'console'];
+const BISH_BASH_BOSH_COMMANDS = ['spec-lint', 'ready', 'promote', 'clean-room', 'proxy', 'control', 'console'];
 
 // Thin router: decides which of bish/bash/bosh/bish-bash-bosh owns argv[0] and delegates. The gating
 // below (which commands exist under which bin) must match exactly what each of bin/bish, bin/bash,

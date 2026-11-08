@@ -6,16 +6,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DEFAULT_RULES, redactSecrets, createSecretProxy, readProxyUsage } from '../src/secret-proxy.js';
 
-const AWS = 'AKIAIOSFODNN7EXAMPLE';
+const KEY = 'sk-' + 'a'.repeat(24);
 const GH = 'ghp_' + 'a'.repeat(36);
 
 test('redactSecrets replaces matches with [REDACTED:rule-id] and reports rules', () => {
-  const r = redactSecrets(`key ${AWS} and token ${GH}`, DEFAULT_RULES);
-  assert.equal(r.text.includes(AWS), false);
+  const r = redactSecrets(`key ${KEY} and token ${GH}`, DEFAULT_RULES);
+  assert.equal(r.text.includes(KEY), false);
   assert.equal(r.text.includes(GH), false);
-  assert.match(r.text, /\[REDACTED:aws-access-key-id\]/);
+  assert.match(r.text, /\[REDACTED:api-key\]/);
   assert.match(r.text, /\[REDACTED:github-token\]/);
-  assert.deepEqual(r.findings.map((f) => f.rule).sort(), ['aws-access-key-id', 'github-token']);
+  assert.deepEqual(r.findings.map((f) => f.rule).sort(), ['api-key', 'github-token']);
 });
 
 test('redactSecrets catches private key blocks and bearer tokens, leaves clean text', () => {
@@ -64,15 +64,15 @@ test('proxy redacts the request before forwarding and the response before return
   const auditFile = join(mkdtempSync(join(tmpdir(), 'bish-proxy-')), 'audit.jsonl');
   const { proxy, url } = await startProxy({ upstream: up.url, auditFile });
   try {
-    const res = await fetch(`${url}/v1/chat`, { method: 'POST', body: `use ${AWS}` });
+    const res = await fetch(`${url}/v1/chat`, { method: 'POST', body: `use ${KEY}` });
     assert.equal(res.status, 200);
-    assert.equal(up.seen[0].body, 'use [REDACTED:aws-access-key-id]');
+    assert.equal(up.seen[0].body, 'use [REDACTED:api-key]');
     assert.equal(await res.text(), 'echo [REDACTED:github-token]');
     const lines = readFileSync(auditFile, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
     assert.equal(lines.length, 2);
     assert.deepEqual(lines.map((l) => l.direction), ['request', 'response']);
-    assert.equal(lines[0].findings[0].rule, 'aws-access-key-id');
-    assert.equal(readFileSync(auditFile, 'utf8').includes(AWS), false);
+    assert.equal(lines[0].findings[0].rule, 'api-key');
+    assert.equal(readFileSync(auditFile, 'utf8').includes(KEY), false);
     assert.equal(readFileSync(auditFile, 'utf8').includes(GH), false);
   } finally {
     await proxy.close();

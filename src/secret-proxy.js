@@ -3,7 +3,6 @@ import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 
 export const DEFAULT_RULES = [
   { id: 'private-key', pattern: '-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----' },
-  { id: 'aws-access-key-id', pattern: '\\b(?:AKIA|ASIA)[0-9A-Z]{16}\\b' },
   { id: 'github-token', pattern: '\\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})\\b' },
   { id: 'api-key', pattern: '\\bsk-[A-Za-z0-9_-]{20,}\\b' },
   { id: 'slack-token', pattern: '\\bxox[abprs]-[A-Za-z0-9-]{10,}\\b' },

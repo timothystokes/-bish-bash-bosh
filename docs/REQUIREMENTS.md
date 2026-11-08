@@ -36,4 +36,4 @@ Live log tail, web dashboard, pause/resume/steer, kill switch, cost meter agains
 Repo template (prompts, scripts, docs) and an installable CLI.
 
 ## Execution targets
-Local command-line execution is the current target. Container support and infrastructure have been removed at the owner's request. Scaling to AWS remains deferred; the original cloud ideas are background only (`../specs/cloud-driver.md`).
+Local command-line execution is the current target. Container support and infrastructure have been removed at the owner's request.

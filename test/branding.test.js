@@ -42,7 +42,6 @@ test('local-only harness has no container implementation or command', async () =
     assert.equal(existsSync(new URL(path, new URL('../', import.meta.url))), false, path);
   }
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.devDependencies['aws-cdk-lib'], undefined);
   assert.equal(pkg.devDependencies.constructs, undefined);
   assert.doesNotMatch(helpText(), /--container|bish-bash-bosh kill/);
   const errors = [];

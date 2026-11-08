@@ -2,6 +2,11 @@
   "name": "bish-bash-bosh",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/timothystokes/bish-bash-bosh.git"
+  },
   "description": "Model-agnostic harness for loop-engineered software delivery",
   "type": "module",
   "bin": {

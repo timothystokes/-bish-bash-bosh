@@ -51,11 +51,6 @@ export function formatReadiness(res) {
   return `ready: no (${plural(res.gaps.length, 'gap')})\n${bullets(res.gaps)}\n`;
 }
 
-// `bish-bash-bosh sync` (syncArtifacts): {uploaded, skipped}.
-export function formatSync(res) {
-  return `synced: ${plural(res.uploaded.length, 'file')} uploaded, ${plural(res.skipped.length, 'file')} already up to date\n`;
-}
-
 // `bish-bash-bosh promote` (requestPromotion): {url}.
 export function formatPromote(res) {
   return `promotion PR opened: ${res.url}\n`;

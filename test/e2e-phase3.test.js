@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const bin = join(here, '..', 'bin', 'bish-bash-bosh');
-const AWS = 'AKIAIOSFODNN7EXAMPLE';
+const KEY = 'sk-' + 'a'.repeat(24);
 
 test('phase 3 exit: bish-bash-bosh proxy (subprocess) redacts secrets, audits without values, and meters usage', async () => {
   /** @type {string[]} */
@@ -44,15 +44,15 @@ test('phase 3 exit: bish-bash-bosh proxy (subprocess) redacts secrets, audits wi
       });
     });
 
-    const r = await fetch(`http://127.0.0.1:${port}/v1/chat`, { method: 'POST', body: JSON.stringify({ prompt: `key ${AWS}` }) });
+    const r = await fetch(`http://127.0.0.1:${port}/v1/chat`, { method: 'POST', body: JSON.stringify({ prompt: `key ${KEY}` }) });
     assert.equal(r.status, 200);
     assert.equal(seen.length, 1);
-    assert.doesNotMatch(seen[0], new RegExp(AWS));
+    assert.doesNotMatch(seen[0], new RegExp(KEY));
     assert.match(seen[0], /\[REDACTED:[\w-]+\]/);
 
     const auditText = readFileSync(audit, 'utf8');
     assert.ok(auditText.trim().length > 0);
-    assert.doesNotMatch(auditText, new RegExp(AWS));
+    assert.doesNotMatch(auditText, new RegExp(KEY));
     const m = JSON.parse(readFileSync(meter, 'utf8').trim().split('\n')[0]);
     assert.equal(m.tokens, 42);
   } finally {

@@ -16,7 +16,7 @@ Current scope: direct local command-line execution only. Container images, conta
 | Gate | Per-step commits to a **sandbox repo/branch**; human reviews completed work before promotion out of sandbox |
 | Tests | Test plan required per objective; must exist and be red before build loops start |
 | Reverse specs | Specs constrained by standards: OpenAPI, JSON Schema, example-based conformance cases |
-| Execution | Directly on the local host; cloud deferred |
+| Execution | Directly on the local host |
 | Secrets | Small Node preflight-style proxy (regex rules, redact, audit) |
 | UI | Terminal TUI first (log tail, pause/resume/steer, kill, cost meter vs budget). No Slack |
 | State | Repo files only (in the target repo, never in bish-bash-bosh) |
@@ -91,26 +91,6 @@ Run record per objective: `runs/<id>/{plan.md, iterations/NNN/{prompt,transcript
 - Validate the round trip on a small project: code -> specs -> clean-room rebuild -> conformance suite passes.
 - After a harness version exists, run Punk as the first real test.
 
-**Phase 5: Cloud (deferred; direct local execution is the current scope)**
-- Image to ECR, Step Functions driver with Fargate Spot iterations, artifacts to S3, secrets from Secrets Manager, promotion review via PR.
-
-## Cloud cost and the Lambda question
-
-- **Lambda** matches Ralph's "fresh context each iteration" shape, but has a hard 15-minute cap per invocation, no persistent workspace (clone every time), and is awkward for long builds and test runs. One agent iteration plus tests can approach or exceed the cap. Chaining iterations needs an external orchestrator (Step Functions), adding cost and complexity.
-- **Cheapest practical option: Fargate Spot**, one task per run. Billed per second, no duration cap, same container as local. Interruptions are tolerable because every iteration is committed, so a run resumes from the last commit.
-- **Current decision:** direct local execution first; cloud execution remains deferred.
-
-## Cloud loop driver: Step Functions (decided)
-
-- `bosh step` is the single iteration unit: idempotent, reads git, runs one loop, commits, emits a small JSON status `{sha, iteration, cost, status}`. Designed in Phases 0-1.
-- Two thin drivers call it: a local Node `while` loop, and an AWS Step Functions state machine (Fargate `RunTask.sync` per iteration, fresh context each time).
-- Git and run records are the source of truth. Execution context holds pointers only (commit SHA, iteration, cumulative cost, last status, pause/stop flag) and must be rebuildable from git.
-- Pause/steer/approval via `waitForTaskToken` or a control record read by a Choice state; budget gate is a Choice on cumulative cost and iteration count.
-- Kill switch: observer calls `StopExecution`. Verify that `.sync` also stops the running ECS task.
-- History limit (~25,000 events): run N iterations per execution, then start a successor execution (continue-as-new) with SHA and totals.
-- Lambda only for light steps (test-plan gate check, budget check); iterations stay on Fargate Spot.
-- TUI uses a status-source abstraction: run files locally, `DescribeExecution`/history/CloudWatch in AWS.
-
 ## Cheapest model path to start
 
 - Locally: use the CLI agents under existing subscriptions (Copilot CLI / Claude Code), so there is no per-token bill. Check vendor terms before running subscription-backed agents unattended or in the cloud.
@@ -134,4 +114,4 @@ Run record per objective: `runs/<id>/{plan.md, iterations/NNN/{prompt,transcript
 
 1. Promotion out of the sandbox: deferred. Expected to align with a traditional CD pipeline from sandbox forward.
 
-Decided: AWS infrastructure uses CDK. Delivery work always happens in a separate target repo, never in the bish-bash-bosh (harness) repo. Bish-Bash-Bosh only holds the harness; each objective points at its own target repo (with its own sandbox branch/repo for per-step commits).
+Delivery work always happens in a separate target repo, never in the bish-bash-bosh (harness) repo. Bish-Bash-Bosh only holds the harness; each objective points at its own target repo (with its own sandbox branch/repo for per-step commits).

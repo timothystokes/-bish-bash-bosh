@@ -10,16 +10,16 @@ import { readControl, writeControl } from './control.js';
 import { runTui } from './tui.js';
 import { addEntry, INBOX_FILE } from './inbox.js';
 import { createSecretProxy } from './secret-proxy.js';
-import { syncArtifacts, requestPromotion } from './artifacts.js';
-import { createAwsCliS3Client, createGhPrOpener, defaultRun } from './cloud-clients.js';
+import { requestPromotion } from './artifacts.js';
+import { createGhPrOpener, defaultRun } from './pr-opener.js';
 import { repoFor, parseFlags, parseRunArgs, loadRunProject } from './cli-lib.js';
 import {
-  formatSpecLint, formatReadiness, formatSync, formatPromote, formatCleanRoom,
+  formatSpecLint, formatReadiness, formatPromote, formatCleanRoom,
   formatProxyListening, formatControlWrite, formatStatus,
 } from './cli-format.js';
 
 // Every top-level command other than the phase commands: run observability
-// (status, tui, console), cloud sync/promotion, spec/readiness checks, the pause/resume/stop control
+// (status, tui, console), promotion, spec/readiness checks, the pause/resume/stop control
 // file and the secret-redacting proxy.
 export async function runBishBashBosh(cmd, argv, deps, out, err) {
   if (cmd === 'spec-lint' || cmd === 'ready') {
@@ -29,9 +29,9 @@ export async function runBishBashBosh(cmd, argv, deps, out, err) {
     out(cmd === 'spec-lint' ? formatSpecLint(res) : formatReadiness(res));
     return (cmd === 'spec-lint' ? res.ok : res.ready) ? 0 : 1;
   }
-  if (cmd === 'sync' || cmd === 'promote') {
-    const allowed = cmd === 'sync' ? ['--bucket', '--run-id', '--repo'] : ['--bucket', '--run-id', '--head', '--base', '--sha', '--repo'];
-    const required = cmd === 'sync' ? ['--bucket', '--run-id'] : ['--bucket', '--run-id', '--head', '--base'];
+  if (cmd === 'promote') {
+    const allowed = ['--run-id', '--head', '--base', '--sha', '--repo'];
+    const required = ['--run-id', '--head', '--base'];
     const v = parseFlags(argv.slice(1), allowed, `bish-bash-bosh ${cmd}`, err);
     if (!v) return 2;
     const missing = required.filter((f) => !v[f]);
@@ -42,11 +42,6 @@ export async function runBishBashBosh(cmd, argv, deps, out, err) {
     const run = deps.exec ?? defaultRun;
     const repoDir = repoFor(v['--repo']);
     try {
-      if (cmd === 'sync') {
-        const res = await syncArtifacts({ client: createAwsCliS3Client({ run }), bucket: v['--bucket'] ?? '', repoDir, runId: v['--run-id'] ?? '' });
-        out(formatSync(res));
-        return 0;
-      }
       let sha = v['--sha'];
       if (!sha) {
         const r = await run('git', ['-C', repoDir, 'rev-parse', v['--head'] ?? ''], { cwd: repoDir });
@@ -58,7 +53,6 @@ export async function runBishBashBosh(cmd, argv, deps, out, err) {
         runId: v['--run-id'] ?? '',
         head: v['--head'] ?? '',
         base: v['--base'] ?? '',
-        artifactsUri: `s3://${v['--bucket']}/runs/${v['--run-id']}/`,
         sha,
       });
       out(formatPromote(res));

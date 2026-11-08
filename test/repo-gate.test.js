@@ -7,25 +7,25 @@ import { checkRepoGate, normalizeRepoId } from '../src/repo-gate.js';
 
 const self = {
   root: '/work/bish-bash-bosh',
-  remotes: ['git@github.com:ticked-com/bish-bash-bosh.git'],
+  remotes: ['git@github.com:timothystokes/bish-bash-bosh.git'],
 };
 
 test('normalizeRepoId unifies ssh, https, case and .git suffix', () => {
   const ids = [
-    'git@github.com:Ticked-Com/bish-bash-bosh.git',
-    'https://github.com/ticked-com/bish-bash-bosh',
-    'https://github.com/ticked-com/bish-bash-bosh.git/',
-    'ssh://git@github.com/ticked-com/bish-bash-bosh.git',
-    'https://user:tok@github.com/ticked-com/bish-bash-bosh.git',
+    'git@github.com:TimothyStokes/bish-bash-bosh.git',
+    'https://github.com/timothystokes/bish-bash-bosh',
+    'https://github.com/timothystokes/bish-bash-bosh.git/',
+    'ssh://git@github.com/timothystokes/bish-bash-bosh.git',
+    'https://user:tok@github.com/timothystokes/bish-bash-bosh.git',
   ].map(normalizeRepoId);
   assert.equal(new Set(ids).size, 1);
-  assert.equal(ids[0], 'github.com/ticked-com/bish-bash-bosh');
+  assert.equal(ids[0], 'github.com/timothystokes/bish-bash-bosh');
 });
 
 test('refuses a target whose remote URL matches bish-bash-bosh', () => {
   for (const t of [
-    'git@github.com:ticked-com/bish-bash-bosh.git',
-    'https://github.com/ticked-com/bish-bash-bosh',
+    'git@github.com:timothystokes/bish-bash-bosh.git',
+    'https://github.com/timothystokes/bish-bash-bosh',
   ]) {
     const r = checkRepoGate(t, self);
     assert.equal(r.ok, false, t);

@@ -2,7 +2,7 @@
 
 Bish-Bash-Bosh is a model-agnostic harness for loop-engineering (Ralph-style) delivery. It holds the harness only, never delivered work (see `specs/repos.md`).
 
-**Focus:** local command-line execution in the current project. Docker/container support has been removed. AWS (`specs/cloud-driver.md`, plan Phase 5) is a future goal: don't pick it or add infrastructure until the owner promotes it. Punk is a later validation project: don't plan around it.
+**Focus:** local command-line execution in the current project. Docker/container support has been removed. Punk is a later validation project: don't plan around it.
 
 **Read:** this file, then `plan.md` ">>> Next best action" (do that unless told otherwise), then only the `specs/*.md` the task needs. `docs/PLAN.md` is background.
 

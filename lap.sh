@@ -4,7 +4,7 @@ set -euo pipefail
 PROMPT='Run exactly one session of this repo, following AGENTS.md strictly.
 
 1. Read AGENTS.md, then plan.md (status and ">>> Next best action"), then only the specs/*.md relevant to that task. Search the repo before assuming anything is missing.
-2. Do the "Next best action" and nothing else. Never pick Phase 5 (AWS) tasks or tasks marked `implement later`. If it is too big for one session, do the largest complete slice and break the rest down in plan.md.
+2. Do the "Next best action" and nothing else. Never pick tasks marked `implement later`. If it is too big for one session, do the largest complete slice and break the rest down in plan.md.
 3. Tests first: write them, run them and see them fail, then implement until they pass. No stubs or partial implementations. Run the repo type check (tsc --checkJs) and the relevant tests; do not run a full bish/bosh loop.
 4. Reconcile, do not rewrite: fix code that violates a spec, or change the spec deliberately with a stated rationale. No compatibility code. No model or vendor names in harness logic.
 5. Missing tools or dependencies are never a blocker: install them. Only a missing credential you cannot obtain is a blocker; name it exactly.

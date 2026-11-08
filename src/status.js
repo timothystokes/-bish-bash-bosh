@@ -14,7 +14,6 @@ function lastIteration(repoDir, runId) {
 }
 
 // Status source backed by local run files (`runs/<id>/iterations/NNN`).
-// Other sources (e.g. cloud execution history) implement the same interface.
 export function createLocalStatusSource(repoDir) {
   return {
     totals: (runId) => sumRunUsage(repoDir, runId),
