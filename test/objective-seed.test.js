@@ -8,7 +8,7 @@ import { validateConfig } from '../src/config.js';
 import { runInterview, buildInterviewPrompt } from '../src/bish-interview.js';
 import { checkReadiness } from '../src/readiness.js';
 import { main } from '../src/cli.js';
-import { freshDir, seedObjectiveProject, withCwd, writeProjectConfig } from './support/project.js';
+import { draftingAdapter, freshDir, seedObjectiveProject, withCwd, writeProjectConfig } from './support/project.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
 const buildConfig = {
@@ -170,10 +170,10 @@ test('bish-bash-bosh ready reports gaps then ready', async () => {
 
 test('bish on a fresh project seeds interview.md, then the Interview Loop asks its first question from stdin and hands the round to the agent', async () => {
   const { repo } = sandbox();
-  // first run only seeds .bish-bash-bosh/interview.md from the template
+  // first run seeds .bish-bash-bosh/interview.md from the template and has the agent draft it from README.md
   let seed = '';
   const seedCode = await withCwd(repo, () =>
-    main(['bish'], { registry: {}, input: Readable.from(['\n']), stdout: (s) => (seed += s), stderr: () => {} }));
+    main(['bish'], { registry: { 'agent-x': draftingAdapter }, input: Readable.from(['\n']), stdout: (s) => (seed += s), stderr: () => {} }));
   assert.equal(seedCode, 0, seed);
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'seed interview store');

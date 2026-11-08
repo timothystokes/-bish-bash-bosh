@@ -2,7 +2,7 @@ import { Readable, Writable } from 'node:stream';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runInterview, buildInterviewPrompt } from '../src/bish-interview.js';
@@ -144,29 +144,27 @@ test('gates: empty objective, dirty tree, harness repo, missing role make no age
   assert.equal(a.prompts.length, 0);
 });
 
-test('bish on a fresh repo first seeds the interview store from its template; once committed, the Interview Loop asks each unanswered question, hands each round to the agent, and ticks both checkboxes until it pauses or completes', async () => {
+test('bish on a fresh repo seeds the stores from their templates, has the agent draft them from README.md, then the Interview Loop asks each unanswered question, hands each round to the agent, and ticks both checkboxes until it pauses or completes', async () => {
   const dir = makeRepo();
   commitProjectConfig(dir, config({ adapter: 'iv' }));
+  const seed = agent({
+    '.bish-bash-bosh/specification.md': '# Specification\n\n1. [ ] C: Greet the user. B: Friendly.\n',
+    '.bish-bash-bosh/interview.md': '# Interview\n\n1. [ ] Q: What is the objective? A: Unknown.\n',
+  });
   const a = agent({});
-  const registry = { iv: () => a.adapter };
+  let built = 0;
+  const registry = { iv: () => (built++ === 0 ? seed.adapter : a.adapter) };
   const out = /** @type {string[]} */ ([]);
-  // the very first run only seeds the store from the template: no agent call, no run folder
+  // the very first run seeds from the templates and makes one initial-spec agent call: no run folder
   const seedCode = await withCwd(dir, () =>
-    main(['bish'], { registry: {}, identity, stdout: (s) => { out.push(s); }, stderr: () => {} }));
+    main(['bish'], { registry, identity, stdout: (s) => { out.push(s); }, stderr: () => {} }));
   assert.equal(seedCode, 0);
-  assert.ok(existsSync(join(dir, '.bish-bash-bosh', 'interview.md')), 'store seeded from the template');
-  assert.equal(
-    readFileSync(join(dir, '.bish-bash-bosh', 'interview.md'), 'utf8'),
-    readFileSync(join(process.cwd(), 'templates', 'interview-template.md'), 'utf8'),
-  );
-  assert.match(out.join(''), /Wrote \.bish-bash-bosh\/interview\.md and \.bish-bash-bosh\/specification\.md from their templates/);
-  assert.ok(existsSync(join(dir, '.bish-bash-bosh', 'specification.md')), 'spec seeded from the template');
-  assert.equal(
-    readFileSync(join(dir, '.bish-bash-bosh', 'specification.md'), 'utf8'),
-    readFileSync(join(process.cwd(), 'templates', 'specification-template.md'), 'utf8'),
-  );
-  assert.equal(readFileSync(join(dir, '.bish-bash-bosh', 'bish-log.md'), 'utf8'), '', 'bish-log.md is created empty on the very first run, before any prompt is ever sent');
-  assert.ok(!existsSync(join(dir, '.bish-bash-bosh', 'runs')), 'no run folder on the seed-only run');
+  assert.equal(seed.prompts.length, 1, 'one initial-spec agent call');
+  assert.equal(seed.prompts[0], loadModePrompt('initial-spec'));
+  assert.match(out.join(''), /Wrote \.bish-bash-bosh\/specification\.md and \.bish-bash-bosh\/interview\.md from README\.md/);
+  assert.match(readFileSync(join(dir, '.bish-bash-bosh', 'specification.md'), 'utf8'), /Greet the user/);
+  assert.match(readFileSync(join(dir, '.bish-bash-bosh', 'bish-log.md'), 'utf8'), /bish: .*Initial Specification/s, 'the initial-spec prompt is logged');
+  assert.ok(!existsSync(join(dir, '.bish-bash-bosh', 'runs')), 'no run folder on the initial-spec run');
   // a second, custom question with a pre-filled default so the loop's resume/default behaviour can be exercised
   writeFileSync(
     join(dir, '.bish-bash-bosh', 'interview.md'),
@@ -232,10 +230,12 @@ test('bish usage errors exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
   const e = (/** @type {string} */ s) => { err.push(s); };
   const missing = mkdtempSync(join(tmpdir(), 'bish-int-missing-'));
+  writeFileSync(join(missing, 'README.md'), '# target\n');
   assert.equal(await withCwd(missing, () => main(['bish'], { input: Readable.from([]), stdout: () => {}, stderr: e })), 2);
   assert.match(err.join(''), /no adapter given/);
 
   const norole = mkdtempSync(join(tmpdir(), 'bish-int-norole-'));
+  writeFileSync(join(norole, 'README.md'), '# target\n');
   writeProjectConfig(norole, config({ adapter: 'missing' }));
   mkdirSync(join(norole, '.bish-bash-bosh'), { recursive: true });
   writeFileSync(join(norole, '.bish-bash-bosh', 'interview.md'), '# Interview\n');
@@ -322,4 +322,29 @@ test("createAsker: on a real terminal, a question's existing default is shown as
     input.push('\r');
     assert.equal(await reply, 'Q');
   }
+});
+
+test('bish refuses to start without a README.md in the project root, before asking for config or calling the agent', async () => {
+  const dir = makeRepo();
+  rmSync(join(dir, 'README.md'));
+  const a = agent({});
+  const err = /** @type {string[]} */ ([]);
+  const code = await withCwd(dir, () =>
+    main(['bish'], { registry: { f: () => a.adapter }, identity, stdout: () => {}, stderr: (s) => { err.push(s); } }));
+  assert.equal(code, 2);
+  assert.match(err.join(''), /README\.md not found in the project root/);
+  assert.equal(a.prompts.length, 0);
+  assert.ok(!existsSync(join(dir, '.bish-bash-bosh')), 'nothing written');
+});
+
+test('if the initial-spec agent leaves the templates untouched, bish fails and discards the seeded files so the next run retries', async () => {
+  const dir = makeRepo();
+  commitProjectConfig(dir, config({ adapter: 'iv' }));
+  const a = agent({});
+  const err = /** @type {string[]} */ ([]);
+  const code = await withCwd(dir, () =>
+    main(['bish'], { registry: { iv: () => a.adapter }, identity, stdout: () => {}, stderr: (s) => { err.push(s); } }));
+  assert.equal(code, 2);
+  assert.match(err.join(''), /specification\.md unchanged/);
+  for (const f of ['interview.md', 'specification.md', 'bish-log.md']) assert.ok(!existsSync(join(dir, '.bish-bash-bosh', f)), f);
 });

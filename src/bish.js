@@ -1,10 +1,11 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stringify as stringifyYaml } from 'yaml';
 import { resolveAdapter, defaultRegistry } from './adapters/index.js';
 import { acquireRunLock } from './run-lock.js';
 import { runInterviewLoop } from './bish-interview-loop.js';
+import { runInitialSpec, README_FILE } from './bish-initial-spec.js';
 import { createLogger } from './bish-log.js';
 import { runReverse } from './bish-reverse.js';
 import { debugAdapter, createAsker, askChoice, parseRunArgs, loadRunProject } from './cli-lib.js';
@@ -24,6 +25,10 @@ export async function runBish(argv, deps, out, err) {
   const { label, reverse, debug, parsed } = parseRunArgs('bish', argv);
   if (!parsed.ok) {
     err(`${label}: ${parsed.error}\n`);
+    return 2;
+  }
+  if (!reverse && !existsSync(README_FILE)) {
+    err(`${label}: ${README_FILE} not found in the project root; write one describing the project, then run bish again\n`);
     return 2;
   }
   const { ask, close } = createAsker(deps.input ?? process.stdin, out);
@@ -64,20 +69,15 @@ export async function runBish(argv, deps, out, err) {
 
 async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out, err, ask) {
   const { config, repo } = project;
-  // The very first `bish` run in a project just seeds the interview store and spec file from
-  // their templates, and creates an empty bish-log.md (every prompt sent to the agent and every
-  // piece of its own output shown in the console gets appended there from then on, see
-  // bish-log.js): no agent call, no lock, no run folder. Later runs proceed as usual.
-  if (!reverse && !existsSync(join(repo, INTERVIEW_FILE))) {
-    writeFileSync(join(repo, INTERVIEW_FILE), readFileSync(join(templatesDir, 'interview-template.md'), 'utf8'));
-    writeFileSync(join(repo, SPEC_FILE), readFileSync(join(templatesDir, 'specification-template.md'), 'utf8'));
-    writeFileSync(join(repo, LOG_FILE), '');
-    out(`Wrote ${INTERVIEW_FILE} and ${SPEC_FILE} from their templates.\nRun \`bish\` again to start the interview.\n`);
-    return 0;
-  }
+  // The very first `bish` run in a project (no interview.md yet) seeds the interview store and spec
+  // file from their templates, creates an empty bish-log.md (every prompt sent to the agent and every
+  // piece of its own output shown in the console gets appended there from then on, see bish-log.js),
+  // then makes one agent call (prompts/initial-spec.md) that turns README.md into a baseline spec and
+  // the first interview questions. It stops there so the owner can review before the interview starts.
+  const firstRun = !reverse && !existsSync(join(repo, INTERVIEW_FILE));
   // A restart after the first run: both files should already exist; self-heal spec.md alone if it
   // was somehow lost, rather than failing a run the owner can otherwise just continue.
-  if (!reverse && !existsSync(join(repo, SPEC_FILE))) {
+  if (!reverse && !firstRun && !existsSync(join(repo, SPEC_FILE))) {
     writeFileSync(join(repo, SPEC_FILE), readFileSync(join(templatesDir, 'specification-template.md'), 'utf8'));
   }
   const lock = acquireRunLock(project.dir);
@@ -88,6 +88,30 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
   try {
     const label = reverse ? 'reverse' : 'interview';
     const adapter = debugAdapter(resolveAdapter(config, deps.registry ?? defaultRegistry), label, debug, out);
+    if (firstRun) {
+      const specTemplate = readFileSync(join(templatesDir, 'specification-template.md'), 'utf8');
+      const seeded = [INTERVIEW_FILE, SPEC_FILE, LOG_FILE].map((f) => join(repo, f));
+      writeFileSync(seeded[0], readFileSync(join(templatesDir, 'interview-template.md'), 'utf8'));
+      writeFileSync(seeded[1], specTemplate);
+      writeFileSync(seeded[2], '');
+      try {
+        await runInitialSpec({
+          adapter,
+          repoDir: repo,
+          readFile: (p) => readFileSync(p, 'utf8'),
+          specPath: seeded[1],
+          interviewPath: seeded[0],
+          specTemplate,
+          say: out,
+          log: createLogger(seeded[2]),
+        });
+      } catch (e) {
+        for (const f of seeded) rmSync(f, { force: true });
+        throw e;
+      }
+      out(`Wrote ${SPEC_FILE} and ${INTERVIEW_FILE} from README.md.\nReview them, then run \`bish\` again to start the interview.\n`);
+      return 0;
+    }
     if (!reverse) {
       // Each round's answer is captured by the deterministic checkbox walk below; the agent only
       // sees one question/answer at a time (prompts/interview-loop.md), with the same session

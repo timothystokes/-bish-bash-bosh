@@ -3,29 +3,57 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parsePlanItems, nextPlanItem, runBuildLoop, buildBuildLoopPrompt, buildQaLoopPrompt } from '../src/bosh-build-loop.js';
+import { parsePlanItems, nextPlanItem, runBuildLoop, buildBuildLoopPrompt, buildQaLoopPrompt, MAX_QA_ATTEMPTS } from '../src/bosh-build-loop.js';
 import { loadModePrompt } from '../src/prompts.js';
 
 const sample = [
   '# Plan',
   '',
-  '- [ ] Phase: High Level Design. Task: Establish architectural constraints.',
-  '- [ ] Phase: Core. Task: Implement the login screen.',
-  '- [x] Phase: Done already. Task: Already implemented.',
+  '1. [ ] Phase: High Level Design. Task: Establish architectural constraints. Depends: None',
+  '2. [ ] Phase: Core. Task: Implement the login screen. Depends: 1',
+  '3. [x] Phase: Done already. Task: Already implemented. Depends: None',
   '',
 ].join('\n');
 
-test('parsePlanItems reads each `- [ ] Phase: ... Task: ...` line', () => {
+test('parsePlanItems reads each numbered `N. [ ] Phase: ... Task: ... Depends: ...` line', () => {
   const items = parsePlanItems(sample);
   assert.equal(items.length, 3);
-  assert.deepEqual(items[0], { checked: false, phase: 'High Level Design.', task: 'Establish architectural constraints.', lineIndex: 2 });
+  assert.deepEqual(items[0], { id: 1, checked: false, phase: 'High Level Design.', task: 'Establish architectural constraints.', dependsOn: [], lineIndex: 2 });
   assert.equal(items[1].task, 'Implement the login screen.');
+  assert.deepEqual(items[1].dependsOn, [1]);
   assert.equal(items[2].checked, true);
 });
 
 test('nextPlanItem is the first item not yet checked, skipping already-processed ones', () => {
   assert.equal(nextPlanItem(parsePlanItems(sample))?.phase, 'High Level Design.');
-  assert.equal(nextPlanItem(parsePlanItems(sample.replace('- [ ] Phase: High Level Design.', '- [x] Phase: High Level Design.')))?.phase, 'Core.');
+  assert.equal(nextPlanItem(parsePlanItems(sample.replace('1. [ ] Phase: High Level Design.', '1. [x] Phase: High Level Design.')))?.phase, 'Core.');
+});
+
+test('parsePlanItems reads a multi-number Depends list, treats a missing or None Depends as no dependencies', () => {
+  const items = parsePlanItems('4. [ ] Phase: P. Task: T. Depends: 1, 3\n5. [ ] Phase: P. Task: No depends label.\n');
+  assert.deepEqual(items.map((i) => i.dependsOn), [[1, 3], []]);
+  assert.equal(items[1].task, 'No depends label.');
+});
+
+test('nextPlanItem skips an unticked item whose dependencies are not all ticked, taking a later ready one first', () => {
+  const items = parsePlanItems('1. [ ] Phase: A. Task: a. Depends: 2\n2. [ ] Phase: B. Task: b. Depends: None\n');
+  assert.equal(nextPlanItem(items).id, 2);
+  assert.equal(nextPlanItem(parsePlanItems('1. [ ] Phase: A. Task: a. Depends: 2\n2. [x] Phase: B. Task: b. Depends: None\n')).id, 1);
+});
+
+test('runBuildLoop builds a dependency before its dependent, ticks only the checkbox, and reports blocked on a dependency cycle', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bosh-deps-'));
+  const path = join(dir, 'plan.md');
+  writeFileSync(path, '1. [ ] Phase: A. Task: first. Depends: 2\n2. [ ] Phase: B. Task: second. Depends: None\n');
+  const adapter = fakeAdapter();
+  const res = await runBuildLoop({ planPath: path, ...io(), say: () => {}, adapter, repoDir: dir, runTests: passingTests });
+  assert.equal(res.status, 'ok');
+  assert.match(adapter.calls[0].prompt, /## Task\n\nsecond\./, 'the dependency is built first');
+  assert.equal(readFileSync(path, 'utf8'), '1. [x] Phase: A. Task: first. Depends: 2\n2. [x] Phase: B. Task: second. Depends: None\n');
+  writeFileSync(path, '1. [ ] Phase: A. Task: a. Depends: 2\n2. [ ] Phase: B. Task: b. Depends: 1\n');
+  const blocked = await runBuildLoop({ planPath: path, ...io(), say: () => {}, adapter: fakeAdapter(), repoDir: dir, runTests: passingTests });
+  assert.equal(blocked.status, 'blocked');
+  assert.match(blocked.output, /1 needs 2; 2 needs 1/);
 });
 
 test('buildBuildLoopPrompt prefaces prompts/build-loop.md onto the item\'s phase and task', () => {
@@ -137,9 +165,43 @@ test('a failing test gate after the QA call stops the loop and still leaves the 
   assert.equal(res.status, 'failed');
   assert.equal(res.processed, 0);
   assert.equal(res.output, 'still broken');
-  assert.equal(adapter.calls.length, 2, 'both build and QA calls happen before the second gate fails');
+  assert.equal(adapter.calls.length, 1 + MAX_QA_ATTEMPTS, 'one build call, then QA is retried up to the cap before the loop gives up');
   const after = parsePlanItems(readFileSync(planPath, 'utf8'));
   assert.equal(after[0].checked, false);
+});
+
+test('a QA call that throws is retried with the error passed into its prompt, and the item is ticked once a retry succeeds', async () => {
+  const { path: planPath, dir } = makeFile();
+  const adapter = fakeAdapter((req, n) => {
+    if (n === 2) throw new Error('adapter exploded');
+    return {};
+  });
+  const res = await runBuildLoop({ planPath, ...io(), say: () => {}, adapter, repoDir: dir, runTests: passingTests });
+  assert.equal(res.status, 'ok');
+  assert.equal(res.processed, 2);
+  assert.doesNotMatch(adapter.calls[1].prompt, /\n\n## Previous Failure/, 'first QA attempt has no feedback');
+  assert.match(adapter.calls[2].prompt, /## Previous Failure\n\nQA step threw an error: adapter exploded/);
+  assert.ok(adapter.calls[2].prompt.startsWith(loadModePrompt('qa-loop')), 'the retry is still the QA prompt');
+});
+
+test('a failing gate after QA is retried with its test output passed into the QA prompt; a persistent failure is reported after the cap', async () => {
+  const { path: planPath, dir } = makeFile();
+  const adapter = fakeAdapter();
+  let gate = 0;
+  const res = await runBuildLoop({
+    planPath, ...io(), say: () => {}, adapter, repoDir: dir,
+    runTests: () => { gate++; return gate === 1 ? { ok: true, output: '' } : { ok: false, output: `red ${gate}` }; },
+  });
+  assert.equal(res.status, 'failed');
+  assert.equal(res.output, `red ${1 + MAX_QA_ATTEMPTS}`);
+  assert.match(adapter.calls[2].prompt, /## Previous Failure\n\nred 2$/);
+  assert.match(adapter.calls[3].prompt, /## Previous Failure\n\nred 3$/);
+});
+
+test('buildQaLoopPrompt tail-truncates a very long previous failure', () => {
+  const p = buildQaLoopPrompt({ phase: 'P', task: 'T' }, `${'x'.repeat(10000)}END`);
+  assert.ok(p.endsWith('xEND'));
+  assert.ok(p.length < loadModePrompt('qa-loop').length + 4200);
 });
 
 test('a later `bosh` run picks up the same still-unticked item after a gate failure', async () => {

@@ -32,6 +32,21 @@ test('parseSpecificationItems tolerates a parenthetical remark before the `B:` l
   assert.equal(items[0].benefit, 'Fewer bad records.');
 });
 
+test('parseSpecificationItems tolerates a parenthetical question reference after `C`, as the Interview Loop writes (`C (Q1):`)', () => {
+  const items = parseSpecificationItems('4. [ ] C (Q1): Play against the computer. B: Solo play.');
+  assert.equal(items.length, 1, 'not silently skipped, which would leave the item unplanned');
+  assert.equal(items[0].constraint, 'Play against the computer.');
+  assert.equal(items[0].benefit, 'Solo play.');
+});
+
+test('ticking an item flips only its checkbox, keeping any `C (Q1):` reference intact', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bash-plan-'));
+  const path = join(dir, 'specification.md');
+  writeFileSync(path, '1. [ ] C (Q1): Play against the computer. B (why): Solo play.\n');
+  await runPlanLoop({ specificationPath: path, ...io(), say: () => {}, adapter: fakeAdapter(), repoDir: dir, ...sessionStore() });
+  assert.equal(readFileSync(path, 'utf8'), '1. [x] C (Q1): Play against the computer. B (why): Solo play.\n');
+});
+
 test('nextSpecificationItem is the first item not yet checked, skipping already-processed ones', () => {
   assert.equal(nextSpecificationItem(parseSpecificationItems(sample))?.id, 1);
   assert.equal(nextSpecificationItem(parseSpecificationItems(sample.replace('1. [ ]', '1. [x]')))?.id, 2);

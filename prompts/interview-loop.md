@@ -1,10 +1,13 @@
 # Per Loop Instructions.
 
-1. Append or adjust the specification.md based on the details of the quesiton and answer provided below. 
+1. Append or adjust `.bish-bash-bosh/specification.md` based on the details of the question and answer provided below and reference this question number in the specification. 
 
-2. Adjust the answers in any unprocessed question in the interview.md from the insights of the answered question below.
+2. Adjust the answers in any unprocessed questions in `.bish-bash-bosh/interview.md` from the insights of the answered question below including:
+- If any question is answered directly from this new answer then mark it as processed also.
+- Update the proposed answer to any unprocessed question to reflect the new information verified in this question and answer below.
+- If the answer to this question conflicts with an already processed question and answer then mark the previous question/answer as unprocessed again and adjust it's proposed answer to have the user verify the conflict.
 
-3. Append follow up questions to interview.md, needed to capture all requirements for the objective, one per line: `<n>. [ ] Q: <question> A: <default answer>`.
+3. Append follow up questions to `.bish-bash-bosh/interview.md`, that you feel need to be asked in order to achieve a complete specification for the objective using the format: `<n>. [ ] Q: <question> A: <default answer>`.
 
 4. Then stop!
 

@@ -10,12 +10,12 @@ const CYAN = '\x1b[1;36m';
 const GREY = '\x1b[90m';
 const RESET = '\x1b[0m';
 
-const LINE = /^(\d+)\.\s*\[([ x])\]\s*C:\s*(.*?)\s*B\s*(?:\([^)]*\))?:\s*(.*)$/;
+const LINE = /^(\d+)\.\s*\[([ x])\]\s*C\s*(?:\([^)]*\))?:\s*(.*?)\s*B\s*(?:\([^)]*\))?:\s*(.*)$/;
 
 // Parses the numbered constraint/benefit lines out of a specification.md's text. Returns one entry
 // per well-formed `<n>. [ ] C: <constraint> B: <benefit>` line, with its line index so the loop can
-// rewrite it in place. Tolerates a parenthetical remark between `B` and `:` (matching the Interview
-// Loop's own `A (...):` leniency), so a line is never silently dropped over a label phrased slightly
+// rewrite it in place. Tolerates a parenthetical remark between `C`/`B` and `:` (e.g. the `C (Q1):`
+// question reference the Interview Loop writes, matching its own `A (...):` leniency), so a line is never silently dropped over a label phrased slightly
 // differently.
 export function parseSpecificationItems(text) {
   const lines = text.split('\n');
@@ -52,11 +52,6 @@ export function buildPlanLoopPrompt(item, { includeIntro = false } = {}) {
   return parts.join('\n\n');
 }
 
-// Renders one specification item line, checked or not, with its current constraint/benefit text.
-function renderLine(id, checked, constraint, benefit) {
-  return `${id}. [${checked ? 'x' : ' '}] C: ${constraint} B: ${benefit}`;
-}
-
 // Ticks a specification item's checkbox by id, re-reading the file first since something else may
 // have changed it meanwhile. A line that is gone is left alone rather than erroring.
 function markProcessed(specificationPath, readFile, writeFile, id) {
@@ -64,7 +59,7 @@ function markProcessed(specificationPath, readFile, writeFile, id) {
   const item = parseSpecificationItems(text).find((x) => x.id === id);
   if (!item) return;
   const lines = text.split('\n');
-  lines[item.lineIndex] = renderLine(item.id, true, item.constraint, item.benefit);
+  lines[item.lineIndex] = lines[item.lineIndex].replace('[ ]', '[x]');
   writeFile(specificationPath, lines.join('\n'));
 }
 

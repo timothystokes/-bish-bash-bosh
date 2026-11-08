@@ -11,6 +11,22 @@ import { main, helpText } from '../src/cli.js';
 import { freshDir, initGitRepo, withCwd } from './support/project.js';
 
 
+function proj() {
+  const dir = freshDir('init-');
+  writeFileSync(join(dir, 'README.md'), '# target\n');
+  return dir;
+}
+
+// An agent that does the initial-spec step: replaces both seeded templates, as prompts/initial-spec.md asks.
+const drafting = () => ({
+  async run(req) {
+    writeFileSync(join(req.cwd, '.bish-bash-bosh', 'specification.md'), '# Specification\n\n1. [ ] C: Greet. B: Friendly.\n');
+    writeFileSync(join(req.cwd, '.bish-bash-bosh', 'interview.md'), '# Interview\n\n1. [ ] Q: Who uses it? A: Developers\n');
+    return { exitStatus: 0, transcript: '', changedFiles: [] };
+  },
+});
+const draftingRegistry = { copilot: drafting, 'agent-x': drafting };
+
 test('writes .bish-bash-bosh/config.yml with a single adapter/model', () => {
   const dir = freshDir('init-');
   const res = initProject({ dir, adapter: 'agent-x', model: 'model-y' });
@@ -39,11 +55,11 @@ test('commits the config when run inside a git repo (so the tree is clean for bi
 });
 
 test('automatic setup commits only config and preserves unrelated staged changes', async () => {
-  const dir = freshDir('init-');
+  const dir = proj();
   initGitRepo(dir);
   writeFileSync(join(dir, 'owner-work.txt'), 'unfinished owner work\n');
   execFileSync('git', ['-C', dir, 'add', 'owner-work.txt']);
-  const r = await withCwd(dir, () => run(['bish'], ['agent-x', 'model-y']));
+  const r = await withCwd(dir, () => run(['bish'], ['agent-x', 'model-y'], { registry: draftingRegistry }));
   assert.equal(r.code, 0, r.err);
   const committed = execFileSync('git', ['-C', dir, 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', 'HEAD'], { encoding: 'utf8' }).trim();
   assert.equal(committed, '.bish-bash-bosh/config.yml');
@@ -87,10 +103,10 @@ async function run(args, lines = [], deps = {}) {
   return { code, out: outs.join(''), err: errs.join('') };
 }
 
-test('first bish asks for a single adapter/model, commits config and seeds interview without an agent', async () => {
-  const dir = freshDir('init-');
+test('first bish asks for a single adapter/model, commits config and seeds and drafts the interview files from README.md', async () => {
+  const dir = proj();
   initGitRepo(dir);
-  const r = await withCwd(dir, () => run(['bish'], ['copilot', 'm1']));
+  const r = await withCwd(dir, () => run(['bish'], ['copilot', 'm1'], { registry: draftingRegistry }));
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /adapter.*model/s, 'prompts are shown');
   assert.doesNotMatch(r.out, /interview adapter|reverse adapter|build adapter|qa adapter/, 'one prompt, not one per role');
@@ -101,13 +117,13 @@ test('first bish asks for a single adapter/model, commits config and seeds inter
   for (const file of ['interview.md', 'specification.md', 'bish-log.md']) {
     assert.ok(existsSync(join(dir, '.bish-bash-bosh', file)), file);
   }
-  assert.match(r.out, /Run `bish` again to start the interview/);
+  assert.match(r.out, /run `bish` again to start the interview/);
   assert.equal(execFileSync('git', ['-C', dir, 'show', 'HEAD:.bish-bash-bosh/config.yml'], { encoding: 'utf8' }), readFileSync(join(dir, '.bish-bash-bosh', 'config.yml'), 'utf8'));
 });
 
 test('first bish without git leaves the config uncommitted, with guidance', async () => {
-  const dir = freshDir('init-');
-  const r = await withCwd(dir, () => run(['bish'], ['copilot', 'm1']));
+  const dir = proj();
+  const r = await withCwd(dir, () => run(['bish'], ['copilot', 'm1'], { registry: draftingRegistry }));
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /Wrote \.bish-bash-bosh\/config\.yml \(adapter: copilot, model: m1\)\./);
   assert.match(r.out, /Commit it before running bish\/bosh/);
@@ -115,8 +131,8 @@ test('first bish without git leaves the config uncommitted, with guidance', asyn
 });
 
 test('first bish picks adapter/model by number from the suggested list', async () => {
-  const dir = freshDir('init-');
-  const r = await withCwd(dir, () => run(['bish'], ['1', '1']));
+  const dir = proj();
+  const r = await withCwd(dir, () => run(['bish'], ['1', '1'], { registry: draftingRegistry }));
   assert.equal(r.code, 0, r.err);
   const cfg = parseYaml(readFileSync(join(dir, '.bish-bash-bosh', 'config.yml'), 'utf8'));
   assert.equal(cfg.adapter, 'copilot');
@@ -124,7 +140,7 @@ test('first bish picks adapter/model by number from the suggested list', async (
 });
 
 test('bish rejects an invalid existing config without prompting or overwriting it', async () => {
-  const dir = freshDir('init-');
+  const dir = proj();
   mkdirSync(join(dir, '.bish-bash-bosh'), { recursive: true });
   writeFileSync(join(dir, '.bish-bash-bosh', 'config.yml'), 'adapter: x\n');
   const r = await withCwd(dir, () => run(['bish'], []));
@@ -135,11 +151,11 @@ test('bish rejects an invalid existing config without prompting or overwriting i
 });
 
 test('first bish aborts without writing config or templates if no adapter or model is given', async () => {
-  const dir1 = freshDir('init-');
+  const dir1 = proj();
   const r1 = await withCwd(dir1, () => run(['bish'], ['']));
   assert.equal(r1.code, 2);
   assert.match(r1.err, /no adapter given/);
-  const dir2 = freshDir('init-');
+  const dir2 = proj();
   const r2 = await withCwd(dir2, () => run(['bish'], ['copilot', '']));
   assert.equal(r2.code, 2);
   assert.match(r2.err, /no model given/);
@@ -147,7 +163,7 @@ test('first bish aborts without writing config or templates if no adapter or mod
 });
 
 test('bish validates arguments before starting setup', async () => {
-  const dir = freshDir('init-');
+  const dir = proj();
   const r = await withCwd(dir, () => run(['bish', '--bogus', 'x'], []));
   assert.equal(r.code, 2);
   assert.match(r.err, /unknown argument/);
@@ -161,11 +177,11 @@ test('the separate init command is removed', async () => {
 });
 
 test('bish uses an existing valid config without prompting or rewriting it', async () => {
-  const dir = freshDir('init-');
+  const dir = proj();
   initProject({ dir, adapter: 'agent-x', model: 'model-y' });
   const path = join(dir, '.bish-bash-bosh', 'config.yml');
   const original = readFileSync(path, 'utf8');
-  const r = await withCwd(dir, () => run(['bish']));
+  const r = await withCwd(dir, () => run(['bish'], [], { registry: draftingRegistry }));
   assert.equal(r.code, 0, r.err);
   assert.doesNotMatch(r.out, /adapter \(1-/);
   assert.equal(readFileSync(path, 'utf8'), original);
@@ -173,14 +189,14 @@ test('bish uses an existing valid config without prompting or rewriting it', asy
 });
 
 test('bish --help does not start setup', async () => {
-  const dir = freshDir('init-');
+  const dir = proj();
   const r = await withCwd(dir, () => run(['bish', '--help']));
   assert.equal(r.code, 0);
   assert.ok(!existsSync(join(dir, '.bish-bash-bosh')));
 });
 
 test('bish --reverse also offers setup when config is missing', async () => {
-  const dir = freshDir('init-');
+  const dir = proj();
   const r = await withCwd(dir, () => run(['bish', '--reverse'], []));
   assert.equal(r.code, 2);
   assert.match(r.err, /no adapter given/);
@@ -188,7 +204,7 @@ test('bish --reverse also offers setup when config is missing', async () => {
 });
 
 test('setup preserves an existing interview and shares buffered input with its next round', async () => {
-  const dir = freshDir('init-');
+  const dir = proj();
   const store = join(dir, '.bish-bash-bosh', 'interview.md');
   mkdirSync(join(dir, '.bish-bash-bosh'));
   writeFileSync(store, '# Interview\n\n1. [ ] Q: What shall we build? A: \n');
@@ -210,16 +226,16 @@ test('setup preserves an existing interview and shares buffered input with its n
 });
 
 test('setup reports filesystem errors instead of claiming success', async () => {
-  const dir = freshDir('init-');
+  const dir = proj();
   writeFileSync(join(dir, '.bish-bash-bosh'), 'not a directory');
-  const r = await withCwd(dir, () => run(['bish'], ['agent-x', 'model-y']));
+  const r = await withCwd(dir, () => run(['bish'], ['agent-x', 'model-y'], { registry: draftingRegistry }));
   assert.equal(r.code, 2);
   assert.match(r.err, /bish:.*EEXIST/);
   assert.doesNotMatch(r.out, /Wrote/);
 });
 
 test('bish rejects malformed YAML without prompting or overwriting it', async () => {
-  const dir = freshDir('init-');
+  const dir = proj();
   mkdirSync(join(dir, '.bish-bash-bosh'));
   const path = join(dir, '.bish-bash-bosh', 'config.yml');
   writeFileSync(path, 'adapter: [\n');

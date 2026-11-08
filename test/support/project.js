@@ -38,8 +38,19 @@ export function commitProjectConfig(dir, config) {
 export function seedObjectiveProject(dir) {
   initGitRepo(dir);
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'target', private: true, type: 'module', scripts: { test: 'node --test tests/*.test.js' } }, null, 2) + '\n');
+  writeFileSync(join(dir, 'README.md'), '# target\n');
   return dir;
 }
+
+// A scripted adapter doing bish's initial-spec step: replaces both seeded templates with a one-item spec
+// and the "What is the objective?" question, as prompts/initial-spec.md asks.
+export const draftingAdapter = () => ({
+  async run(req) {
+    writeFileSync(join(req.cwd, '.bish-bash-bosh', 'specification.md'), '# Specification\n\n1. [ ] C: Greet. B: Friendly.\n');
+    writeFileSync(join(req.cwd, '.bish-bash-bosh', 'interview.md'), '# Interview\n\n1. [ ] Q: What is the objective? A: Unknown.\n');
+    return { exitStatus: 0, transcript: '', changedFiles: [] };
+  },
+});
 
 // Run `fn` with the process cwd set to `dir`, restoring it afterwards: the CLI (main()) always
 // operates on cwd now, so tests exercising it must chdir instead of passing a sandbox --dir.

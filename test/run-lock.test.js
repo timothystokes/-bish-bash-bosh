@@ -55,6 +55,7 @@ test('bish, bash and bosh refuse a project held by a live process, and release t
   initGitRepo(dir);
   await withCwd(dir, async () => {
     commitProjectConfig(dir, { adapter: 'f', model: 'm' });
+    writeFileSync(join(dir, 'README.md'), '# target\n');
     mkdirSync(join(dir, '.bish-bash-bosh'), { recursive: true });
     writeFileSync(join(dir, '.bish-bash-bosh', 'interview.md'), '# Interview\n');
     // bash's own first-run seed (of plan.md from specification.md) bypasses the lock by design,

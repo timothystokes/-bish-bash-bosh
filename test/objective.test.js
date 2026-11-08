@@ -7,7 +7,7 @@ import { Readable } from 'node:stream';
 import { runObjective } from '../src/bish-objective.js';
 import { sumRunUsage } from '../src/run-usage.js';
 import { main } from '../src/cli.js';
-import { freshDir, initGitRepo, seedObjectiveProject, withCwd, writeProjectConfig } from './support/project.js';
+import { draftingAdapter, freshDir, initGitRepo, seedObjectiveProject, withCwd, writeProjectConfig } from './support/project.js';
 
 const identity = { root: '/nonexistent/bish-bash-bosh', remotes: [] };
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
@@ -271,10 +271,10 @@ test('bish drives the Interview Loop from stdin, operating on cwd, and hands eac
   writeProjectConfig(dir, buildConfig);
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', 'seed');
-  // first run only seeds .bish-bash-bosh/interview.md from the template; commit it so the next run isn't gated
+  // first run seeds .bish-bash-bosh/interview.md from the template and has the agent draft it from README.md; commit it so the next run isn't gated
   const seedOuts = /** @type {string[]} */ ([]);
   const seedCode = await withCwd(dir, () =>
-    main(['bish'], { stdout: (s) => seedOuts.push(s), stderr: (s) => seedOuts.push(s), registry: {}, identity }));
+    main(['bish'], { stdout: (s) => seedOuts.push(s), stderr: (s) => seedOuts.push(s), registry: { a: draftingAdapter }, identity }));
   assert.equal(seedCode, 0, seedOuts.join(''));
   writeFileSync(
     join(dir, '.bish-bash-bosh', 'interview.md'),

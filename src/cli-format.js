@@ -14,17 +14,20 @@ export function formatInterviewLoopResult(res) {
   return `Paused after ${plural(answered, 'question')}: ${plural(res.remaining, 'question')} left. Run \`bish\` again to continue.\n`;
 }
 
-// `bosh`'s Plan Loop (runPlanLoop): {status, processed}. Unlike the Interview Loop there is no
+// `bash`'s Plan Loop (runPlanLoop): {status, processed}. Unlike the Interview Loop there is no
 // pause state: every unprocessed specification item is handed to the agent in one run.
 export function formatPlanLoopResult(res) {
   return `Plan complete: ${plural(res.processed, 'item')} processed this run.\n`;
 }
 
-// `bosh`'s Build Loop (runBuildLoop): {status, processed}. Same shape and the same reasoning as
+// `bosh`'s Build Loop (runBuildLoop): {status, processed}; 'blocked' when unticked items remain but none has all its dependencies ticked. Same shape and the same reasoning as
 // formatPlanLoopResult above: every unprocessed plan.md item is handed to the agent in one run.
 export function formatBuildLoopResult(res) {
+  if (res.status === 'blocked') {
+    return `Build stopped after ${plural(res.processed, 'item')}: ${res.output}. Fix the Depends lines in plan.md, then run \`bosh\` again.\n`;
+  }
   if (res.status === 'failed') {
-    return `Build stopped after ${plural(res.processed, 'item')}: tests failed on "${res.item.phase}: ${res.item.task}" (unticked; run \`bosh\` again to retry).\n${res.output}\n`;
+    return `Build stopped after ${plural(res.processed, 'item')}: tests failed (or QA kept failing) on "${res.item.phase}: ${res.item.task}" (unticked; run \`bosh\` again to retry).\n${res.output}\n`;
   }
   return `Build complete: ${plural(res.processed, 'item')} processed this run.\n`;
 }

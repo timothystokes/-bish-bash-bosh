@@ -5,6 +5,9 @@ not trust that it works just because its own test passed. Read `.bish-bash-bosh/
 the project's own source files and the test(s) already written for this item under
 `.bish-bash-bosh/tests/`.
 
+If a `## Previous Failure` section follows, your previous attempt at this verification failed with that
+error or test output: find and fix its cause first.
+
 1. Check that the implementation actually satisfies this item's phase and task against what the
    interview, specification and plan describe — not just that its own test passes: a narrow or
    mocked test can pass while the real behaviour is still wrong.
