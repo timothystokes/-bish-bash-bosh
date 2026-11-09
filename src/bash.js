@@ -34,7 +34,7 @@ export async function runBash(cmd, argv, deps, out, err) {
     return 2;
   }
   if (!existsSync(join(repo, PLAN_FILE))) {
-    writeFileSync(join(repo, PLAN_FILE), readFileSync(join(templatesDir, 'plan-template.md'), 'utf8'));
+    writeFileSync(join(repo, PLAN_FILE), readFileSync(join(templatesDir, 'plan-template.md'), 'utf8').replaceAll('{{TODAY}}', new Date().toISOString().slice(0, 10)));
     if (!existsSync(join(repo, LOG_FILE))) writeFileSync(join(repo, LOG_FILE), '');
     out(`Wrote ${PLAN_FILE} from its template.\n`);
     // Unlike bish (which needs the owner to actually type an answer before the Interview Loop's

@@ -34,6 +34,8 @@ test('bash on a fresh repo seeds plan.md from its template, then falls straight 
   const text = out.join('');
   assert.match(text, /Wrote \.bish-bash-bosh\/plan\.md from its template\./);
   assert.ok(existsSync(join(dir, '.bish-bash-bosh', 'plan.md')), 'plan.md seeded from the template');
+  const today = new Date().toISOString().slice(0, 10);
+  assert.ok(readFileSync(join(dir, '.bish-bash-bosh', 'plan.md'), 'utf8').includes(`:t1, ${today} 00:00, 5m`), 'the seeded Gantt chart starts today');
   assert.equal(adapter.calls.length, 1, 'the one specification item was handed to the agent in this same run, no second invocation needed');
   assert.match(text, /Plan complete: 1 item processed this run\./);
   const specAfter = readFileSync(join(dir, '.bish-bash-bosh', 'specification.md'), 'utf8');
