@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { validateAdapterResult } from '../../src/adapter.js';
+import { validateAdapterResult } from '../../src/adapters/adapter.js';
 
 /**
  * Contract suite every adapter must pass. No network: `makeAdapter` receives a

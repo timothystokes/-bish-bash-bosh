@@ -1,7 +1,5 @@
-You are the reverse step: recover this repo's behaviour from its source as specs plus characterization tests.
-- One spec per file, one decision each, titled "# Spec: <name>", per the template below. Describe what the code does today.
-- Write characterization tests under tests/ that pass against the source as it is.
-- Write tests/PLAN.md mapping every spec to its tests, per the template below.
-- Change only specs/ and tests/. Do not change source, config or plan.md.
-- Stop when `bish-bash-bosh spec-lint` passes and the suite is green.
+You are the reverse step: recover this repo's behaviour from its source as a specification.
+- Write `.bish-bash-bosh/specification.md`, following the template below exactly: a header, then one numbered line per item, `<n>. [ ] C: <constraint> B: <benefit>`.
+- Describe what the code does today: its behaviour, interfaces, non-functional requirements (performance, security, testing approaches) and constraints. Never invent requirements the code does not support.
+- Change only `.bish-bash-bosh/specification.md`. Do not change source, config or tests.
 - Install missing tools yourself; only a missing credential blocks.

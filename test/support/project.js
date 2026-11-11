@@ -42,8 +42,8 @@ export function seedObjectiveProject(dir) {
   return dir;
 }
 
-// A scripted adapter doing bish's initial-spec step: replaces both seeded templates with a one-item spec
-// and the "What is the objective?" question, as prompts/initial-spec.md asks.
+// A scripted adapter doing bish's bootstrap step: replaces both seeded templates with a one-item spec
+// and the "What is the objective?" question, as src/bish/prompts/bish-bootstrap.md asks.
 export const draftingAdapter = () => ({
   async run(req) {
     writeFileSync(join(req.cwd, '.bish-bash-bosh', 'specification.md'), '# Specification\n\n1. [ ] C: Greet. B: Friendly.\n');
