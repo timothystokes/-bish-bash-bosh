@@ -9,6 +9,7 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 // `-bish`'s Interview Loop (runInterviewLoop): {status, answered, remaining?}.
 export function formatInterviewLoopResult(res) {
   const { status, answered } = res;
+  if (status === 'ok' && answered === 0) return 'No unanswered questions in .bish-bash-bosh/interview.md. Add questions to it (or edit specification.md), or run `-bash` next.\n';
   if (status === 'ok') return `Interview complete: ${plural(answered, 'question')} answered this run.\n`;
   return `Paused after ${plural(answered, 'question')}: ${plural(res.remaining, 'question')} left. Run \`-bish\` again to continue.\n`;
 }

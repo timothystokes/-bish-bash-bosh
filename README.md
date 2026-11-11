@@ -23,7 +23,7 @@ A loop engineering harness for software delivery.
 ## Install
 
 ```sh
-npm install -g -bish-bash-bosh   # or, from a clone: npm install && npm link
+npm install -g github:timothystokes/-bish-bash-bosh   # or, from a clone: npm install && npm link
 ```
 
 ## New Objective
