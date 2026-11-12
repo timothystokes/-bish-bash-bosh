@@ -10,7 +10,7 @@ import { createLogger } from './bish-log.js';
 import { runReverse } from './bish-reverse.js';
 import { debugAdapter, createAsker, askChoice, parseRunArgs, loadRunProject } from '../cli/cli-lib.js';
 import { formatInterviewLoopResult, formatReverseResult } from '../cli/cli-format.js';
-import { initProject, ADAPTER_CHOICES, MODEL_CHOICES } from '../shared/init.js';
+import { initProject, ADAPTER_CHOICES, listModels } from '../shared/init.js';
 import { CONFIG_FILE } from '../shared/project-config.js';
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), 'templates');
@@ -39,7 +39,7 @@ export async function runBish(argv, deps, out, err) {
         err(`${label}: aborted (no adapter given)\n`);
         return 2;
       }
-      const choices = MODEL_CHOICES[adapter];
+      const choices = await (deps.listModels ?? listModels)(adapter);
       const model = choices ? await askChoice(ask, out, 'model', choices) : await ask('model: ');
       if (!model) {
         err(`${label}: aborted (no model given)\n`);
@@ -106,7 +106,8 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
           log: createLogger(seeded[2]),
         });
       } catch (e) {
-        for (const f of seeded) rmSync(f, { force: true });
+        // Keep bish-log.md (seeded[2]) so the failed call's prompt and response stay readable.
+        for (const f of seeded.slice(0, 2)) rmSync(f, { force: true });
         throw e;
       }
       out(`Wrote ${SPEC_FILE} and ${INTERVIEW_FILE} from README.md.\nReview them, then run \`bish\` again to start the interview.\n`);

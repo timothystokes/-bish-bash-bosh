@@ -18,7 +18,7 @@ export async function runBootstrap({ adapter, repoDir, readFile, specPath, inter
   log('bish/bootstrap prompt', prompt);
   say('\x1b[90mReading README.md to draft the baseline specification and first questions...\n');
   let reasoning = '';
-  await adapter.run({
+  const result = await adapter.run({
     prompt,
     cwd: repoDir,
     limits: {},
@@ -28,7 +28,14 @@ export async function runBootstrap({ adapter, repoDir, readFile, specPath, inter
     },
   });
   say('\x1b[0m\n');
-  if (reasoning) log('bish/bootstrap response', reasoning);
-  if (readFile(specPath) === specTemplate) throw new Error('the agent left specification.md unchanged from its template');
-  if (!nextQuestion(parseInterview(readFile(interviewPath)))) throw new Error('the agent wrote no unprocessed question to interview.md');
+  const response = reasoning || result?.transcript || '';
+  if (response) log('bish/bootstrap response', response);
+  // The agent's own account of what happened, so a failure says why rather than just what was missing.
+  const detail = () => {
+    const status = result?.exitStatus ? ` (agent exit status ${result.exitStatus})` : '';
+    const tail = response.trim().slice(-1500);
+    return `${status}${tail ? `\nLast agent output:\n${tail}` : '\nThe agent produced no output.'}`;
+  };
+  if (readFile(specPath) === specTemplate) throw new Error(`the agent left specification.md unchanged from its template${detail()}`);
+  if (!nextQuestion(parseInterview(readFile(interviewPath)))) throw new Error(`the agent wrote no unprocessed question to interview.md${detail()}`);
 }

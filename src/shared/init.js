@@ -30,11 +30,51 @@ function commitConfig(dir, configPath) {
 // It goes stale as vendors release models; update it by hand when that happens.
 export const ADAPTER_CHOICES = ['copilot', 'claude-code', 'codex', 'openai-http'];
 export const MODEL_CHOICES = {
-  copilot: ['gpt-5', 'claude-sonnet-4.5', 'claude-opus-4.1', 'auto'],
+  copilot: ['auto'], // the real list is fetched live, see listModels
   'claude-code': ['claude-opus-4-1-20250805', 'claude-sonnet-4-5-20250929'],
   codex: ['gpt-5-codex', 'gpt-5'],
   // openai-http hits an arbitrary /chat/completions endpoint: no catalog, type the model directly.
 };
+
+// Copilot's own model list for this account, fetched live from the same service the Copilot CLI uses
+// (only chat models the picker offers, labelled with the picker's cost tier since the API gives no price), so it is never stale. Returns null on any failure (no token,
+// offline, unexpected response) and the caller falls back to MODEL_CHOICES.
+async function fetchCopilotModels({ fetchFn = fetch, getToken = defaultToken, timeoutMs = 8000 } = {}) {
+  try {
+    const token = getToken();
+    if (!token) return null;
+    const res = await fetchFn('https://api.githubcopilot.com/models', {
+      headers: { Authorization: `Bearer ${token}`, 'Copilot-Integration-Id': 'copilot-developer-cli' },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return null;
+    const { data } = await res.json();
+    const TIER = { lightweight: 'low cost', versatile: 'medium cost', powerful: 'high cost' };
+    const models = data
+      .filter((m) => m.model_picker_enabled && (m.capabilities?.type ?? 'chat') === 'chat')
+      .map((m) => ({ value: m.id, label: TIER[m.model_picker_category] ? `${m.id}  (${TIER[m.model_picker_category]})` : m.id }));
+    return models.length ? ['auto', ...models] : null;
+  } catch {
+    return null;
+  }
+}
+
+function defaultToken() {
+  const env = process.env.COPILOT_GITHUB_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+  if (env) return env;
+  try {
+    return execFileSync('gh', ['auth', 'token'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trim();
+  } catch {
+    return '';
+  }
+}
+
+// The model pick-list for an adapter: live where the vendor offers a list (copilot), otherwise the
+// static suggestions, or undefined for free-text entry.
+export async function listModels(adapter, opts) {
+  if (adapter === 'copilot') return (await fetchCopilotModels(opts)) ?? MODEL_CHOICES.copilot;
+  return MODEL_CHOICES[adapter];
+}
 
 // `bish` setup: writes <dir>/.bish-bash-bosh/config.yml (default dir: cwd) with the single
 // adapter/model the owner picked. Refuses if a config already exists.

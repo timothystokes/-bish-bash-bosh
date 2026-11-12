@@ -10,7 +10,11 @@ To edit the `.bish-bash-bosh/interview.md` file use normal file read/edit tools 
 
 To edit the `.bish-bash-bosh/specification.md` file use normal file read/edit tools to update one or more lines using the format `<n>. [ ] C: <constraint> B: <benefit> Q: <related questions>` where C: means the constraint and B: is the described benefit of applying that constraint and Q: is a list of the question numbers that drove the definition of the specification item.
 
-## Non functional requirements considerations
+## PRIME DIRECTIVE 
+
+Do not conflate the workings of -bish-bash-bosh with the specified requirements from the user. For example -bish-bash-bosh uses it's own testing harness and tests inside the .bish-bash-bosh folder to verify it's effectiveness but if the user specifies tests as a requirment then they would be an independent set of tests in the users actual project space. Remember -bish-bash-bosh is a software delvelopment tool, the means to the end, and in no way forms part of the user's specified requirments. 
+
+## SPECIAL CONSIDERATIONS
 
 In determining specific questions to ask, consider these broad areas of concern and how they apply specifically to the users objective as each question and answer is prepared and as each specification item is captured.
 

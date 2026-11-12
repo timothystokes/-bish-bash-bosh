@@ -174,11 +174,12 @@ export function createAsker(input, out, output = process.stdout) {
 // list, then accepts either the choice's number or any typed value (so a value outside the list, or
 // scripted stdin, still works). Returns the chosen string, or '' if the answer is blank.
 export async function askChoice(ask, out, label, choices) {
-  for (const [i, choice] of choices.entries()) out(`  ${i + 1}) ${choice}\n`);
+  const value = (c) => (typeof c === 'string' ? c : c.value);
+  for (const [i, choice] of choices.entries()) out(`  ${i + 1}) ${typeof choice === 'string' ? choice : choice.label}\n`);
   const answer = await ask(`${label} (1-${choices.length}, or type your own): `);
   if (!answer) return '';
   const n = Number(answer);
-  return Number.isInteger(n) && n >= 1 && n <= choices.length ? choices[n - 1] : answer;
+  return Number.isInteger(n) && n >= 1 && n <= choices.length ? value(choices[n - 1]) : answer;
 }
 
 // Shared argument shape for bish/bash/bosh: the display label for error messages, whether

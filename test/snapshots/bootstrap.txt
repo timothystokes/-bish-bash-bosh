@@ -14,11 +14,13 @@ The files `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` 
 
 Edit `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` directly, using your normal file read/edit tools, and nothing else: no skills, no searching, no other files. Their entire format is the numbered checklist lines already in each file.
 
-## The objective 
+## PRIME DIRECTIVE 
 
 Do not conflate the workings of -bish-bash-bosh with the specified requirements from the user. For example -bish-bash-bosh uses it's own testing harness and tests inside the .bish-bash-bosh folder to verify it's effectiveness but if the user specifies tests as a requirment then they would be an independent set of tests in the users actual project space. Remember -bish-bash-bosh is a software delvelopment tool, the means to the end, and in no way forms part of the user's specified requirments. 
 
-## Non functional requirements considerations
+## SPECIAL CONSIDERATIONS
+
+In determining specific questions to ask, consider these broad areas of concern and how they apply specifically to the users objective as each question and answer is prepared and as each specification item is captured.
 
 - How does this solution align with the users strategy?
 - What architectural constraints must be applied to ensure the success of this solution?

@@ -99,7 +99,7 @@ test('help describes automatic setup in bish, not a separate init command', () =
 async function run(args, lines = [], deps = {}) {
   const outs = [];
   const errs = [];
-  const code = await main(args, { ...deps, stdout: (s) => outs.push(s), stderr: (s) => errs.push(s), input: Readable.from(lines.map((l) => `${l}\n`)) });
+  const code = await main(args, { listModels: async () => undefined, ...deps, stdout: (s) => outs.push(s), stderr: (s) => errs.push(s), input: Readable.from(lines.map((l) => `${l}\n`)) });
   return { code, out: outs.join(''), err: errs.join('') };
 }
 
@@ -132,11 +132,11 @@ test('first bish without git leaves the config uncommitted, with guidance', asyn
 
 test('first bish picks adapter/model by number from the suggested list', async () => {
   const dir = proj();
-  const r = await withCwd(dir, () => run(['bish'], ['1', '1'], { registry: draftingRegistry }));
+  const r = await withCwd(dir, () => run(['bish'], ['1', '2'], { registry: draftingRegistry, listModels: async () => ['auto', { value: 'live-1', label: 'live-1  (low cost)' }] }));
   assert.equal(r.code, 0, r.err);
   const cfg = parseYaml(readFileSync(join(dir, '.bish-bash-bosh', 'config.yml'), 'utf8'));
   assert.equal(cfg.adapter, 'copilot');
-  assert.equal(cfg.model, 'gpt-5');
+  assert.equal(cfg.model, 'live-1');
 });
 
 test('bish rejects an invalid existing config without prompting or overwriting it', async () => {
@@ -244,4 +244,20 @@ test('bish rejects malformed YAML without prompting or overwriting it', async ()
   assert.match(r.err, /invalid YAML/);
   assert.doesNotMatch(r.out, /adapter \(1-/);
   assert.equal(readFileSync(path, 'utf8'), 'adapter: [\n');
+});
+
+test('listModels fetches Copilot\'s own model list live (chat models the picker offers, after auto) and falls back to the static list on any failure', async () => {
+  const { listModels, MODEL_CHOICES } = await import('../../src/shared/init.js');
+  const data = [
+    { id: 'm-a', model_picker_enabled: true, model_picker_category: 'powerful', capabilities: { type: 'chat' } },
+    { id: 'hidden', model_picker_enabled: false },
+    { id: 'embed', model_picker_enabled: true, capabilities: { type: 'embeddings' } },
+    { id: 'm-b', model_picker_enabled: true },
+  ];
+  const ok = { fetchFn: async () => ({ ok: true, json: async () => ({ data }) }), getToken: () => 't' };
+  assert.deepEqual(await listModels('copilot', ok), ['auto', { value: 'm-a', label: 'm-a  (high cost)' }, { value: 'm-b', label: 'm-b' }]);
+  assert.deepEqual(await listModels('copilot', { ...ok, getToken: () => '' }), MODEL_CHOICES.copilot, 'no token');
+  assert.deepEqual(await listModels('copilot', { ...ok, fetchFn: async () => { throw new Error('offline'); } }), MODEL_CHOICES.copilot);
+  assert.deepEqual(await listModels('copilot', { ...ok, fetchFn: async () => ({ ok: false }) }), MODEL_CHOICES.copilot);
+  assert.equal(await listModels('openai-http'), undefined, 'free-text adapters have no list');
 });

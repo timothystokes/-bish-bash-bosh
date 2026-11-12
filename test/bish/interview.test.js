@@ -249,5 +249,17 @@ test('if the bootstrap agent leaves the templates untouched, bish fails and disc
     main(['bish'], { registry: { iv: () => a.adapter }, identity, stdout: () => {}, stderr: (s) => { err.push(s); } }));
   assert.equal(code, 2);
   assert.match(err.join(''), /specification\.md unchanged/);
-  for (const f of ['interview.md', 'specification.md', 'bish-log.md']) assert.ok(!existsSync(join(dir, '.bish-bash-bosh', f)), f);
+  for (const f of ['interview.md', 'specification.md']) assert.ok(!existsSync(join(dir, '.bish-bash-bosh', f)), f);
+  assert.match(readFileSync(join(dir, '.bish-bash-bosh', 'bish-log.md'), 'utf8'), /bish\/bootstrap prompt:/, 'the log is kept so the failed call can be read');
+});
+
+test('a failed bootstrap reports the agent\'s exit status and last output so the reason is visible', async () => {
+  const dir = makeRepo();
+  commitProjectConfig(dir, config({ adapter: 'iv' }));
+  const adapter = { run: async () => ({ exitStatus: 1, transcript: 'model not available', changedFiles: [] }) };
+  const err = /** @type {string[]} */ ([]);
+  const code = await withCwd(dir, () =>
+    main(['bish'], { registry: { iv: () => adapter }, identity, stdout: () => {}, stderr: (s) => { err.push(s); } }));
+  assert.equal(code, 2);
+  assert.match(err.join(''), /\(agent exit status 1\)\nLast agent output:\nmodel not available/);
 });
