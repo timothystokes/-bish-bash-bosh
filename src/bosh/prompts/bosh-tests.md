@@ -13,7 +13,8 @@ or the new tests did not fail before any implementation): fix that first.
    what language or stack the project itself is implemented in: it runs a command or makes an HTTP request and
    lets you assert on the result, exercising the project from the outside, never by importing its internals).
 2. The tests must FAIL now, for the right reason: the behaviour this item adds does not exist yet. The harness runs them
-   immediately and rejects tests that already pass.
+   immediately and rejects tests that already pass. (If an earlier interrupted run already implemented this item in the
+   project, say so and keep your tests; the harness accepts them on the second attempt.)
 3. Do NOT implement the item, and do not change any file outside `.bish-bash-bosh/tests/`. A fresh agent implements it next.
 4. Never weaken or delete an existing test.
 5. Stop.

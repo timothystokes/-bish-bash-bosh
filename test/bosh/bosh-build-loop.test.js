@@ -250,3 +250,12 @@ test('parsePlanItems reads the short P/T/S/D line format as well as the long lab
     [3, false, 'Core', 'Old style', [1]],
   ]);
 });
+
+test('tests that still pass on the retry are accepted (the item was implemented by an earlier interrupted run) and the loop carries on', async () => {
+  const { path, dir } = makeFile('1. [ ] Phase: A. Task: a. Depends: None\n');
+  const adapter = fakeAdapter();
+  const res = await run(path, dir, adapter, { runTests: () => ({ ok: true, output: 'all green' }) });
+  assert.equal(res.status, 'ok');
+  assert.equal(adapter.calls.filter((c) => c.prompt.startsWith(loadModePrompt('test-loop'))).length, 2);
+  assert.ok(adapter.calls.some((c) => c.prompt.startsWith(loadModePrompt('build-loop'))));
+});

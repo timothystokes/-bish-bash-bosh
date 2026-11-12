@@ -166,13 +166,20 @@ export async function runBuildLoop({
     const fail = (output) => ({ status: 'failed', processed, item: next, output });
 
     const before = listTests({ cwd: repoDir });
+    // An item whose implementation survived an interrupted earlier run can never go red. So tests that still
+    // pass on the retry are accepted (the verifier step then checks the work) instead of failing the item.
+    let alreadyGreen = 0;
     const redFailure = await step('Writing tests', async (previous) => {
       await callAgent(adapter, repoDir, buildTestLoopPrompt(next, previous), log, 'bosh/tester');
       const after = listTests({ cwd: repoDir });
       const touched = [...after].filter(([path, stamp]) => before.get(path) !== stamp).map(([path]) => path);
       if (touched.length === 0) return 'No test file under .bish-bash-bosh/tests/ was added or changed: write at least one test for this item.';
       const red = runTests({ cwd: repoDir, files: touched });
-      if (red.ok) return `The new tests (${touched.join(', ')}) already pass before any implementation, so they prove nothing: make them fail for the right reason (the item's behaviour missing).\n${red.output}`;
+      if (red.ok && ++alreadyGreen >= 2) {
+        log('bosh/harness', `The new tests (${touched.join(', ')}) still pass before any implementation; accepting them, the item may already be implemented from an earlier run.`);
+        return '';
+      }
+      if (red.ok) return `The new tests (${touched.join(', ')}) already pass before any implementation, so they prove nothing: make them fail for the right reason (the item's behaviour missing). If the project's files already implement this item, say so in your reply and keep the tests as they are.\n${red.output}`;
       return '';
     });
     if (redFailure) return fail(redFailure);
