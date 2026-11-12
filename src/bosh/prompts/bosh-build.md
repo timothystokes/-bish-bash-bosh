@@ -9,7 +9,10 @@ If a `## Previous Failure` section follows, your previous attempt left the test 
 
 1. Implement this item: write or change whatever files and configuration are needed in the project root so that the
    tests pass, for the stated phase and task. The harness then runs the whole suite and requires it green.
-2. Never weaken or delete a test, including one from an earlier item, to make it pass; fix the implementation instead.
-   Do not add or rewrite this item's tests; they define what you must build.
+2. Never weaken or delete a test just to make it pass; fix the implementation instead. Do not add or rewrite this
+   item's tests; they define what you must build. The one exception: a test from an earlier item that contradicts
+   `.bish-bash-bosh/specification.md` or `plan.md` (for example it assumes behaviour that a later item legitimately
+   changes) may be corrected minimally so it expresses the specified behaviour. Keep its intent, and say in your
+   final reply which test you corrected and why.
 3. Do not edit specification.md, interview.md or plan.md.
 4. Stop.

@@ -14,7 +14,7 @@ const RESET = '\x1b[0m';
 
 // Every step (write tests, implement, verify) that fails its gate or throws is retried, in a fresh agent
 // context with that failure as input, up to this many attempts.
-export const MAX_ATTEMPTS = 3;
+export const MAX_ATTEMPTS = 5;
 const MAX_FAILURE_CHARS = 4000;
 
 const LINE = /^(\d+)\.\s*\[([ x])\]\s*(?:Phase|P):\s*(.*?)\s*(?:Task|T):\s*(.*?)(?:\s+S:\s*(?:.*?))?(?:\s+(?:Depends|D):\s*(.*))?$/;
