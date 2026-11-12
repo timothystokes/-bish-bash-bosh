@@ -1,5 +1,18 @@
 Apply the following sequence to the single specification item to follow these instructions.
 
+0. First read the whole of `.bish-bash-bosh/plan.md`. Do not simply append work for this item at the end. Decide, for
+   this item, which of these apply, and do all that do:
+   - Already covered by existing plan items: add this item's id to their `S:` and adjust their task detail; add no
+     duplicate.
+   - Partly covered or conflicting: change the existing items (task detail, `S:`, `D:`, duration), or split or merge
+     them, so the plan describes the combined need.
+   - New work: add items into the dependency chain where they belong: give them a `D:` on the existing items they
+     need, and add them to the `D:` of existing items that need them. Where a line sits in the file does not matter
+     (new items may simply take the next free number); the dependency links are what place it in the build order.
+   - Existing items now depending on this new work (shared foundations, setup, data or interfaces) must have it added
+     to their `D:`. Keep dependencies acyclic.
+   The position of this specification item in the specification says nothing about where its work belongs in the plan.
+
 1. Append or adjust `.bish-bash-bosh/plan.md`'s checklist based on this item, organised into phases, one
    numbered line per item: `<n>. [ ] P: <phase> T: <task> S: <specification-id(s)> D: <depends-on>`.
    Numbers are unique, start at 1 and increase down the file; `Depends` lists the numbers of the items that must be
@@ -15,7 +28,7 @@ Apply the following sequence to the single specification item to follow these in
    a line to its chart bar.
    The chart and the numbered lines must always describe the same items, ids and dependencies.
 
-3. Don't actually reorder the items in `.bish-bash-bosh/plan.md`. The build priority will be determined by the Depends on references.
+3. Don't renumber or physically reorder existing lines in `.bish-bash-bosh/plan.md` (new items may take the next free number wherever they sit). The build order is determined only by the `D:` references, so make them right.
 
 4. Stop!
 
