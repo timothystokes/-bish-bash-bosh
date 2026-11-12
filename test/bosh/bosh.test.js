@@ -43,9 +43,26 @@ test('bosh seeds .bish-bash-bosh/test-harness.js from its template and creates .
   writeFileSync(join(dir, '.bish-bash-bosh', 'plan.md'), '# Plan\n\n');
   const code = await withCwd(dir, () =>
     main(['bosh'], { registry: { bl: fakeAdapter }, stdout: () => {}, stderr: () => {} }));
-  assert.equal(code, 0, 'nothing to process, but seeding still happens');
+  assert.equal(code, 1, 'an empty plan is reported, but seeding still happens');
   assert.ok(existsSync(join(dir, '.bish-bash-bosh', 'test-harness.js')), 'test-harness.js is seeded');
   assert.ok(existsSync(join(dir, '.bish-bash-bosh', 'tests')), '.bish-bash-bosh/tests/ is created');
+});
+
+test('bosh says why when there is nothing to build: an empty plan versus an all-ticked one', async () => {
+  const dir = initGitRepo(freshDir('bosh-cli-'));
+  commitProjectConfig(dir, config({ adapter: 'bl' }));
+  const go = async (plan) => {
+    writeFileSync(join(dir, '.bish-bash-bosh', 'plan.md'), plan);
+    const out = [];
+    const code = await withCwd(dir, () => main(['bosh'], { registry: { bl: fakeAdapter }, stdout: (s) => out.push(s), stderr: () => {} }));
+    return { code, out: out.join('') };
+  };
+  const empty = await go('# Plan\n\n');
+  assert.equal(empty.code, 1);
+  assert.match(empty.out, /Nothing to build: .*no checklist items/);
+  const done = await go('1. [x] Phase: A Task: t\n');
+  assert.equal(done.code, 0);
+  assert.match(done.out, /Nothing to build: all 1 plan item in plan\.md are already ticked/);
 });
 
 test('bosh drives the Build Loop over every unprocessed plan.md item: fresh-context test-writing, implementing and verifying calls, ticking only once its own red then green gates pass', async () => {

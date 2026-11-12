@@ -1,7 +1,7 @@
-Apply the following sequence to the single specification item below.
+Apply the following sequence to the single specification item to follow these instructions.
 
 1. Append or adjust `.bish-bash-bosh/plan.md`'s checklist based on this item, organised into phases, one
-   numbered line per item: `<n>. [ ] Phase: words... Task: words... Depends: <item numbers, comma separated, or None>`.
+   numbered line per item: `<n>. [ ] P: <phase> T: <task> S: <specification-id(s)> D: <depends-on>`.
    Numbers are unique, start at 1 and increase down the file; `Depends` lists the numbers of the items that must be
    done before this one can start (never itself, no cycles). Each item small enough to implement and verify in one build loop ideally no more than 5 mins of work.
 
@@ -15,6 +15,8 @@ Apply the following sequence to the single specification item below.
    a line to its chart bar.
    The chart and the numbered lines must always describe the same items, ids and dependencies.
 
-3. Re-order the items in the `.bish-bash-bosh/plan.md` file based on priority and dependencies, so that every item comes after the items it depends on; renumber them in order and update every `Depends` and the chart's ids/`after` to match. Do not implement anything yet, and do not edit `.bish-bash-bosh/specification.md` or `.bish-bash-bosh/interview.md`.
+3. Don't actually reorder the items in `.bish-bash-bosh/plan.md`. The build priority will be determined by the Depends on references.
 
-4. Stop.
+4. Stop!
+
+## Sepcification Item to process this time...

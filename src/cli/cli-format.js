@@ -26,9 +26,13 @@ export function formatBuildLoopResult(res) {
   if (res.status === 'blocked') {
     return `Build stopped after ${plural(res.processed, 'item')}: ${res.output}. Fix the Depends lines in plan.md, then run \`-bosh\` again.\n`;
   }
+  if (res.status === 'empty') {
+    return 'Nothing to build: .bish-bash-bosh/plan.md has no checklist items (lines like `1. [ ] P: … T: … S: … D: …`). Run `-bash` to create the plan.\n';
+  }
   if (res.status === 'failed') {
     return `Build stopped after ${plural(res.processed, 'item')}: tests failed (or QA kept failing) on "${res.item.phase}: ${res.item.task}" (unticked; run \`-bosh\` again to retry).\n${res.output}\n`;
   }
+  if (res.processed === 0 && res.total) return `Nothing to build: all ${plural(res.total, 'plan item')} in plan.md are already ticked.\n`;
   return `Build complete: ${plural(res.processed, 'item')} processed this run.\n`;
 }
 

@@ -217,7 +217,7 @@ test('once every item is processed, a further call reports ok with nothing left 
   assert.match(adapter.calls[0].prompt, /Establish architectural constraints\./);
   assert.ok(adapter.calls[0].prompt.startsWith(loadModePrompt('test-loop')));
   const again = fakeAdapter();
-  assert.deepEqual(await run(path, dir, again), { status: 'ok', processed: 0 });
+  assert.deepEqual(await run(path, dir, again), { status: 'ok', processed: 0, total: 3 });
   assert.equal(again.calls.length, 0);
 });
 
@@ -236,4 +236,17 @@ test('log gets each full prompt (\'bosh\'), streamed reasoning (\'agent\') only 
   const { path: p2, dir: d2 } = makeFile();
   await run(p2, d2, fakeAdapter(), { runTests: () => ({ ok: false, output: 'boom' }), log: (s, t) => failing.push([s, t]) });
   assert.ok(failing.some((l) => l[0] === 'bosh/harness' && l[1].includes('boom')));
+});
+
+test('parsePlanItems reads the short P/T/S/D line format as well as the long labels', () => {
+  const items = parsePlanItems([
+    '1. [ ] P: Core T: Make the board - detail. S: Q1, Q2 D: None',
+    '2. [x] P: Core T: Pick moves S: Q1 D: 1, 3',
+    '3. [ ] Phase: Core Task: Old style Depends: 1',
+  ].join('\n'));
+  assert.deepEqual(items.map((i) => [i.id, i.checked, i.phase, i.task, i.dependsOn]), [
+    [1, false, 'Core', 'Make the board - detail.', []],
+    [2, true, 'Core', 'Pick moves', [1, 3]],
+    [3, false, 'Core', 'Old style', [1]],
+  ]);
 });

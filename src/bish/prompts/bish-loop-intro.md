@@ -28,4 +28,7 @@ In determining specific questions to ask, consider these broad areas of concern 
 - What perfomance, scalability and availability needs to be met?
 - Are there change management aspect that need to be coordinated for this objective?
 - Are there current risks being carried or new risks introduced by this objective?
+- What UX/UI and visual style is important to meet this objective?
+- What language, coding style and standards should this solution align to?
+
 

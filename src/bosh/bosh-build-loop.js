@@ -17,10 +17,10 @@ const RESET = '\x1b[0m';
 export const MAX_ATTEMPTS = 3;
 const MAX_FAILURE_CHARS = 4000;
 
-const LINE = /^(\d+)\.\s*\[([ x])\]\s*Phase:\s*(.*?)\s*Task:\s*(.*?)(?:\s*Depends:\s*(.*))?$/;
+const LINE = /^(\d+)\.\s*\[([ x])\]\s*(?:Phase|P):\s*(.*?)\s*(?:Task|T):\s*(.*?)(?:\s+S:\s*(?:.*?))?(?:\s+(?:Depends|D):\s*(.*))?$/;
 
 // Parses the numbered plan lines out of a plan.md's text. Returns one entry per well-formed
-// `<n>. [ ] Phase: <phase> Task: <task> Depends: <item numbers or None>` line, with its line index so
+// `<n>. [ ] P: <phase> T: <task> S: <spec ids> D: <item numbers or None>` line (the long `Phase:`/`Task:`/`Depends:` labels and a missing S are also accepted), with its line index so
 // the loop can rewrite it in place. `Depends` is optional (missing or `None` = no dependencies).
 export function parsePlanItems(text) {
   const lines = text.split('\n');
@@ -158,7 +158,8 @@ export async function runBuildLoop({
     const next = nextPlanItem(items);
     if (!next) {
       const stuck = items.find((i) => !i.checked);
-      if (!stuck) return { status: 'ok', processed };
+      if (items.length === 0) return { status: 'empty', processed };
+      if (!stuck) return { status: 'ok', processed, total: items.length };
       return { status: 'blocked', processed, item: stuck, output: `no item can start: every unticked item depends on another unticked item (${items.filter((i) => !i.checked).map((i) => `${i.id} needs ${i.dependsOn.join(', ')}`).join('; ')})` };
     }
     say(`\n${CYAN}Phase: ${next.phase}${RESET}\n`);

@@ -1,6 +1,8 @@
 # Plan
 
-This is a plan organised into phases of implementation. Each item is numbered and lists the numbers of the items that must be completed before it (`Depends`), or `None`. The plan is defined using a Mermaid Gantt chart (one section per phase, one task per item, `Depends` as `after` links, durations estimated in minutes), which must always mirror the numbered items below. Each item's `Task:` starts with its chart short name, then ` - ` and the detail.
+This is a plan organised into phases of implementation. Each item is numbered and lists the numbers of the items that must be completed and checked as done byt he build phase. 
+
+The plan is defined using a Mermaid Gantt chart (one section per phase (P), one task per item (T), references to specification numbers related to the task (S) and with depends-on list of other plan items (D). Durations estimated in minutes, which must always mirror the numbered items below. 
 
 ```mermaid
 gantt
@@ -13,4 +15,4 @@ gantt
 
 ## High Level Design Phase
 
-1. [ ] Phase: High Level Design Task: Establish architectural constraints - Establish architectural constraints. Depends: None
+1. [ ] P: <phase> T: <task> S: <specification-ids> D: <depends-on> 

@@ -1,1 +1,11 @@
-This is the start of a new Plan Loop session for this project. Over many separate calls — each its own call, each handing you exactly one constraint/benefit item from the specification — you will turn the specification into a dependency-ordered checklist in `.bish-bash-bosh/plan.md`, defined using a Mermaid Gantt chart (phases as sections, items as tasks, `Depends` as `after` links, durations estimated in minutes of agent build time) that mirrors the numbered checklist (each `Task:` starts with the chart's short name, then ` - ` and the detail). Edit `.bish-bash-bosh/plan.md` directly with your file tools (no skills, no searching). Every specification item must become real plan items that deliver it in the project itself. Never assume that bish-bash-bosh's own behaviour satisfies a specification item, and never plan its own machinery: for example, the verification checks `-bosh` writes under `.bish-bash-bosh/tests/` are independent of any tests the specification requires, which need their own plan items in the project's own conventions and location, placed beside the work they cover rather than deferred to the end unless the specification says otherwise. Treat every later call in this session as a continuation of this same conversation: remember what has already been turned into plan items; never duplicate a plan item you have already added for an earlier constraint/benefit.
+# Planning
+
+We need to define a concrete Plan of how we will do all the tasks required to implement the users objective. 
+
+You will be asked to assess each specification item in a loop and for each one update the `.bish-bash-bosh/plan.md` file.
+
+## SPECIAL INSTRUCTION
+
+When processing each item it is important to make sure that the tasks added ot updated are detailed and highly technical description of the work items to do.
+
+
