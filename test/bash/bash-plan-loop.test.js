@@ -170,9 +170,9 @@ test('log is called once per item with the full prompt sent (\'bash\') and once 
     specificationPath, ...io(), say: () => {}, adapter, repoDir: dir,
     log: (source, text) => logged.push([source, text]), ...sessionStore(),
   });
-  assert.equal(logged[0][0], 'bash');
+  assert.equal(logged[0][0], 'bash/planner prompt');
   assert.match(logged[0][1], /## Constraint\n\nProvide a login screen\.\n\n## Benefit\n\nUsers can authenticate\./);
-  assert.deepEqual(logged[1], ['agent', 'step one, step two']);
+  assert.deepEqual(logged[1], ['bash/planner response', 'step one, step two']);
 });
 
 test('log is only called with the "bosh" entry, never an "agent" one, when the adapter never streams any reasoning text', async () => {
@@ -183,6 +183,6 @@ test('log is only called with the "bosh" entry, never an "agent" one, when the a
     specificationPath, ...io(), say: () => {}, adapter: fakeAdapter(), repoDir: dir,
     log: (source, text) => logged.push([source, text]), ...sessionStore(),
   });
-  assert.deepEqual(logged[0], ['bash', logged[0][1]]);
-  assert.ok(!logged.some((l) => l[0] === 'agent'), 'no "agent" entry is logged when the adapter never streams any reasoning text');
+  assert.deepEqual(logged[0], ['bash/planner prompt', logged[0][1]]);
+  assert.ok(!logged.some((l) => l[0].endsWith('response')), 'no "agent" entry is logged when the adapter never streams any reasoning text');
 });

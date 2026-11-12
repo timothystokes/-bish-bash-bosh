@@ -35,3 +35,9 @@ npm install -g github:timothystokes/-bish-bash-bosh   # or, from a clone: npm in
 3. Run -bish command from within the folder.
 
 
+## TODO
+
+- Add a hygene document for -bosh
+
+- Add a best practices md or -bish
+

@@ -12,8 +12,9 @@ const CYAN = '\x1b[1;36m';
 const GREY = '\x1b[90m';
 const RESET = '\x1b[0m';
 
-// A QA attempt that throws or leaves the suite failing is retried with that failure as input, up to this many attempts.
-export const MAX_QA_ATTEMPTS = 3;
+// Every step (write tests, implement, verify) that fails its gate or throws is retried, in a fresh agent
+// context with that failure as input, up to this many attempts.
+export const MAX_ATTEMPTS = 3;
 const MAX_FAILURE_CHARS = 4000;
 
 const LINE = /^(\d+)\.\s*\[([ x])\]\s*Phase:\s*(.*?)\s*Task:\s*(.*?)(?:\s*Depends:\s*(.*))?$/;
@@ -46,23 +47,27 @@ export function nextPlanItem(items) {
   return items.find((i) => !i.checked && !i.dependsOn.some((d) => d !== i.id && open.has(d))) ?? null;
 }
 
-// The build agent's prompt for one item: src/bosh/prompts/bosh-build.md's instructions (test-driven: write a
-// failing test first, using the bundled `.bish-bash-bosh/test-harness.js`, then implement), prefaced onto
-// this item's phase and task. The agent is expected to implement the item in the project root; it is
-// not expected to edit specification.md, interview.md or plan.md.
-export function buildBuildLoopPrompt(item) {
-  return [loadModePrompt('build-loop'), '## Phase', item.phase, '## Task', item.task].join('\n\n');
-}
-
-// The QA agent's prompt for the same item, called only once the build call's test-gate has passed:
-// src/bosh/prompts/bosh-qa.md's instructions (independently verify against interview.md/specification.md/
-// plan.md and the source, fix bugs directly rather than merely reporting them), prefaced onto the
-// same phase and task. A retry after a failed QA attempt also carries that failure (an error thrown
-// by the call, or the test output of the gate after it) under `## Previous Failure`, tail-truncated.
-export function buildQaLoopPrompt(item, failure) {
-  const parts = [loadModePrompt('qa-loop'), '## Phase', item.phase, '## Task', item.task];
+function withFailure(parts, failure) {
   if (failure) parts.push('## Previous Failure', failure.length > MAX_FAILURE_CHARS ? `...${failure.slice(-MAX_FAILURE_CHARS)}` : failure);
   return parts.join('\n\n');
+}
+
+// Step 1's prompt (src/bosh/prompts/bosh-tests.md): write the harness verification tests for this item only,
+// no implementation. A retry also carries the failure the harness found under `## Previous Failure`.
+export function buildTestLoopPrompt(item, failure) {
+  return withFailure([loadModePrompt('test-loop'), '## Phase', item.phase, '## Task', item.task], failure);
+}
+
+// Step 2's prompt (src/bosh/prompts/bosh-build.md): implement the item so the tests written in step 1 pass. A
+// retry also carries the failing test output under `## Previous Failure`, tail-truncated.
+export function buildBuildLoopPrompt(item, failure) {
+  return withFailure([loadModePrompt('build-loop'), '## Phase', item.phase, '## Task', item.task], failure);
+}
+
+// Step 3's prompt (src/bosh/prompts/bosh-qa.md): independently verify against interview.md/specification.md/
+// plan.md and the source, fixing bugs directly. A retry carries the previous failure the same way.
+export function buildQaLoopPrompt(item, failure) {
+  return withFailure([loadModePrompt('qa-loop'), '## Phase', item.phase, '## Task', item.task], failure);
 }
 
 // Ticks a plan item's checkbox by line index, re-reading the file first since something else may have
@@ -76,30 +81,34 @@ function markProcessed(planPath, readFile, writeFile, lineIndex) {
   writeFile(planPath, lines.join('\n'));
 }
 
-async function callAgent(adapter, repoDir, prompt, log, logSource) {
-  log(logSource, prompt);
+async function callAgent(adapter, repoDir, prompt, log, persona) {
+  log(`${persona} prompt`, prompt);
   let reasoning = '';
   // No `session` key: every call (build or QA) is opted out of session tracking, so each one is a
   // fresh agent context with no memory of any earlier call in this loop (see adapters/*.js: session
   // tracking is opt-in via `Object.hasOwn(req, 'session')`).
   await adapter.run({ prompt, cwd: repoDir, limits: {}, onReasoning: (chunk) => { reasoning += chunk; } });
-  if (reasoning) log('agent', reasoning);
+  if (reasoning) log(`${persona} response`, reasoning);
 }
 
 // Runs the loop against `plan.md` in `repoDir`: finds the next unprocessed item, shows it in colour,
-// then for that one item: (1) a fresh-context build agent call (src/bosh/prompts/bosh-build.md, expected to
-// write a failing test then implement it), (2) `runTests` — bosh's own code, never the agent's
-// self-report — runs the full `.bish-bash-bosh/tests/` suite; a failure here stops this invocation with
-// the item left unticked (a later `bosh` run naturally retries it, since the loop always picks the
-// first unticked item), (3) a fresh-context QA agent call (src/bosh/prompts/bosh-qa.md, independently verifies
-// against interview.md/specification.md/plan.md and the source, and is expected to fix any bug it
-// finds directly), (4) `runTests` again as the final gate; if that QA call throws or the gate fails,
-// the QA step is retried (up to MAX_QA_ATTEMPTS) with the error/test output passed in as part of its
-// prompt; only once both gates have passed is the item's checkbox ticked. Unlike the Plan Loop there is no human input and no pause: it processes
-// every unprocessed item in one call, stopping only once none remain (status 'ok') or a gate fails
-// (status 'failed'). `log` (see bish-log.js), if given, is called with the full prompt sent for each
-// agent call (`'bosh'`) and, if the agent streamed any reasoning text via an opt-in `onReasoning`
+// then for that one item, each agent call a fresh context and every gate bosh's own code, never the
+// agent's self-report: (1) WRITE TESTS (src/bosh/prompts/bosh-tests.md): the agent writes the harness
+// verification tests for the item and nothing else; the harness checks that new/changed test files
+// exist and that they run RED (fail) before any implementation, (2) IMPLEMENT (src/bosh/prompts/bosh-build.md):
+// the agent implements the item; the harness runs the full `.bish-bash-bosh/tests/` suite and requires
+// GREEN, (3) VERIFY (src/bosh/prompts/bosh-qa.md): an independent agent checks the work against
+// interview.md/specification.md/plan.md and fixes bugs directly; the harness runs the suite again.
+// A step that throws or fails its gate is retried (up to MAX_ATTEMPTS) with the failure passed back in
+// its prompt; if it never passes, the invocation stops with the item left unticked (a later `bosh` run
+// retries it, since the loop always picks the first unticked item). Only once all three steps have
+// passed is the item's checkbox ticked. Unlike the Plan Loop there is no human input and no pause: it
+// processes every unprocessed item in one call, stopping once none remain (status 'ok') or a step
+// gives up (status 'failed'). `log` (see bish-log.js), if given, is called with the full prompt sent for
+// each agent call (`'bosh'`) and, if the agent streamed any reasoning text via an opt-in `onReasoning`
 // callback, the full accumulated text of that stream (`'agent'`) — never the raw JSON behind either.
+// These harness tests are bish-bash-bosh's own verification and never stand in for anything the
+// user's objective specifies for itself.
 /**
  * @param {{
  *   planPath: string,
@@ -108,7 +117,8 @@ async function callAgent(adapter, repoDir, prompt, log, logSource) {
  *   say: (s: string) => void,
  *   adapter: { run: (req: object) => Promise<object> },
  *   repoDir?: string,
- *   runTests: (opts: { cwd: string }) => { ok: boolean, output: string },
+ *   runTests: (opts: { cwd: string, files?: string[] }) => { ok: boolean, output: string },
+ *   listTests: (opts: { cwd: string }) => Map<string, string>,
  *   log?: (source: string, text: string) => void,
  * }} opts
  */
@@ -120,8 +130,27 @@ export async function runBuildLoop({
   adapter,
   repoDir,
   runTests,
+  listTests,
   log = (/** @type {string} */ _source, /** @type {string} */ _text) => {},
 }) {
+  // Runs one step up to MAX_ATTEMPTS times; `attempt(previousFailure)` returns '' on success or the failure text.
+  async function step(label, attempt) {
+    let previous = '';
+    for (let n = 1; n <= MAX_ATTEMPTS; n++) {
+      say(`${GREY}${label}${n > 1 ? ` (attempt ${n} of ${MAX_ATTEMPTS}, passing the previous failure back)` : ''}...${RESET}\n`);
+      let failure;
+      try {
+        failure = await attempt(previous);
+      } catch (e) {
+        failure = `${label} step threw an error: ${e?.message ?? e}`;
+      }
+      if (!failure) return '';
+      log('bosh/harness', `${label} attempt ${n} failed:\n${failure}`);
+      previous = failure;
+    }
+    return previous;
+  }
+
   let processed = 0;
   for (;;) {
     const text = readFile(planPath);
@@ -133,36 +162,33 @@ export async function runBuildLoop({
       return { status: 'blocked', processed, item: stuck, output: `no item can start: every unticked item depends on another unticked item (${items.filter((i) => !i.checked).map((i) => `${i.id} needs ${i.dependsOn.join(', ')}`).join('; ')})` };
     }
     say(`\n${CYAN}Phase: ${next.phase}${RESET}\n`);
+    const fail = (output) => ({ status: 'failed', processed, item: next, output });
 
-    say(`${GREY}Thinking...${RESET}\n`);
-    await callAgent(adapter, repoDir, buildBuildLoopPrompt(next), log, 'bosh');
+    const before = listTests({ cwd: repoDir });
+    const redFailure = await step('Writing tests', async (previous) => {
+      await callAgent(adapter, repoDir, buildTestLoopPrompt(next, previous), log, 'bosh/tester');
+      const after = listTests({ cwd: repoDir });
+      const touched = [...after].filter(([path, stamp]) => before.get(path) !== stamp).map(([path]) => path);
+      if (touched.length === 0) return 'No test file under .bish-bash-bosh/tests/ was added or changed: write at least one test for this item.';
+      const red = runTests({ cwd: repoDir, files: touched });
+      if (red.ok) return `The new tests (${touched.join(', ')}) already pass before any implementation, so they prove nothing: make them fail for the right reason (the item's behaviour missing).\n${red.output}`;
+      return '';
+    });
+    if (redFailure) return fail(redFailure);
 
-    let result = runTests({ cwd: repoDir });
-    if (!result.ok) {
-      log('bosh', `tests failed after implementation:\n${result.output}`);
-      return { status: 'failed', processed, item: next, output: result.output };
-    }
+    const greenFailure = await step('Implementing', async (previous) => {
+      await callAgent(adapter, repoDir, buildBuildLoopPrompt(next, previous), log, 'bosh/builder');
+      const result = runTests({ cwd: repoDir });
+      return result.ok ? '' : result.output;
+    });
+    if (greenFailure) return fail(greenFailure);
 
-    let previous = '';
-    let failure = '';
-    let failed = false;
-    for (let attempt = 1; attempt <= MAX_QA_ATTEMPTS; attempt++) {
-      say(`${GREY}Verifying${attempt > 1 ? ` (attempt ${attempt} of ${MAX_QA_ATTEMPTS}, passing the previous failure back)` : ''}...${RESET}\n`);
-      failed = false;
-      try {
-        await callAgent(adapter, repoDir, buildQaLoopPrompt(next, previous), log, 'bosh');
-        result = runTests({ cwd: repoDir });
-        failed = !result.ok;
-        failure = result.output;
-      } catch (e) {
-        failed = true;
-        failure = `QA step threw an error: ${e?.message ?? e}`;
-      }
-      if (!failed) break;
-      log('bosh', `QA attempt ${attempt} failed:\n${failure}`);
-      previous = failure;
-    }
-    if (failed) return { status: 'failed', processed, item: next, output: failure };
+    const qaFailure = await step('Verifying', async (previous) => {
+      await callAgent(adapter, repoDir, buildQaLoopPrompt(next, previous), log, 'bosh/verifier');
+      const result = runTests({ cwd: repoDir });
+      return result.ok ? '' : result.output;
+    });
+    if (qaFailure) return fail(qaFailure);
 
     markProcessed(planPath, readFile, writeFile, next.lineIndex);
     processed++;

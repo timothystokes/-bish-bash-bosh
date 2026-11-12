@@ -137,7 +137,7 @@ export async function runInterviewLoop({
     say(`${GREY}Thinking...\n`);
     const session = loadSession();
     const prompt = buildInterviewLoopPrompt(next.question, answer, { includeIntro: session === undefined });
-    log('bish', prompt);
+    log('bish/interviewer prompt', prompt);
     let reasoning = '';
     const result = await adapter.run({
       prompt,
@@ -150,7 +150,7 @@ export async function runInterviewLoop({
       },
     });
     say(`${RESET}\n`);
-    if (reasoning) log('agent', reasoning);
+    if (reasoning) log('bish/interviewer response', reasoning);
     saveSession(result.session);
 
     markProcessed(interviewPath, readFile, writeFile, next.id);

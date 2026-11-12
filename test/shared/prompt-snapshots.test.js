@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MODES, loadModePrompt } from '../../src/shared/prompts.js';
+import { MODES, loadModePrompt, loadInterviewIntro } from '../../src/shared/prompts.js';
 
 const snapDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'snapshots');
 
@@ -26,12 +26,12 @@ for (const mode of MODES) {
   test(`snapshot: ${mode} prompt`, () => matchSnapshot(mode, loadModePrompt(mode)));
 }
 
-test('bish-loop.md tells the agent to update specification.md, adjust unprocessed questions and append follow-up questions in the store\'s own line format, then stop', () => {
+test('bish-loop.md tells the agent to update specification.md, adjust unprocessed questions and append follow-up questions in the store\'s own line format, then stop (the line format lives in the intro)', () => {
+  assert.match(loadInterviewIntro(), /\[ \] Q: <question> A: <answer>/);
   const kit = readFileSync(join(snapDir, '..', '..', 'src', 'bish', 'prompts', 'bish-loop.md'), 'utf8');
   for (const text of [loadModePrompt('interview'), kit]) {
     assert.match(text, /specification\.md/i);
     assert.match(text, /interview\.md/i);
-    assert.match(text, /\[ \] Q: <question> A: <default answer>/);
     assert.match(text, /stop/i);
   }
 });

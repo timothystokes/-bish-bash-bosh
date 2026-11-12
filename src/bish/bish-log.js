@@ -1,8 +1,10 @@
 // bish-log.md: a plain-text, append-only transcript of every prompt sent to the agent and every
 // piece of the agent's own output shown in the console (never the raw JSON an adapter's `--debug`
-// might emit). Each entry is one timestamped line, `[<ISO timestamp>] <source>: <text>` — `bish`
-// for a prompt this harness sent, `agent` for text the agent streamed back — so the owner can read
-// back exactly what was sent and what came back, in order, without re-running anything.
+// might emit). Each entry is one timestamped line, `[<ISO timestamp>] <persona> <kind>: <text>`.
+// The persona names which agent role the call belongs to (`bish/bootstrap`, `bish/interviewer`,
+// `bash/planner`, `bosh/tester`, `bosh/builder`, `bosh/verifier`; `bosh/harness` for the harness's own gate
+// results) and the kind is `prompt` (what the harness sent) or `response` (the text the agent streamed
+// back), so the owner can read back exactly who was asked what and what came back, in order.
 import { appendFileSync } from 'node:fs';
 
 /**

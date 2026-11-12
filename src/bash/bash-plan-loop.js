@@ -110,7 +110,7 @@ export async function runPlanLoop({
     say(`${GREY}Thinking...${RESET}\n`);
     const session = loadSession();
     const prompt = buildPlanLoopPrompt(next, { includeIntro: session === undefined });
-    log('bash', prompt);
+    log('bash/planner prompt', prompt);
     let reasoning = '';
     const result = await adapter.run({
       prompt,
@@ -119,7 +119,7 @@ export async function runPlanLoop({
       session,
       onReasoning: (/** @type {string} */ chunk) => { reasoning += chunk; },
     });
-    if (reasoning) log('agent', reasoning);
+    if (reasoning) log('bash/planner response', reasoning);
     saveSession(result.session);
     markProcessed(specificationPath, readFile, writeFile, next.id);
     processed++;

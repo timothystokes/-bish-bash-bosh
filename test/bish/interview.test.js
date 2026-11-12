@@ -66,7 +66,7 @@ test('bish on a fresh repo seeds the stores from their templates, has the agent 
   assert.equal(seed.prompts[0], loadModePrompt('bootstrap'));
   assert.match(out.join(''), /Wrote \.bish-bash-bosh\/specification\.md and \.bish-bash-bosh\/interview\.md from README\.md/);
   assert.match(readFileSync(join(dir, '.bish-bash-bosh', 'specification.md'), 'utf8'), /Greet the user/);
-  assert.match(readFileSync(join(dir, '.bish-bash-bosh', 'bish-log.md'), 'utf8'), /bish: .*Initial Specification/s, 'the bootstrap prompt is logged');
+  assert.match(readFileSync(join(dir, '.bish-bash-bosh', 'bish-log.md'), 'utf8'), /bish\/bootstrap prompt: .*Initial Specification/s, 'the bootstrap prompt is logged');
   assert.ok(!existsSync(join(dir, '.bish-bash-bosh', 'runs')), 'no run folder on the bootstrap run');
   // a second, custom question with a pre-filled default so the loop's resume/default behaviour can be exercised
   writeFileSync(
@@ -87,7 +87,7 @@ test('bish on a fresh repo seeds the stores from their templates, has the agent 
   assert.match(afterFirst, /1\. \[x\] Q: What is the objective\? A: Build a greeter/, 'checked, and the answer is written back, once handed to and processed by the agent');
   assert.match(afterFirst, /2\. \[ \] Q: Who uses the greeter\? A: Developers/, 'the second question is untouched, not yet asked');
   const logAfterFirst = readFileSync(join(dir, '.bish-bash-bosh', 'bish-log.md'), 'utf8');
-  assert.match(logAfterFirst, /^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] bish: .*## Answer\n\nBuild a greeter/s, 'the full prompt sent to the agent is logged, plain text with a timestamp');
+  assert.match(logAfterFirst, /\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] bish\/interviewer prompt: .*## Answer\n\nBuild a greeter/s, 'the full prompt sent to the agent is logged, plain text with a timestamp');
   out.length = 0;
   const done = await withCwd(dir, () =>
     main(['bish'], { registry, identity, input: Readable.from(['\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));

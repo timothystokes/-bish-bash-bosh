@@ -15,7 +15,7 @@ export function buildBootstrapPrompt() {
 // can discard the seeded files and the next `bish` run retries this step.
 export async function runBootstrap({ adapter, repoDir, readFile, specPath, interviewPath, specTemplate, say = (/** @type {string} */ _s) => {}, log = (/** @type {string} */ _src, /** @type {string} */ _text) => {} }) {
   const prompt = buildBootstrapPrompt();
-  log('bish', prompt);
+  log('bish/bootstrap prompt', prompt);
   say('\x1b[90mReading README.md to draft the baseline specification and first questions...\n');
   let reasoning = '';
   await adapter.run({
@@ -28,7 +28,7 @@ export async function runBootstrap({ adapter, repoDir, readFile, specPath, inter
     },
   });
   say('\x1b[0m\n');
-  if (reasoning) log('agent', reasoning);
+  if (reasoning) log('bish/bootstrap response', reasoning);
   if (readFile(specPath) === specTemplate) throw new Error('the agent left specification.md unchanged from its template');
   if (!nextQuestion(parseInterview(readFile(interviewPath)))) throw new Error('the agent wrote no unprocessed question to interview.md');
 }

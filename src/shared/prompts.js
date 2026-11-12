@@ -10,6 +10,7 @@ const MODE_FILES = {
   interview: 'bish/prompts/bish-loop.md',
   reverse: 'bish/prompts/bish-reverse.md',
   'plan-loop': 'bash/prompts/bash-loop.md',
+  'test-loop': 'bosh/prompts/bosh-tests.md',
   'build-loop': 'bosh/prompts/bosh-build.md',
   'qa-loop': 'bosh/prompts/bosh-qa.md',
 };

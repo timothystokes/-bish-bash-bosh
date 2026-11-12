@@ -1,3 +1,7 @@
+bish-bash-bosh's own behaviour never satisfies, or substitutes for, a requirement of the user's objective; the two are separate and independent. For example, two separate sets of tests exist:
+- The project's own tests: whatever the specification requires of the user's project. They live in the project with its normal tooling and are built as ordinary plan items.
+- The harness verification tests: bish-bash-bosh's own black-box checks of each plan item, under `.bish-bash-bosh/tests/`. They are applied in addition to, and never instead of, anything the specification requires, and are not part of the product.
+
 You are independently verifying the single plan item below, after it was just implemented. You did
 not necessarily build it yourself, and you have no memory of any earlier call in this Build Loop: do
 not trust that it works just because its own test passed. Read `.bish-bash-bosh/interview.md`,

@@ -160,9 +160,9 @@ test('log is called once with the full prompt sent (\'bish\') and once with the 
     interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir,
     log: (source, text) => logged.push([source, text]), ...sessionStore(),
   });
-  assert.equal(logged[0][0], 'bish');
+  assert.equal(logged[0][0], 'bish/interviewer prompt');
   assert.match(logged[0][1], /## Question\n\nDescribe the objective in a sentence\.\n\n## Answer\n\na/);
-  assert.deepEqual(logged[1], ['agent', 'step one, step two']);
+  assert.deepEqual(logged[1], ['bish/interviewer response', 'step one, step two']);
 });
 
 test('log is only called with the "bish" entry, never an "agent" one, when the adapter never streams any reasoning text', async () => {
@@ -174,8 +174,8 @@ test('log is only called with the "bish" entry, never an "agent" one, when the a
     interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir,
     log: (source, text) => logged.push([source, text]), ...sessionStore(),
   });
-  assert.deepEqual(logged[0], ['bish', logged[0][1]]);
-  assert.ok(!logged.some((l) => l[0] === 'agent'), 'no "agent" entry is logged when the adapter never streams any reasoning text');
+  assert.deepEqual(logged[0], ['bish/interviewer prompt', logged[0][1]]);
+  assert.ok(!logged.some((l) => l[0].endsWith('response')), 'no "agent" entry is logged when the adapter never streams any reasoning text');
 });
 
 test('buildInterviewLoopPrompt only prefaces bish-loop-intro.md when includeIntro is passed, and puts it above everything else', () => {

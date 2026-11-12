@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parsePlanItems, nextPlanItem, runBuildLoop, buildBuildLoopPrompt, buildQaLoopPrompt, MAX_QA_ATTEMPTS } from '../../src/bosh/bosh-build-loop.js';
+import { parsePlanItems, nextPlanItem, runBuildLoop, buildTestLoopPrompt, buildBuildLoopPrompt, buildQaLoopPrompt, MAX_ATTEMPTS } from '../../src/bosh/bosh-build-loop.js';
 import { loadModePrompt } from '../../src/shared/prompts.js';
 
 const sample = [
@@ -41,43 +41,14 @@ test('nextPlanItem skips an unticked item whose dependencies are not all ticked,
   assert.equal(nextPlanItem(parsePlanItems('1. [ ] Phase: A. Task: a. Depends: 2\n2. [x] Phase: B. Task: b. Depends: None\n')).id, 1);
 });
 
-test('runBuildLoop builds a dependency before its dependent, ticks only the checkbox, and reports blocked on a dependency cycle', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'bosh-deps-'));
-  const path = join(dir, 'plan.md');
-  writeFileSync(path, '1. [ ] Phase: A. Task: first. Depends: 2\n2. [ ] Phase: B. Task: second. Depends: None\n');
-  const adapter = fakeAdapter();
-  const res = await runBuildLoop({ planPath: path, ...io(), say: () => {}, adapter, repoDir: dir, runTests: passingTests });
-  assert.equal(res.status, 'ok');
-  assert.match(adapter.calls[0].prompt, /## Task\n\nsecond\./, 'the dependency is built first');
-  assert.equal(readFileSync(path, 'utf8'), '1. [x] Phase: A. Task: first. Depends: 2\n2. [x] Phase: B. Task: second. Depends: None\n');
-  writeFileSync(path, '1. [ ] Phase: A. Task: a. Depends: 2\n2. [ ] Phase: B. Task: b. Depends: 1\n');
-  const blocked = await runBuildLoop({ planPath: path, ...io(), say: () => {}, adapter: fakeAdapter(), repoDir: dir, runTests: passingTests });
-  assert.equal(blocked.status, 'blocked');
-  assert.match(blocked.output, /1 needs 2; 2 needs 1/);
-});
-
-test('buildBuildLoopPrompt prefaces src/bosh/prompts/bosh-build.md onto the item\'s phase and task', () => {
-  const p = buildBuildLoopPrompt({ phase: 'Core.', task: 'Implement the login screen.' });
-  assert.ok(p.startsWith(loadModePrompt('build-loop')));
-  assert.match(p, /## Phase\n\nCore\.\n\n## Task\n\nImplement the login screen\./);
-});
-
-test('buildQaLoopPrompt prefaces src/bosh/prompts/bosh-qa.md onto the same item\'s phase and task', () => {
-  const p = buildQaLoopPrompt({ phase: 'Core.', task: 'Implement the login screen.' });
-  assert.ok(p.startsWith(loadModePrompt('qa-loop')));
-  assert.match(p, /## Phase\n\nCore\.\n\n## Task\n\nImplement the login screen\./);
-});
-
-function makeFile() {
+function makeFile(text = sample) {
   const dir = mkdtempSync(join(tmpdir(), 'bosh-build-loop-'));
   const path = join(dir, 'plan.md');
-  writeFileSync(path, sample);
+  writeFileSync(path, text);
   return { path, dir };
 }
 
 const io = () => ({ readFile: (p) => readFileSync(p, 'utf8'), writeFile: (p, s) => writeFileSync(p, s) });
-
-const passingTests = () => ({ ok: true, output: '' });
 
 /**
  * @param {{ exitStatus: number, transcript: string, changedFiles: string[] }
@@ -95,164 +66,174 @@ function fakeAdapter(result = { exitStatus: 0, transcript: '', changedFiles: [] 
   };
 }
 
-test('runBuildLoop hands every unprocessed item to the agent (build then QA) in turn, ticking each once both test gates pass', async () => {
-  const { path: planPath, dir } = makeFile();
+// Fake harness: every listTests call reports a changed test file (as if the agent wrote one), a run of
+// only the touched files is red, and a full run is green, unless overridden.
+function harness(over = {}) {
+  let stamp = 0;
+  return {
+    listTests: () => new Map([['/t/a.test.js', String(stamp++)]]),
+    runTests: ({ files }) => (files ? { ok: false, output: 'red' } : { ok: true, output: '' }),
+    ...over,
+  };
+}
+
+const run = (planPath, dir, adapter, extra = {}) =>
+  runBuildLoop({ planPath, ...io(), say: () => {}, adapter, repoDir: dir, ...harness(), ...extra });
+
+test('runBuildLoop builds a dependency before its dependent, ticks only the checkbox, and reports blocked on a dependency cycle', async () => {
+  const { path, dir } = makeFile('1. [ ] Phase: A. Task: first. Depends: 2\n2. [ ] Phase: B. Task: second. Depends: None\n');
   const adapter = fakeAdapter();
-  const res = await runBuildLoop({ planPath, ...io(), say: () => {}, adapter, repoDir: dir, runTests: passingTests });
+  const res = await run(path, dir, adapter);
+  assert.equal(res.status, 'ok');
+  assert.match(adapter.calls[0].prompt, /## Task\n\nsecond\./, 'the dependency is built first');
+  assert.equal(readFileSync(path, 'utf8'), '1. [x] Phase: A. Task: first. Depends: 2\n2. [x] Phase: B. Task: second. Depends: None\n');
+  writeFileSync(path, '1. [ ] Phase: A. Task: a. Depends: 2\n2. [ ] Phase: B. Task: b. Depends: 1\n');
+  const blocked = await run(path, dir, fakeAdapter());
+  assert.equal(blocked.status, 'blocked');
+  assert.match(blocked.output, /1 needs 2; 2 needs 1/);
+});
+
+for (const [name, build, mode] of [
+  ['buildTestLoopPrompt', buildTestLoopPrompt, 'test-loop'],
+  ['buildBuildLoopPrompt', buildBuildLoopPrompt, 'build-loop'],
+  ['buildQaLoopPrompt', buildQaLoopPrompt, 'qa-loop'],
+]) {
+  test(`${name} prefaces its mode prompt onto the item's phase and task, and tail-truncates a long previous failure`, () => {
+    const p = build({ phase: 'Core.', task: 'Implement the login screen.' });
+    assert.ok(p.startsWith(loadModePrompt(mode)));
+    assert.match(p, /## Phase\n\nCore\.\n\n## Task\n\nImplement the login screen\./);
+    assert.doesNotMatch(p, /\n\n## Previous Failure/);
+    const long = build({ phase: 'P', task: 'T' }, `${'x'.repeat(10000)}END`);
+    assert.ok(long.endsWith('xEND'));
+    assert.ok(long.length < loadModePrompt(mode).length + 4200);
+  });
+}
+
+test('each item runs three fresh-context steps in order: write tests, implement, verify; then ticks, for every item', async () => {
+  const { path, dir } = makeFile();
+  const adapter = fakeAdapter();
+  const res = await run(path, dir, adapter);
   assert.equal(res.status, 'ok');
   assert.equal(res.processed, 2);
-  const after = parsePlanItems(readFileSync(planPath, 'utf8'));
-  assert.equal(after[0].checked, true);
-  assert.equal(after[1].checked, true);
-  assert.equal(after[2].checked, true, 'already-processed item stays untouched but still checked');
-  assert.equal(adapter.calls.length, 4, 'two agent calls (build, QA) per item, two items');
-  assert.match(adapter.calls[0].prompt, /## Phase\n\nHigh Level Design\.\n\n## Task\n\nEstablish architectural constraints\./);
-  assert.ok(adapter.calls[0].prompt.startsWith(loadModePrompt('build-loop')), 'first call of an item is the build prompt');
-  assert.ok(adapter.calls[1].prompt.startsWith(loadModePrompt('qa-loop')), 'second call of an item is the QA prompt');
+  const after = parsePlanItems(readFileSync(path, 'utf8'));
+  assert.ok(after.every((i) => i.checked));
+  assert.equal(adapter.calls.length, 6, 'three agent calls per item, two items');
+  assert.ok(adapter.calls[0].prompt.startsWith(loadModePrompt('test-loop')));
+  assert.ok(adapter.calls[1].prompt.startsWith(loadModePrompt('build-loop')));
+  assert.ok(adapter.calls[2].prompt.startsWith(loadModePrompt('qa-loop')));
+  assert.match(adapter.calls[0].prompt, /## Task\n\nEstablish architectural constraints\./);
   assert.equal(adapter.calls[0].cwd, dir);
+  for (const call of adapter.calls) assert.ok(!Object.hasOwn(call, 'session'), 'no call opts into session tracking');
 });
 
-test('no call ever opts into session tracking: every build and QA call is a fresh agent context', async () => {
-  const { path: planPath, dir } = makeFile();
+test('the red check runs only the new or changed test files; the green check runs the full suite', async () => {
+  const { path, dir } = makeFile('1. [ ] Phase: A. Task: a. Depends: None\n');
+  const runs = [];
+  await run(path, dir, fakeAdapter(), { runTests: (o) => { runs.push(o.files); return o.files ? { ok: false, output: 'red' } : { ok: true, output: '' }; } });
+  assert.deepEqual(runs, [['/t/a.test.js'], undefined, undefined]);
+});
+
+test('a test step that adds or changes no test file is retried with that feedback, and the item fails after the cap', async () => {
+  const { path, dir } = makeFile();
   const adapter = fakeAdapter();
-  await runBuildLoop({ planPath, ...io(), say: () => {}, adapter, repoDir: dir, runTests: passingTests });
-  for (const call of adapter.calls) assert.ok(!Object.hasOwn(call, 'session'), 'no "session" key on any request');
+  const res = await run(path, dir, adapter, { listTests: () => new Map([['/t/a.test.js', '1']]) });
+  assert.equal(res.status, 'failed');
+  assert.match(res.output, /No test file .* was added or changed/);
+  assert.equal(adapter.calls.length, MAX_ATTEMPTS, 'only the test step ran, retried up to the cap');
+  assert.match(adapter.calls[1].prompt, /## Previous Failure\n\nNo test file/);
+  assert.equal(parsePlanItems(readFileSync(path, 'utf8'))[0].checked, false);
 });
 
-test('runBuildLoop shows each item in colour with "Thinking..." before the build call and "Verifying..." before the QA call', async () => {
-  const { path: planPath, dir } = makeFile();
-  const said = [];
-  await runBuildLoop({ planPath, ...io(), say: (s) => said.push(s), adapter: fakeAdapter(), repoDir: dir, runTests: passingTests });
-  assert.match(said[0], /\x1b\[1;36mPhase: High Level Design\.\x1b\[0m/);
-  assert.match(said[1], /^\x1b\[90mThinking\.\.\.\x1b\[0m\n$/);
-  assert.match(said[2], /^\x1b\[90mVerifying\.\.\.\x1b\[0m\n$/);
-});
-
-test('once every item is processed, a further call reports ok with nothing left to hand to the agent', async () => {
-  const { path: planPath, dir } = makeFile();
-  await runBuildLoop({ planPath, ...io(), say: () => {}, adapter: fakeAdapter(), repoDir: dir, runTests: passingTests });
+test('new tests that already pass are rejected (must be red before implementing), then accepted on a retry that makes them fail', async () => {
+  const { path, dir } = makeFile('1. [ ] Phase: A. Task: a. Depends: None\n');
+  let reds = 0;
   const adapter = fakeAdapter();
-  const res = await runBuildLoop({ planPath, ...io(), say: () => {}, adapter, repoDir: dir, runTests: passingTests });
+  const res = await run(path, dir, adapter, {
+    runTests: ({ files }) => (files ? (++reds === 1 ? { ok: true, output: 'all green' } : { ok: false, output: 'red' }) : { ok: true, output: '' }),
+  });
   assert.equal(res.status, 'ok');
-  assert.equal(res.processed, 0);
-  assert.equal(adapter.calls.length, 0);
+  assert.ok(adapter.calls[1].prompt.startsWith(loadModePrompt('test-loop')), 'the test step is retried');
+  assert.match(adapter.calls[1].prompt, /## Previous Failure\n\nThe new tests .* already pass before any implementation[\s\S]*all green/);
+  assert.ok(adapter.calls[2].prompt.startsWith(loadModePrompt('build-loop')), 'only then does the implement step start');
 });
 
-test('a failing test gate after the build call stops the loop, leaves the item unticked, and never calls QA', async () => {
-  const { path: planPath, dir } = makeFile();
+test('a red implement step is retried with the failing output, then the item fails after the cap and QA never runs', async () => {
+  const { path, dir } = makeFile();
   const adapter = fakeAdapter();
-  const res = await runBuildLoop({
-    planPath, ...io(), say: () => {}, adapter, repoDir: dir,
-    runTests: () => ({ ok: false, output: 'boom' }),
+  let full = 0;
+  const res = await run(path, dir, adapter, {
+    runTests: ({ files }) => (files ? { ok: false, output: 'red' } : { ok: false, output: `boom ${++full}` }),
   });
   assert.equal(res.status, 'failed');
-  assert.equal(res.processed, 0);
-  assert.equal(res.item.phase, 'High Level Design.');
-  assert.equal(res.output, 'boom');
-  assert.equal(adapter.calls.length, 1, 'only the build call happens; QA is never reached');
-  const after = parsePlanItems(readFileSync(planPath, 'utf8'));
-  assert.equal(after[0].checked, false, 'left unticked so a later `bosh` run retries it');
+  assert.equal(res.output, `boom ${MAX_ATTEMPTS}`);
+  assert.equal(adapter.calls.length, 1 + MAX_ATTEMPTS);
+  assert.match(adapter.calls[2].prompt, /## Previous Failure\n\nboom 1$/);
+  assert.ok(adapter.calls.every((c, i) => i === 0 || c.prompt.startsWith(loadModePrompt('build-loop'))));
+  assert.equal(parsePlanItems(readFileSync(path, 'utf8'))[0].checked, false);
 });
 
-test('a failing test gate after the QA call stops the loop and still leaves the item unticked', async () => {
-  const { path: planPath, dir } = makeFile();
-  const adapter = fakeAdapter();
-  let call = 0;
-  const res = await runBuildLoop({
-    planPath, ...io(), say: () => {}, adapter, repoDir: dir,
-    runTests: () => { call++; return { ok: call === 1, output: call === 1 ? '' : 'still broken' }; },
-  });
-  assert.equal(res.status, 'failed');
-  assert.equal(res.processed, 0);
-  assert.equal(res.output, 'still broken');
-  assert.equal(adapter.calls.length, 1 + MAX_QA_ATTEMPTS, 'one build call, then QA is retried up to the cap before the loop gives up');
-  const after = parsePlanItems(readFileSync(planPath, 'utf8'));
-  assert.equal(after[0].checked, false);
-});
-
-test('a QA call that throws is retried with the error passed into its prompt, and the item is ticked once a retry succeeds', async () => {
-  const { path: planPath, dir } = makeFile();
+test('a verify call that throws is retried with the error in its prompt, and the item is ticked once a retry succeeds', async () => {
+  const { path, dir } = makeFile();
   const adapter = fakeAdapter((req, n) => {
-    if (n === 2) throw new Error('adapter exploded');
+    if (n === 3) throw new Error('adapter exploded');
     return {};
   });
-  const res = await runBuildLoop({ planPath, ...io(), say: () => {}, adapter, repoDir: dir, runTests: passingTests });
+  const res = await run(path, dir, adapter);
   assert.equal(res.status, 'ok');
   assert.equal(res.processed, 2);
-  assert.doesNotMatch(adapter.calls[1].prompt, /\n\n## Previous Failure/, 'first QA attempt has no feedback');
-  assert.match(adapter.calls[2].prompt, /## Previous Failure\n\nQA step threw an error: adapter exploded/);
-  assert.ok(adapter.calls[2].prompt.startsWith(loadModePrompt('qa-loop')), 'the retry is still the QA prompt');
+  assert.match(adapter.calls[3].prompt, /## Previous Failure\n\nVerifying step threw an error: adapter exploded/);
+  assert.ok(adapter.calls[3].prompt.startsWith(loadModePrompt('qa-loop')));
 });
 
-test('a failing gate after QA is retried with its test output passed into the QA prompt; a persistent failure is reported after the cap', async () => {
-  const { path: planPath, dir } = makeFile();
+test('a failing suite after verify is retried with its output, then reported after the cap, leaving the item unticked', async () => {
+  const { path, dir } = makeFile();
   const adapter = fakeAdapter();
-  let gate = 0;
-  const res = await runBuildLoop({
-    planPath, ...io(), say: () => {}, adapter, repoDir: dir,
-    runTests: () => { gate++; return gate === 1 ? { ok: true, output: '' } : { ok: false, output: `red ${gate}` }; },
+  let full = 0;
+  const res = await run(path, dir, adapter, {
+    runTests: ({ files }) => (files ? { ok: false, output: 'red' } : ++full === 1 ? { ok: true, output: '' } : { ok: false, output: `red ${full}` }),
   });
   assert.equal(res.status, 'failed');
-  assert.equal(res.output, `red ${1 + MAX_QA_ATTEMPTS}`);
-  assert.match(adapter.calls[2].prompt, /## Previous Failure\n\nred 2$/);
-  assert.match(adapter.calls[3].prompt, /## Previous Failure\n\nred 3$/);
+  assert.equal(res.output, `red ${1 + MAX_ATTEMPTS}`);
+  assert.match(adapter.calls[3].prompt, /## Previous Failure\n\nred 2$/);
+  assert.equal(parsePlanItems(readFileSync(path, 'utf8'))[0].checked, false);
 });
 
-test('buildQaLoopPrompt tail-truncates a very long previous failure', () => {
-  const p = buildQaLoopPrompt({ phase: 'P', task: 'T' }, `${'x'.repeat(10000)}END`);
-  assert.ok(p.endsWith('xEND'));
-  assert.ok(p.length < loadModePrompt('qa-loop').length + 4200);
+test('shows each item in colour with a grey status line before each step', async () => {
+  const { path, dir } = makeFile();
+  const said = [];
+  await run(path, dir, fakeAdapter(), { say: (s) => said.push(s) });
+  assert.match(said[0], /\x1b\[1;36mPhase: High Level Design\.\x1b\[0m/);
+  assert.match(said[1], /^\x1b\[90mWriting tests\.\.\.\x1b\[0m\n$/);
+  assert.match(said[2], /^\x1b\[90mImplementing\.\.\.\x1b\[0m\n$/);
+  assert.match(said[3], /^\x1b\[90mVerifying\.\.\.\x1b\[0m\n$/);
 });
 
-test('a later `bosh` run picks up the same still-unticked item after a gate failure', async () => {
-  const { path: planPath, dir } = makeFile();
-  await runBuildLoop({
-    planPath, ...io(), say: () => {}, adapter: fakeAdapter(), repoDir: dir,
-    runTests: () => ({ ok: false, output: 'boom' }),
-  });
+test('once every item is processed, a further call reports ok with nothing left to hand to the agent; a failed item is retried from its first step next run', async () => {
+  const { path, dir } = makeFile();
+  await run(path, dir, fakeAdapter(), { runTests: () => ({ ok: false, output: 'boom' }) });
   const adapter = fakeAdapter();
-  const res = await runBuildLoop({ planPath, ...io(), say: () => {}, adapter, repoDir: dir, runTests: passingTests });
-  assert.equal(res.status, 'ok');
-  assert.equal(res.processed, 2, 'the previously-failed item and the one after it both get processed');
-  assert.match(adapter.calls[0].prompt, /Establish architectural constraints\./, 'the same item is retried from scratch');
+  const res = await run(path, dir, adapter);
+  assert.equal(res.processed, 2);
+  assert.match(adapter.calls[0].prompt, /Establish architectural constraints\./);
+  assert.ok(adapter.calls[0].prompt.startsWith(loadModePrompt('test-loop')));
+  const again = fakeAdapter();
+  assert.deepEqual(await run(path, dir, again), { status: 'ok', processed: 0 });
+  assert.equal(again.calls.length, 0);
 });
 
-test('log is called with the full prompt sent for each agent call (\'bosh\') and the full accumulated reasoning text (\'agent\') when the agent streams any', async () => {
-  const { path: planPath, dir } = makeFile();
+test('log gets each full prompt (\'bosh\'), streamed reasoning (\'agent\') only when streamed, and failure output when a gate fails', async () => {
+  const { path, dir } = makeFile('1. [ ] Phase: A. Task: a. Depends: None\n');
   const logged = [];
-  const adapter = fakeAdapter((req) => {
-    req.onReasoning?.('step one, ');
-    req.onReasoning?.('step two');
-    return {};
-  });
-  await runBuildLoop({
-    planPath, ...io(), say: () => {}, adapter, repoDir: dir, runTests: passingTests,
-    log: (source, text) => logged.push([source, text]),
-  });
-  assert.equal(logged[0][0], 'bosh');
-  assert.match(logged[0][1], /## Phase\n\nHigh Level Design\.\n\n## Task\n\nEstablish architectural constraints\./);
-  assert.deepEqual(logged[1], ['agent', 'step one, step two']);
-  assert.equal(logged[2][0], 'bosh');
-  assert.ok(logged[2][1].startsWith(loadModePrompt('qa-loop')), 'the third logged prompt is the QA call');
-});
-
-test('log is only called with "bosh" entries, never "agent" ones, when the adapter never streams any reasoning text', async () => {
-  const { path: planPath, dir } = makeFile();
-  const logged = [];
-  await runBuildLoop({
-    planPath, ...io(), say: () => {}, adapter: fakeAdapter(), repoDir: dir, runTests: passingTests,
-    log: (source, text) => logged.push([source, text]),
-  });
-  assert.ok(!logged.some((l) => l[0] === 'agent'), 'no "agent" entry is logged when the adapter never streams any reasoning text');
-});
-
-test('log records the test gate\'s failing output when a gate fails', async () => {
-  const { path: planPath, dir } = makeFile();
-  const logged = [];
-  await runBuildLoop({
-    planPath, ...io(), say: () => {}, adapter: fakeAdapter(), repoDir: dir,
-    runTests: () => ({ ok: false, output: 'boom' }),
-    log: (source, text) => logged.push([source, text]),
-  });
-  assert.ok(logged.some((l) => l[0] === 'bosh' && l[1].includes('boom')));
+  await run(path, dir, fakeAdapter((req) => { req.onReasoning?.('step one, '); req.onReasoning?.('step two'); return {}; }), { log: (s, t) => logged.push([s, t]) });
+  assert.equal(logged[0][0], 'bosh/tester prompt');
+  assert.ok(logged[0][1].startsWith(loadModePrompt('test-loop')));
+  assert.deepEqual(logged[1], ['bosh/tester response', 'step one, step two']);
+  assert.deepEqual(logged.filter((l) => l[0].endsWith('prompt')).map((l) => l[0]), ['bosh/tester prompt', 'bosh/builder prompt', 'bosh/verifier prompt'], 'each fresh-context step is logged under its own persona');
+  const quiet = [];
+  await run(path, dir, fakeAdapter(), { log: (s, t) => quiet.push([s, t]) });
+  assert.ok(!quiet.some((l) => l[0].endsWith('response')));
+  const failing = [];
+  const { path: p2, dir: d2 } = makeFile();
+  await run(p2, d2, fakeAdapter(), { runTests: () => ({ ok: false, output: 'boom' }), log: (s, t) => failing.push([s, t]) });
+  assert.ok(failing.some((l) => l[0] === 'bosh/harness' && l[1].includes('boom')));
 });

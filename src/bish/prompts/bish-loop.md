@@ -1,15 +1,19 @@
 # Per Loop Instructions.
 
-1. Append or adjust `.bish-bash-bosh/specification.md` based on the details of the question and answer provided below and reference this question number in the specification. 
+The output of this step is to update `.bish-bash-bosh/interview.md` and or  `.bish-bash-bosh/specification.md` based on the new information verified in the question and answer below.
 
-2. Adjust the answers in any unprocessed questions in `.bish-bash-bosh/interview.md` from the insights of the answered question below including:
-- If any question is answered directly from this new answer then mark it as processed also.
+1. Adjust unprocessed items in `.bish-bash-bosh/interview.md` from the insights of the answered question below including:
+- If any question is answered directly from this new answer then mark it as processed.
 - Update the proposed answer to any unprocessed question to reflect the new information verified in this question and answer below.
 - If the answer to this question conflicts with an already processed question and answer then mark the previous question/answer as unprocessed again and adjust it's proposed answer to have the user verify the conflict.
+- Append any follow up questions that you feel need to be asked in order to achieve a complete specification for the objective.
 
-3. Append follow up questions to `.bish-bash-bosh/interview.md`, that you feel need to be asked in order to achieve a complete specification for the objective using the format: `<n>. [ ] Q: <question> A: <default answer>`.
+2. Update the specification items in `.bish-bash-bosh/specification.md` to include any new Constraints and Benifits that can be derived form the confirmed answer to the question below including:
+- Update existing specifications with more clarity or fidelity if the answered question provides more insight.
+- Add any new constraints and benefits that can be determined from the verified answer to the question below.
+-  
 
-4. Then stop!
+3. Then stop!
 
 ## The Question and Answer to process
 

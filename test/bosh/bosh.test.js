@@ -1,3 +1,4 @@
+import { MAX_ATTEMPTS } from '../../src/bosh/bosh-build-loop.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -18,13 +19,12 @@ function fakeAdapter() {
   };
 }
 
-// Writes a trivially-passing `.bish-bash-bosh/tests/*.test.js` file, as if the agent had already added
-// one: bosh's own code-enforced test gate requires at least one to exist before it will tick an item.
-function seedPassingTest(dir) {
+// Writes a harness test that is red until `done.flag` exists in the project, as the test-writing step would.
+function seedRedTest(dir) {
   mkdirSync(join(dir, '.bish-bash-bosh', 'tests'), { recursive: true });
   writeFileSync(
     join(dir, '.bish-bash-bosh', 'tests', 'a.test.js'),
-    "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\ntest('ok', () => assert.ok(true));\n",
+    "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { existsSync } from 'node:fs';\ntest('done', () => assert.ok(existsSync('done.flag')));\n",
   );
 }
 
@@ -48,7 +48,7 @@ test('bosh seeds .bish-bash-bosh/test-harness.js from its template and creates .
   assert.ok(existsSync(join(dir, '.bish-bash-bosh', 'tests')), '.bish-bash-bosh/tests/ is created');
 });
 
-test('bosh drives the Build Loop over every unprocessed plan.md item: a fresh-context build call, then a fresh-context QA call, ticking only once its own test-gate passes both times', async () => {
+test('bosh drives the Build Loop over every unprocessed plan.md item: fresh-context test-writing, implementing and verifying calls, ticking only once its own red then green gates pass', async () => {
   const dir = initGitRepo(freshDir('bosh-cli-'));
   commitProjectConfig(dir, config({ adapter: 'bl' }));
   writeFileSync(
@@ -59,9 +59,9 @@ test('bosh drives the Build Loop over every unprocessed plan.md item: a fresh-co
     calls: [],
     run: async (req) => {
       adapter.calls.push(req);
-      // The build call is expected to write the item's test; simulate that happening once the
-      // build call has actually run, before bosh's own code runs the test gate.
-      if (adapter.calls.length === 1) seedPassingTest(dir);
+      // Call 1 writes the (red) test, call 2 implements the item so the test goes green.
+      if (adapter.calls.length === 1) seedRedTest(dir);
+      if (adapter.calls.length === 2) writeFileSync(join(dir, 'done.flag'), '');
       return { exitStatus: 0, transcript: '', changedFiles: [] };
     },
   };
@@ -70,7 +70,7 @@ test('bosh drives the Build Loop over every unprocessed plan.md item: a fresh-co
   const code = await withCwd(dir, () =>
     main(['bosh'], { registry, stdout: (s) => out.push(s), stderr: () => {} }));
   assert.equal(code, 0);
-  assert.equal(adapter.calls.length, 2, 'one build call and one QA call for the single item');
+  assert.equal(adapter.calls.length, 3, 'one test-writing, one implementing and one QA call for the single item');
   assert.match(out.join(''), /Build complete: 1 item processed this run\./);
   assert.ok(existsSync(join(dir, '.bish-bash-bosh', 'bosh-log.md')), 'bosh-log.md is created');
   const planAfter = readFileSync(join(dir, '.bish-bash-bosh', 'plan.md'), 'utf8');
@@ -89,8 +89,8 @@ test('bosh stops and leaves the item unticked when its own test gate fails, repo
   const out = [];
   const code = await withCwd(dir, () =>
     main(['bosh'], { registry: { bl: () => adapter }, stdout: (s) => out.push(s), stderr: () => {} }));
-  assert.equal(code, 1, 'the agent never added a test, so the gate fails');
-  assert.equal(adapter.calls.length, 1, 'only the build call happens; QA is never reached');
+  assert.equal(code, 1, 'the agent never added a test, so the red gate fails');
+  assert.equal(adapter.calls.length, MAX_ATTEMPTS, 'only the test-writing step runs, retried up to the cap');
   assert.match(out.join(''), /Build stopped after 0 items/);
   const planAfter = readFileSync(join(dir, '.bish-bash-bosh', 'plan.md'), 'utf8');
   assert.match(planAfter, /1\. \[ \] Phase: Core\./, 'left unticked so a later `bosh` run retries it');

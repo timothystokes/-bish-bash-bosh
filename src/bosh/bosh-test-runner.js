@@ -4,7 +4,7 @@
 // under `.bish-bash-bosh/tests/` — a directory that is missing or has no test file in it yet is treated
 // as a failing gate, since every item is expected to add one (see src/bosh/prompts/bosh-build.md).
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const TESTS_DIR = '.bish-bash-bosh/tests';
@@ -21,10 +21,20 @@ function findTestFiles(dir) {
   return out;
 }
 
-/** @param {string} repoDir @returns {{ ok: boolean, output: string }} */
-export function runTestSuite(repoDir) {
+// Every harness test file with a change stamp (mtime and size), so the Build Loop can tell which ones a step added or edited.
+/** @param {string} repoDir @returns {Map<string, string>} */
+export function listTestFiles(repoDir) {
+  return new Map(findTestFiles(join(repoDir, TESTS_DIR)).map((f) => {
+    const st = statSync(f);
+    return [f, `${st.mtimeMs}:${st.size}`];
+  }));
+}
+
+// Runs the whole suite, or only `only` (absolute paths from listTestFiles) when given.
+/** @param {string} repoDir @param {string[]} [only] @returns {{ ok: boolean, output: string }} */
+export function runTestSuite(repoDir, only) {
   const dir = join(repoDir, TESTS_DIR);
-  const files = findTestFiles(dir);
+  const files = only?.length ? only : findTestFiles(dir);
   if (files.length === 0) {
     return { ok: false, output: `No *.test.js file found under ${TESTS_DIR}: every plan item must add at least one.` };
   }

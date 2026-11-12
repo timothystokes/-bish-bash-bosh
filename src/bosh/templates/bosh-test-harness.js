@@ -1,3 +1,6 @@
+// These are bish-bash-bosh's OWN verification helpers: separate from, in addition to and never a
+// substitute for any requirement of the user's objective (for example the tests it specifies for
+// itself, which live in the project).
 // Shipped by bish-bash-bosh (`bosh` writes this file once, if missing) as
 // `.bish-bash-bosh/test-harness.js`: a few generic, black-box verification helpers built only on
 // Node's own standard library (no extra dependency, so it works no matter what language or stack

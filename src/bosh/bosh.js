@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { resolveAdapter, defaultRegistry } from '../adapters/index.js';
 import { acquireRunLock } from '../shared/run-lock.js';
 import { runBuildLoop } from './bosh-build-loop.js';
-import { runTestSuite } from './bosh-test-runner.js';
+import { runTestSuite, listTestFiles } from './bosh-test-runner.js';
 import { createLogger } from '../bish/bish-log.js';
 import { debugAdapter, parseRunArgs, loadRunProject } from '../cli/cli-lib.js';
 import { formatBuildLoopResult } from '../cli/cli-format.js';
@@ -53,7 +53,8 @@ export async function runBosh(cmd, argv, deps, out, err) {
       say: out,
       adapter,
       repoDir: repo,
-      runTests: ({ cwd }) => runTestSuite(cwd),
+      runTests: ({ cwd, files }) => runTestSuite(cwd, files),
+      listTests: ({ cwd }) => listTestFiles(cwd),
       log: createLogger(join(repo, LOG_FILE)),
     });
     out(formatBuildLoopResult(res));

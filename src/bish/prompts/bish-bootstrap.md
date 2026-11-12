@@ -9,3 +9,25 @@ The files `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` 
 2. Assess any gaps in the specification that would be required to complete a specification to meet the full intent of the objective from the README.md
 
 3. Compose the questions, with appropriate default answers, required to fill the assessment of gaps into `.bish-bash-bosh/interview.md` using it's defined format.
+
+## Working with the files
+
+Edit `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` directly, using your normal file read/edit tools, and nothing else: no skills, no searching, no other files. Their entire format is the numbered checklist lines already in each file.
+
+## The objective 
+
+Do not conflate the workings of -bish-bash-bosh with the specified requirements from the user. For example -bish-bash-bosh uses it's own testing harness and tests inside the .bish-bash-bosh folder to verify it's effectiveness but if the user specifies tests as a requirment then they would be an independent set of tests in the users actual project space. Remember -bish-bash-bosh is a software delvelopment tool, the means to the end, and in no way forms part of the user's specified requirments. 
+
+## Non functional requirements considerations
+
+- How does this solution align with the users strategy?
+- What architectural constraints must be applied to ensure the success of this solution?
+- What Product or Customer metric are expection to be met through the implementation of this solution?
+- How is the user's objective built, verified and deployed through formal quality and security gates and release approvals and how much automation should be applied?
+- What aspects of security should be considered for this type of solution?
+- What operational processes and observability apply to this solution?
+- Are there regulatory or industry compliance expectations that need to be met?
+- What perfomance, scalability and availability needs to be met?
+- Are there change management aspect that need to be coordinated for this objective?
+- Are there current risks being carried or new risks introduced by this objective?
+
