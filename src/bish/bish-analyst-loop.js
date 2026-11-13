@@ -14,6 +14,11 @@ const RESET = '\x1b[0m';
 
 const LINE = /^(\d+)\.\s*\[([ x])\]\s*Q:\s*(.*?)\s*A\s*(?:\([^)]*\))?:\s*(.*)$/;
 
+// Offered once every question is answered, so the owner can start another round of requirements: any answer
+// other than a no is appended to interview.md as a new question and handed to the agent like any other.
+export const NEW_REQUIREMENT_QUESTION = 'All questions have been answered but would you like to describe a new requirement?';
+const NO = new Set(['', 'n', 'no']);
+
 // Parses the numbered question lines out of an interview.md's text. Returns one entry per
 // well-formed `<n>. [ ] Q: <question> A: <answer>` line, with its line index so the loop can
 // rewrite it in place. Tolerates a parenthetical remark between `A` and `:` (e.g. an agent
@@ -124,19 +129,34 @@ export async function runInterviewLoop({
   for (;;) {
     const text = readFile(interviewPath);
     const questions = parseInterview(text);
-    const next = nextQuestion(questions);
-    if (!next) return { status: 'ok', answered };
-    say(`\n${CYAN}Q: ${next.question}${RESET}\n`);
-    const reply = await ask(`${YELLOW}A: `, next.answer);
-    say(RESET);
-    if (reply === null) {
-      const remaining = parseInterview(readFile(interviewPath)).filter((q) => !q.checked).length;
-      return { status: 'paused', answered, remaining };
+    let next = nextQuestion(questions);
+    let answer;
+    let reply;
+    if (!next) {
+      say(`\n${CYAN}Q: ${NEW_REQUIREMENT_QUESTION}${RESET}\n`);
+      reply = await ask(`${YELLOW}A: `, 'no');
+      say(RESET);
+      if (reply === null || NO.has(reply.trim().toLowerCase())) return { status: 'ok', answered };
+      answer = reply.trim();
+      const id = questions.reduce((max, q) => Math.max(max, q.id), 0) + 1;
+      const lines = text.split('\n');
+      while (lines.length && lines[lines.length - 1] === '') lines.pop();
+      lines.push(renderLine(id, false, NEW_REQUIREMENT_QUESTION, answer), '');
+      writeFile(interviewPath, lines.join('\n'));
+      next = { id, question: NEW_REQUIREMENT_QUESTION };
+    } else {
+      say(`\n${CYAN}Q: ${next.question}${RESET}\n`);
+      reply = await ask(`${YELLOW}A: `, next.answer);
+      say(RESET);
+      if (reply === null) {
+        const remaining = parseInterview(readFile(interviewPath)).filter((q) => !q.checked).length;
+        return { status: 'paused', answered, remaining };
+      }
+      answer = reply.trim() === '' ? next.answer : reply.trim();
+      const lines = text.split('\n');
+      lines[next.lineIndex] = renderLine(next.id, false, next.question, answer);
+      writeFile(interviewPath, lines.join('\n'));
     }
-    const answer = reply.trim() === '' ? next.answer : reply.trim();
-    const lines = text.split('\n');
-    lines[next.lineIndex] = renderLine(next.id, false, next.question, answer);
-    writeFile(interviewPath, lines.join('\n'));
 
     say(`${GREY}Analyst thinking...\n`);
     const session = loadSession();

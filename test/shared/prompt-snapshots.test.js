@@ -30,15 +30,19 @@ function matchSnapshot(name, actual) {
 }
 
 // Each prompt function rendered with placeholder arguments; the build personas also with feedback.
+const CONTEXT = ['3. [ ] C: <constraint> B: <benefit> Q: 1', '1. [x] Q: <question> A: <answer>'];
+
 const SNAPSHOTS = {
   'analyst-init': () => analystInit(),
   'analyst-loop': () => analystLoop('<item>'),
   'reverse-engineer': () => reverseEngineer('<focus>', '<template>'),
   planner: () => planner(),
-  'test-writer': () => testWriter('<item>', '', '<testfile>', '<resultsfile>'),
-  'test-writer-feedback': () => testWriter('<item>', '<feedback>', '<testfile>', '<resultsfile>'),
+  'test-writer': () => testWriter('<item>', '', '<testfile>', '3. [ ] C: <constraint> B: <benefit> Q: TBC'),
+  'test-writer-feedback': () => testWriter('<item>', '<feedback>', '<testfile>', ''),
   builder: () => builder('<item>', '', '<testfile>', '<resultsfile>'),
   'builder-feedback': () => builder('<item>', '<feedback>', '<testfile>', '<resultsfile>'),
+  'builder-context': () => builder('<item>', '', '<testfile>', ...CONTEXT),
+  'inspector-context': () => inspector('<item>', '', '<testfile>', '<resultsfile>', ...CONTEXT),
   inspector: () => inspector('<item>', '', '<testfile>', '<resultsfile>'),
   'inspector-feedback': () => inspector('<item>', '<feedback>', '<testfile>', '<resultsfile>'),
 };

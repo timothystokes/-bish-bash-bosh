@@ -79,7 +79,7 @@ test('bosh drives the Build Loop over every unprocessed plan.md item: fresh-cont
       // Call 1 writes the (red) test, call 2 implements the item so the test goes green.
       if (adapter.calls.length === 1) seedRedTest(dir);
       if (adapter.calls.length === 2) writeFileSync(join(dir, 'done.flag'), '');
-      return { exitStatus: 0, transcript: '', changedFiles: [] };
+      return { exitStatus: 0, transcript: adapter.calls.length === 3 ? 'APPROVED' : '', changedFiles: [] };
     },
   };
   const registry = { bl: () => adapter };

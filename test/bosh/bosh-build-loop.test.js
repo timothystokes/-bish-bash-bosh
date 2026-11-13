@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdtempSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { parsePlanItems, nextPlanItem, runBuildLoop, buildTestLoopPrompt, buildBuildLoopPrompt, buildQaLoopPrompt, testFileFor, TEST_RESULTS_FILE, MAX_ATTEMPTS } from '../../src/bosh/bosh-build-loop.js';
@@ -55,7 +55,10 @@ function fakeAdapter(result = { exitStatus: 0, transcript: '', changedFiles: [] 
     run: async (req) => {
       calls.push(req);
       const r = typeof result === 'function' ? result(req, calls.length) : result;
-      return { exitStatus: 0, transcript: '', changedFiles: [], ...r };
+      // The Builder leaves a project file behind and the Inspector approves, unless a test says otherwise.
+      if (req.prompt.includes('You are a software Builder')) writeFileSync(join(req.cwd, 'built.js'), `// ${calls.length}\n`);
+      const merged = { exitStatus: 0, transcript: '', changedFiles: [], ...r };
+      return !merged.transcript && req.prompt.includes('You are a Quality Inspector') ? { ...merged, transcript: 'APPROVED' } : merged;
     },
   };
 }
@@ -120,7 +123,7 @@ test('the red check runs only the new or changed test files; the green check run
   const { path, dir } = makeFile('1. [ ] T: a\n');
   const runs = [];
   await run(path, dir, fakeAdapter(), { runTests: (o) => { runs.push(o.files); return o.files ? { ok: false, output: 'red' } : { ok: true, output: '' }; } });
-  assert.deepEqual(runs, [['/t/a.test.js'], undefined, undefined]);
+  assert.deepEqual(runs, [['/t/a.test.js'], undefined]);
 });
 
 test('a test step that adds or changes no test file is retried with that feedback, and the item fails after the cap', async () => {
@@ -175,17 +178,68 @@ test('a verify call that throws is retried with the error in its prompt, and the
   assert.ok(adapter.calls[3].prompt.trimStart().startsWith(head('inspector')));
 });
 
-test('a failing suite after verify is retried with its output, then reported after the cap, leaving the item unticked', async () => {
-  const { path, dir } = makeFile();
-  const adapter = fakeAdapter();
-  let full = 0;
-  const res = await run(path, dir, adapter, {
-    runTests: ({ files }) => (files ? { ok: false, output: 'red' } : ++full === 1 ? { ok: true, output: '' } : { ok: false, output: `red ${full}` }),
-  });
+test('the Inspector approves, or sends feedback to the Builder (not the Test Writer), who builds again before the Inspector looks once more', async () => {
+  const { path, dir } = makeFile('1. [ ] T: a\n');
+  let inspections = 0;
+  const adapter = fakeAdapter((req) => (req.prompt.includes('Quality Inspector') ? { transcript: ++inspections === 1 ? 'Close.\nFEEDBACK: the page has no title' : 'APPROVED' } : {}));
+  const res = await run(path, dir, adapter);
+  assert.equal(res.status, 'ok');
+  const who = adapter.calls.map((c) => /You are (?:the|a) (?:Quality |software )?(Test Writer|Builder|Inspector)/.exec(c.prompt)[1]);
+  assert.deepEqual(who, ['Test Writer', 'Builder', 'Inspector', 'Builder', 'Inspector']);
+  assert.match(adapter.calls[3].prompt, /on behalf of the user[^]*the page has no title/);
+  assert.doesNotMatch(adapter.calls[1].prompt, /on behalf of the user/);
+});
+
+test('an Inspector that never approves fails the item after the cap, and one with no verdict is asked for one', async () => {
+  const { path, dir } = makeFile('1. [ ] T: a\n');
+  const res = await run(path, dir, fakeAdapter((req) => (req.prompt.includes('Quality Inspector') ? { transcript: 'FEEDBACK: still wrong' } : {})));
   assert.equal(res.status, 'failed');
-  assert.equal(res.output, `red ${1 + MAX_ATTEMPTS}`);
-  assert.match(adapter.calls[3].prompt, /red 2/);
-  assert.equal(parsePlanItems(readFileSync(path, 'utf8'))[0].checked, false);
+  assert.equal(res.persona, 'Inspector');
+  assert.match(res.output, /still wrong/);
+  let asked = 0;
+  const adapter = fakeAdapter((req) => (req.prompt.includes('Quality Inspector') ? { transcript: ++asked === 1 ? 'Looks fine to me.' : 'APPROVED' } : {}));
+  const again = await run(path, dir, adapter);
+  assert.equal(again.status, 'ok');
+  assert.match(adapter.calls.at(-1).prompt, /End your reply with APPROVED/);
+});
+
+test('each role may only change its own files: anything else is reverted and sent back as feedback', async () => {
+  const { path, dir } = makeFile('1. [ ] T: a\n');
+  const wrote = (rel, text) => { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), text); };
+  wrote('keep.txt', 'original');
+
+  const tester = await run(path, dir, fakeAdapter((req) => (req.prompt.includes('Test Writer') ? wrote('sneaky.js', 'x') : {})));
+  assert.equal(tester.status, 'failed');
+  assert.equal(tester.persona, 'Test Writer');
+  assert.match(tester.output, /sneaky\.js/);
+  assert.equal(existsSync(join(dir, 'sneaky.js')), false, 'the Test Writer\'s project file is reverted');
+
+  let tampered = false;
+  const builder = fakeAdapter((req) => {
+    if (req.prompt.includes('software Builder') && !tampered) { tampered = true; wrote('.bish-bash-bosh/specification.md', 'tampered'); }
+    return {};
+  });
+  assert.equal((await run(path, dir, builder)).status, 'ok');
+  assert.equal(existsSync(join(dir, '.bish-bash-bosh', 'specification.md')), false, 'the Builder cannot write under .bish-bash-bosh/');
+  assert.match(builder.calls.filter((c) => c.prompt.includes('software Builder'))[1].prompt, /have been reverted: \.bish-bash-bosh\/specification\.md/);
+
+  let edited = false;
+  const inspector = fakeAdapter((req) => {
+    if (req.prompt.includes('Quality Inspector') && !edited) { edited = true; wrote('keep.txt', 'changed by inspector'); }
+    return {};
+  });
+  assert.equal((await run(path, dir, inspector)).status, 'ok');
+  assert.equal(readFileSync(join(dir, 'keep.txt'), 'utf8'), 'original', 'the Inspector is read-only');
+});
+
+test('an item cannot pass when the Builder changed none of the project\'s own files', async () => {
+  const { path, dir } = makeFile('1. [ ] T: a\n');
+  const idle = { calls: [], run: async (req) => ({ exitStatus: 0, transcript: req.prompt.includes('Quality Inspector') ? 'APPROVED' : '', changedFiles: [] }) };
+  const { path: p2, dir: d2 } = makeFile('1. [ ] T: a\n');
+  const failed = await run(p2, d2, idle);
+  assert.equal(failed.status, 'failed');
+  assert.equal(failed.persona, 'Builder');
+  assert.match(failed.output, /project's own files/);
 });
 
 test('shows each item in colour with a grey status line before each step', async () => {
@@ -193,9 +247,18 @@ test('shows each item in colour with a grey status line before each step', async
   const said = [];
   await run(path, dir, fakeAdapter(), { say: (s) => said.push(s) });
   assert.match(said[0], /\x1b\[1;36mEstablish architectural constraints\x1b\[0m/);
-  assert.match(said[1], /^\x1b\[90mTest Writer\.\.\.\x1b\[0m\n$/);
-  assert.match(said[2], /^\x1b\[90mBuilder\.\.\.\x1b\[0m\n$/);
-  assert.match(said[3], /^\x1b\[90mInspector\.\.\.\x1b\[0m\n$/);
+  const lines = said.slice(0, 9).map((l) => l.replace(/\x1b\[\d+(;\d+)?m/g, '').trim());
+  assert.deepEqual(lines.slice(1), [
+    'Harness: Preparing the test file...',
+    'Test Writer...',
+    'Harness: Testing the new tests, expecting them to fail...',
+    'Builder...',
+    'Harness: Testing the whole suite...',
+    'Inspector...',
+    'Harness: Writing the test results for the Inspector...',
+    'Harness: Committing...',
+  ]);
+  assert.match(said[1], /^\x1b\[90mHarness: /, 'harness steps are grey like the agent steps');
 });
 
 test('once every item is processed, a further call reports ok with nothing left to hand to the agent; a failed item is retried from its first step next run', async () => {
@@ -237,16 +300,14 @@ test('tests that still pass on the retry are accepted (the item was implemented 
   assert.ok(adapter.calls.some((c) => c.prompt.trimStart().startsWith(head('builder'))));
 });
 
-test('the plan item\'s S: ids reach the tester prompt, and a green full run ticks only spec items whose tagged tests all pass', async () => {
+test('the Inspector\'s VERIFIED line ticks only the item\'s own specification items', async () => {
   const { path, dir } = makeFile('1. [ ] T: a S: 1, 2\n');
   const specPath = join(dir, 'specification.md');
   writeFileSync(specPath, '1. [ ] C: one. B: x\n2. [ ] C: two. B: y\n3. [ ] C: three. B: z\n');
-  const adapter = fakeAdapter();
-  const output = '✔ [S1] works (2ms)\n✔ [S2, S1] also (1ms)\n✖ [S2] breaks (1ms)\nℹ pass 2\n';
-  const res = await run(path, dir, adapter, { specPath, runTests: ({ files }) => ({ ok: !!files ? false : true, output }) });
-  assert.match(adapter.calls[0].prompt, /Specification ids S1, S2/);
+  const adapter = fakeAdapter((req) => (req.prompt.includes('Quality Inspector') ? { transcript: 'Good work.\nAPPROVED\nVERIFIED: S1, S3' } : {}));
+  const res = await run(path, dir, adapter, { specPath });
   assert.equal(res.status, 'ok');
-  assert.deepEqual(res.spec, { verified: [1], failing: [2], uncovered: [3] });
+  assert.deepEqual(res.spec, { verified: [1], uncovered: [2, 3] });
   assert.equal(readFileSync(specPath, 'utf8'), '1. [x] C: one. B: x\n2. [ ] C: two. B: y\n3. [ ] C: three. B: z\n');
 });
 
@@ -284,8 +345,11 @@ test('a Builder TEST FEEDBACK reply goes back to the Test Writer, then the Build
   const adapter = {
     async run(req) {
       prompts.push(req.prompt);
-      if (req.prompt.includes('You are a software Builder')) return { transcript: ++builds === 1 ? 'The probe is broken.\nTEST FEEDBACK: t.test.js: board is not defined' : 'done' };
-      return { transcript: '' };
+      if (req.prompt.includes('You are a software Builder')) {
+        writeFileSync(join(req.cwd, 'built.js'), String(prompts.length));
+        return { transcript: ++builds === 1 ? 'The probe is broken.\nTEST FEEDBACK: t.test.js: board is not defined' : 'done' };
+      }
+      return { transcript: req.prompt.includes('Quality Inspector') ? 'APPROVED' : '' };
     },
   };
   let stamp = 0;
@@ -301,11 +365,10 @@ test('testFileFor names the test file from its number, task and specification id
   assert.equal(testFileFor({ id: 12, task: 'Wire it!', specs: [] }), '.bish-bash-bosh/tests/12-wire-it.test.js');
 });
 
-test('every build persona is handed the item with its spec tag instruction and the item\'s test file', () => {
+test('every build persona is handed the item and the item\'s test file', () => {
   const item = { id: 3, task: 'Define winningLine - pure', specs: [3, 5] };
   for (const build of [buildTestLoopPrompt, buildBuildLoopPrompt, buildQaLoopPrompt]) {
     const p = build(item, 'boom');
-    assert.match(p, /\[S3, S5\] \.\.\./);
     assert.match(p, /03-define-winningline\.s3-s5\.test\.js/);
     assert.match(p, /boom/);
   }
@@ -320,7 +383,7 @@ test('the Inspector is pointed at a results file holding the latest full-suite o
   assert.equal(readFileSync(join(dir, TEST_RESULTS_FILE), 'utf8'), 'SUITE OUTPUT');
 });
 
-test('each item gets a starter test file with the harness import and its spec tag, unless one already exists', async () => {
+test('each item gets a starter test file with the harness import, unless one already exists', async () => {
   const { path, dir } = makeFile('1. [ ] T: a - detail S: 3\n');
   const item = parsePlanItems(readFileSync(path, 'utf8'))[0];
   let seen = '';
@@ -330,5 +393,32 @@ test('each item gets a starter test file with the harness import and its spec ta
   });
   await run(path, dir, adapter);
   assert.match(seen, /from '\.\.\/test-harness\.js'/);
-  assert.match(seen, /\[S3\]/);
+});
+
+test('the Test Writer is given the item\'s specification rows as they appear in specification.md, not just their numbers', async () => {
+  const { path, dir } = makeFile('1. [ ] T: a - detail S: 2\n');
+  const specPath = join(dir, 'specification.md');
+  writeFileSync(specPath, '# Specification\n\n1. [ ] C: One. B: First. Q: TBC\n2. [ ] C: Two. B: Second. Q: TBC\n');
+  const adapter = fakeAdapter();
+  await run(path, dir, adapter, { specPath });
+  assert.match(adapter.calls[0].prompt, /2\. \[ \] C: Two\. B: Second\. Q: TBC/);
+  assert.doesNotMatch(adapter.calls[0].prompt, /C: One\./);
+});
+
+test('the Builder and Inspector are told the README, the item\'s specification rows and the interview questions behind them', async () => {
+  const { path, dir } = makeFile('1. [ ] T: a - detail S: 2\n');
+  const specPath = join(dir, 'specification.md');
+  writeFileSync(specPath, '# Specification\n\n1. [ ] C: One. B: First. Q: 1\n2. [ ] C: Two. B: Second. Q: 2, 3\n');
+  writeFileSync(join(dir, 'README.md'), '# A greeter\n');
+  mkdirSync(join(dir, '.bish-bash-bosh'), { recursive: true });
+  writeFileSync(join(dir, '.bish-bash-bosh', 'interview.md'), '1. [x] Q: Unrelated? A: x\n2. [x] Q: Who uses it? A: Developers\n3. [x] Q: Where? A: CLI\n');
+  const adapter = fakeAdapter();
+  await run(path, dir, adapter, { specPath });
+  for (const persona of ['builder', 'inspector']) {
+    const p = adapter.calls.find((c) => c.prompt.trimStart().startsWith(head(persona))).prompt;
+    assert.match(p, /`README\.md`/, persona);
+    assert.match(p, /2\. \[ \] C: Two\. B: Second\. Q: 2, 3/, persona);
+    assert.match(p, /2\. \[x\] Q: Who uses it\? A: Developers\n3\. \[x\] Q: Where\? A: CLI/, persona);
+    assert.doesNotMatch(p, /Unrelated|C: One\./, persona);
+  }
 });

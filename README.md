@@ -41,7 +41,7 @@ The project must be a git repository. The harness (never the agents) commits, an
 
 1. `-bish`: the Analyst reads your README.md and drafts `.bish-bash-bosh/specification.md` (starting with a `# Objective` summary) and the first questions in `.bish-bash-bosh/interview.md`, then carries straight on through the interview, asking each question in turn. Answer or accept the default; you can stop at any question and run `-bish` again to resume. Edit `specification.md` directly at any point.
 2. `-bash`: the Planner turns the whole specification and the current code into a prioritised `.bish-bash-bosh/plan.md`. Review and edit it before building.
-3. `-bosh`: for each unticked plan item, in order, the Test Writer writes failing tests, the Builder implements until they pass, and the Inspector checks the work. The item is then ticked and committed, and specification items are ticked when their tagged tests pass.
+3. `-bosh`: for each unticked plan item, in order, the Test Writer writes failing tests, the Builder implements until they pass, and the Inspector checks the project's files on the user's behalf. The Test Writer can only change `.bish-bash-bosh/tests/`, the Builder only the project's own files, and the Inspector nothing (the harness reverts anything else). The Builder must change at least one project file, and the Inspector either approves (listing the specification items it verified, which the harness ticks) or sends feedback back to the Builder. The item is then ticked and committed.
 4. Re-run `-bosh` to resume after a failure or interruption. It picks up at the first unticked item.
 
 ### Changing direction

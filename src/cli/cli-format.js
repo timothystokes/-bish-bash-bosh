@@ -23,7 +23,7 @@ export function formatPlanLoopResult(res) {
 function formatSpecStatus(spec) {
   if (!spec) return '';
   const ids = (list) => (list.length ? ` (${list.join(', ')})` : '');
-  return `Specification: ${spec.verified.length} verified${ids(spec.verified)}, ${spec.failing.length} failing${ids(spec.failing)}, ${spec.uncovered.length} with no tagged tests${ids(spec.uncovered)}.\n`;
+  return `Specification: ${spec.verified.length} verified${ids(spec.verified)}, ${spec.uncovered.length} not yet verified${ids(spec.uncovered)}.\n`;
 }
 
 export function formatBuildLoopResult(res) {

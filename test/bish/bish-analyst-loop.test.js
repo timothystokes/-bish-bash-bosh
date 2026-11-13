@@ -118,7 +118,7 @@ test('the question and the prompt are shown in color, distinguishing Q from A, w
   const prompts = [];
   /** @type {(string | undefined)[]} */
   const defaults = [];
-  const ask = async (p, d) => { prompts.push(p); defaults.push(d); return 'x'; };
+  const ask = async (p, d) => { prompts.push(p); defaults.push(d); return d === 'no' ? '' : 'x'; };
   await runInterviewLoop({ interviewPath, ...io(), ask, say: (s) => said.push(s), adapter: fakeAdapter(), repoDir: dir, ...sessionStore() });
   assert.match(said[0], /\x1b\[1;36mQ: Describe the objective in a sentence\.\x1b\[0m/);
   assert.match(prompts[0], /^\x1b\[33mA: $/, 'no trailing reset: the prompt stays "active" so a pre-filled default and anything typed after it inherit the same color; one trailing space so the cursor/answer sits one column clear of the colon, not immediately after it');
@@ -144,7 +144,7 @@ test('the agent\'s own live reasoning text streams on the line after "Analyst th
       return { exitStatus: 0, transcript: '', changedFiles: [] };
     },
   };
-  await runInterviewLoop({ interviewPath, ...io(), ask: async () => 'a', say: (s) => said.push(s), adapter, repoDir: dir, ...sessionStore() });
+  await runInterviewLoop({ interviewPath, ...io(), ask: answerA, say: (s) => said.push(s), adapter, repoDir: dir, ...sessionStore() });
   assert.equal(typeof adapter.calls[0].onReasoning, 'function', 'the adapter request carries an onReasoning callback');
   assert.deepEqual(said.slice(2, 5), ['\x1b[90mAnalyst thinking...\n', "I'm", ' thinking this through'], 'reasoning text is forwarded to say() plain, inheriting the grey already set by "Analyst thinking..."');
 });
@@ -159,7 +159,7 @@ test('log is called once with the full prompt sent (\'bish\') and once with the 
     return {};
   });
   await runInterviewLoop({
-    interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir,
+    interviewPath, ...io(), ask: answerA, say: () => {}, adapter, repoDir: dir,
     log: (source, text) => logged.push([source, text]), ...sessionStore(),
   });
   assert.equal(logged[0][0], 'bish/analyst prompt');
@@ -173,7 +173,7 @@ test('log is only called with the "bish" entry, never an "agent" one, when the a
   const logged = [];
   const adapter = fakeAdapter();
   await runInterviewLoop({
-    interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir,
+    interviewPath, ...io(), ask: answerA, say: () => {}, adapter, repoDir: dir,
     log: (source, text) => logged.push([source, text]), ...sessionStore(),
   });
   assert.deepEqual(logged[0], ['bish/analyst prompt', logged[0][1]]);
@@ -191,7 +191,7 @@ test('buildInterviewLoopPrompt only prefaces bish-analyst-intro.js when includeI
 test('bish-analyst-intro.js is prefaced onto the agent prompt only on the very first round of a brand-new session, never on a later round in the same loop', async () => {
   const { path: interviewPath, dir } = makeFile();
   const adapter = fakeAdapter((req) => ({ session: req.session ? `${req.session}+` : 's1' }));
-  await runInterviewLoop({ interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir, ...sessionStore() });
+  await runInterviewLoop({ interviewPath, ...io(), ask: answerA, say: () => {}, adapter, repoDir: dir, ...sessionStore() });
   assert.ok(adapter.calls[0].prompt.startsWith(loadInterviewIntro().trimEnd()), 'first-ever round of this session: intro included');
   assert.equal(adapter.calls[1].prompt.startsWith(loadInterviewIntro().trimEnd()), false, 'second round of the same session: no intro');
 });
@@ -201,25 +201,49 @@ test('bish-analyst-intro.js is not re-included after a restart that resumes an a
   const adapter = fakeAdapter();
   const session = sessionStore();
   session.store.session = 's1'; // simulates a config.yml already carrying a session from a prior invocation
-  await runInterviewLoop({ interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir, ...session });
+  await runInterviewLoop({ interviewPath, ...io(), ask: answerA, say: () => {}, adapter, repoDir: dir, ...session });
   assert.equal(adapter.calls[0].prompt.startsWith(loadInterviewIntro().trimEnd()), false, 'a resumed session never gets the intro again, even on its first round since the restart');
 });
 
-test('once every question is answered, a further call reports ok with nothing left to ask or hand to the agent', async () => {
+// Answers every question with 'a', and declines the new-requirement offer that follows the last one.
+const answerA = async (_p, d) => (d === 'no' ? '' : 'a');
+
+test('once every question is answered, a call only offers a new requirement (default no) and does nothing on Enter', async () => {
   const { path: interviewPath, dir } = makeFile();
-  await runInterviewLoop({ interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter: fakeAdapter(), repoDir: dir, ...sessionStore() });
+  await runInterviewLoop({ interviewPath, ...io(), ask: answerA, say: () => {}, adapter: fakeAdapter(), repoDir: dir, ...sessionStore() });
+  const before = readFileSync(interviewPath, 'utf8');
   const adapter = fakeAdapter();
-  const res = await runInterviewLoop({ interviewPath, ...io(), ask: async () => { throw new Error('must not ask again'); }, say: () => {}, adapter, repoDir: dir, ...sessionStore() });
+  const asked = [];
+  const said = [];
+  const res = await runInterviewLoop({ interviewPath, ...io(), ask: async (p, d) => { asked.push(d); return ''; }, say: (s) => said.push(s), adapter, repoDir: dir, ...sessionStore() });
   assert.equal(res.status, 'ok');
   assert.equal(res.answered, 0);
+  assert.deepEqual(asked, ['no']);
+  assert.match(said.join(''), /All questions have been answered but would you like to describe a new requirement\?/);
   assert.equal(adapter.calls.length, 0);
+  assert.equal(readFileSync(interviewPath, 'utf8'), before);
+});
+
+test('an answer to the new-requirement offer is appended as a question and handed to the agent like any other', async () => {
+  const { path: interviewPath, dir } = makeFile();
+  await runInterviewLoop({ interviewPath, ...io(), ask: answerA, say: () => {}, adapter: fakeAdapter(), repoDir: dir, ...sessionStore() });
+  const adapter = fakeAdapter();
+  const replies = ['Add a dark mode', ''];
+  const messages = [];
+  const res = await runInterviewLoop({ interviewPath, ...io(), ask: async () => replies.shift(), say: () => {}, adapter, repoDir: dir, ...sessionStore(), commit: (m) => messages.push(m) });
+  assert.equal(res.status, 'ok');
+  assert.equal(res.answered, 1);
+  assert.equal(adapter.calls.length, 1);
+  assert.match(adapter.calls[0].prompt, /would you like to describe a new requirement\?\n\n## Answer\n\nAdd a dark mode/);
+  assert.match(readFileSync(interviewPath, 'utf8'), /\[x\] Q: All questions have been answered but would you like to describe a new requirement\? A: Add a dark mode/);
+  assert.equal(messages.length, 1);
 });
 
 test('the same session is threaded through every round, and persisted via saveSession/loadSession', async () => {
   const { path: interviewPath, dir } = makeFile();
   const adapter = fakeAdapter((req) => ({ session: req.session ? `${req.session}+` : 's1' }));
   const session = sessionStore();
-  await runInterviewLoop({ interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir, ...session });
+  await runInterviewLoop({ interviewPath, ...io(), ask: answerA, say: () => {}, adapter, repoDir: dir, ...session });
   assert.equal(adapter.calls[0].session, undefined, 'no session yet on the very first round');
   assert.equal(adapter.calls[1].session, 's1', 'the second round resumes what the first round returned');
   assert.equal(session.store.session, 's1+', 'the final session is persisted for a future bish invocation');
