@@ -6,16 +6,18 @@ import { acquireRunLock } from '../shared/run-lock.js';
 import { runBuildLoop } from './bosh-build-loop.js';
 import { runTestSuite, listTestFiles } from './bosh-test-runner.js';
 import { createLogger } from '../bish/bish-log.js';
-import { debugAdapter, parseRunArgs, loadRunProject } from '../cli/cli-lib.js';
+import { debugAdapter, parseRunArgs, loadRunProject, requireGitRepo } from '../cli/cli-lib.js';
+import { commitAll } from '../shared/git-commit.js';
 import { formatBuildLoopResult } from '../cli/cli-format.js';
 
 const templatesDir = join(dirname(fileURLToPath(import.meta.url)), 'templates');
+const SPEC_FILE = '.bish-bash-bosh/specification.md';
 const PLAN_FILE = '.bish-bash-bosh/plan.md';
 const LOG_FILE = '.bish-bash-bosh/bosh-log.md';
 const HARNESS_FILE = '.bish-bash-bosh/test-harness.js';
 const TESTS_DIR = '.bish-bash-bosh/tests';
 
-// `bosh`: the Build Loop (plan.md's dependency-ordered checklist items -> actual files and
+// `bosh`: the Build Loop (plan.md's prioritised checklist items -> actual files and
 // configuration in the project root). Requires plan.md to already exist (written by `bash`, the Plan
 // Loop) before it can run at all. Each unprocessed plan item is handed to a fresh-context build agent
 // call, gated by bosh's own code running the bundled test harness (never the agent's self-report)
@@ -27,6 +29,7 @@ export async function runBosh(cmd, argv, deps, out, err) {
     err(`${label}: ${parsed.error}\n`);
     return 2;
   }
+  if (!requireGitRepo(label, err)) return 2;
   const project = loadRunProject(label, err);
   if (!project) return 2;
   const { config, repo } = project;
@@ -48,6 +51,8 @@ export async function runBosh(cmd, argv, deps, out, err) {
     const adapter = debugAdapter(resolveAdapter(config, deps.registry ?? defaultRegistry), 'bosh', debug, out);
     const res = await runBuildLoop({
       planPath: join(repo, PLAN_FILE),
+      commit: (message) => commitAll(repo, message),
+      specPath: existsSync(join(repo, SPEC_FILE)) ? join(repo, SPEC_FILE) : undefined,
       readFile: (p) => readFileSync(p, 'utf8'),
       writeFile: (p, s) => writeFileSync(p, s),
       say: out,

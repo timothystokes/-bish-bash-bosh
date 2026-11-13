@@ -60,7 +60,7 @@ test('bosh says why when there is nothing to build: an empty plan versus an all-
   const empty = await go('# Plan\n\n');
   assert.equal(empty.code, 1);
   assert.match(empty.out, /Nothing to build: .*no checklist items/);
-  const done = await go('1. [x] Phase: A Task: t\n');
+  const done = await go('1. [x] T: t\n');
   assert.equal(done.code, 0);
   assert.match(done.out, /Nothing to build: all 1 plan item in plan\.md are already ticked/);
 });
@@ -70,7 +70,7 @@ test('bosh drives the Build Loop over every unprocessed plan.md item: fresh-cont
   commitProjectConfig(dir, config({ adapter: 'bl' }));
   writeFileSync(
     join(dir, '.bish-bash-bosh', 'plan.md'),
-    '# Plan\n\n1. [ ] Phase: Core. Task: Implement the login screen. Depends: None\n',
+    '# Plan\n\n1. [ ] T: Implement the login screen\n',
   );
   const adapter = {
     calls: [],
@@ -91,7 +91,7 @@ test('bosh drives the Build Loop over every unprocessed plan.md item: fresh-cont
   assert.match(out.join(''), /Build complete: 1 item processed this run\./);
   assert.ok(existsSync(join(dir, '.bish-bash-bosh', 'bosh-log.md')), 'bosh-log.md is created');
   const planAfter = readFileSync(join(dir, '.bish-bash-bosh', 'plan.md'), 'utf8');
-  assert.match(planAfter, /1\. \[x\] Phase: Core\. Task: Implement the login screen\. Depends: None/, 'the item is marked processed');
+  assert.match(planAfter, /1\. \[x\] T: Implement the login screen/, 'the item is marked processed');
   for (const call of adapter.calls) assert.ok(!Object.hasOwn(call, 'session'), 'bosh never opts into session tracking');
 });
 
@@ -100,7 +100,7 @@ test('bosh stops and leaves the item unticked when its own test gate fails, repo
   commitProjectConfig(dir, config({ adapter: 'bl' }));
   writeFileSync(
     join(dir, '.bish-bash-bosh', 'plan.md'),
-    '# Plan\n\n1. [ ] Phase: Core. Task: Implement the login screen. Depends: None\n',
+    '# Plan\n\n1. [ ] T: Implement the login screen\n',
   );
   const adapter = fakeAdapter();
   const out = [];
@@ -110,5 +110,5 @@ test('bosh stops and leaves the item unticked when its own test gate fails, repo
   assert.equal(adapter.calls.length, MAX_ATTEMPTS, 'only the test-writing step runs, retried up to the cap');
   assert.match(out.join(''), /Build stopped after 0 items/);
   const planAfter = readFileSync(join(dir, '.bish-bash-bosh', 'plan.md'), 'utf8');
-  assert.match(planAfter, /1\. \[ \] Phase: Core\./, 'left unticked so a later `bosh` run retries it');
+  assert.match(planAfter, /1\. \[ \] T: Implement the login screen/, 'left unticked so a later `bosh` run retries it');
 });

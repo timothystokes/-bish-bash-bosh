@@ -1,35 +1,10 @@
-Apply the following sequence to the single specification item to follow these instructions.
+Plan the build in one pass.
 
-0. First read the whole of `.bish-bash-bosh/plan.md`. Do not simply append work for this item at the end. Decide, for
-   this item, which of these apply, and do all that do:
-   - Already covered by existing plan items: add this item's id to their `S:` and adjust their task detail; add no
-     duplicate.
-   - Partly covered or conflicting: change the existing items (task detail, `S:`, `D:`, duration), or split or merge
-     them, so the plan describes the combined need.
-   - New work: add items into the dependency chain where they belong: give them a `D:` on the existing items they
-     need, and add them to the `D:` of existing items that need them. Where a line sits in the file does not matter
-     (new items may simply take the next free number); the dependency links are what place it in the build order.
-   - Existing items now depending on this new work (shared foundations, setup, data or interfaces) must have it added
-     to their `D:`. Keep dependencies acyclic.
-   The position of this specification item in the specification says nothing about where its work belongs in the plan.
-
-1. Append or adjust `.bish-bash-bosh/plan.md`'s checklist based on this item, organised into phases, one
-   numbered line per item: `<n>. [ ] P: <phase> T: <task> S: <specification-id(s)> D: <depends-on>`.
-   Numbers are unique, start at 1 and increase down the file; `Depends` lists the numbers of the items that must be
-   done before this one can start (never itself, no cycles). Each item small enough to implement and verify in one build loop ideally no more than 5 mins of work.
-
-2. Define the plan with a Mermaid Gantt chart: keep one fenced ```mermaid `gantt` block in `.bish-bash-bosh/plan.md`
-   (`dateFormat YYYY-MM-DD HH:mm`, `axisFormat %H:%M`), one `section` per phase, one task per numbered item, written as
-   `<task words> :t<n>, after t<a> t<b>, <n>m` (`:t<n>, <start date> 00:00, <n>m` when Depends is None, reusing the start date of the chart's first task, as a task with no dependency needs an explicit start date or Mermaid reports "Invalid date"; `done,` before the id once ticked).
-   Durations are the build agent's estimated minutes of work for that item (`5m`, `10m`, `15m`; whole minutes only,
-   never `d`/`w`).
-   Task names must be short labels (under 60 characters) with no `:`, `;` or `#`, as those break Mermaid's parser;
-   start each numbered line's `Task:` with that same short name, then ` - ` and the full detail, so humans can match
-   a line to its chart bar.
-   The chart and the numbered lines must always describe the same items, ids and dependencies.
-
-3. Don't renumber or physically reorder existing lines in `.bish-bash-bosh/plan.md` (new items may take the next free number wherever they sit). The build order is determined only by the `D:` references, so make them right.
-
-4. Stop!
-
-## Sepcification Item to process this time...
+1. Read the whole of `.bish-bash-bosh/specification.md`, then study the project's existing source files and tests. Do not assume anything is unimplemented: search the code first.
+2. Do a gap analysis: what the specification requires that the code does not yet provide.
+3. Write `.bish-bash-bosh/plan.md` as a prioritised checklist of concrete construction tasks, most important first. Order is build order: foundations and anything others rely on come before what uses them, and each task should leave the project in a working state.
+   - One numbered line per task: `<n>. [ ] T: <short name> - <what to build: the file/function/markup/style, what it does, how it is used> S: <specification ids>`
+   - Numbers are unique and start at 1. Each task is fine-grained: one concern, one new function or one file section, doable in about 5 minutes and checkable by a single small test. If a task needs "and" to describe it, or touches more than one function or file, split it (for example the page skeleton, each SVG symbol, each style rule group, each pure function, each event handler and each test file are separate tasks). Expect a typical small app to produce 15 to 30 tasks, not 5 to 10. Detail is one short sentence.
+   - Keep tasks that are already ticked (`[x]`) as they are. Update, split, reorder or remove unticked tasks freely; the plan is disposable.
+   - Tasks are construction work ("Create index.html with the 3x3 grid"), not restated requirements. No dependency lists, phases or charts.
+4. Stop.

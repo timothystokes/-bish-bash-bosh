@@ -222,3 +222,15 @@ test('the same session is threaded through every round, and persisted via saveSe
   assert.equal(adapter.calls[1].session, 's1', 'the second round resumes what the first round returned');
   assert.equal(session.store.session, 's1+', 'the final session is persisted for a future bish invocation');
 });
+
+test('the harness commits after each completed round, with the question and answer as the message', async () => {
+  const { path: interviewPath, dir } = makeFile();
+  const answers = ['my objective', ''];
+  let n = 0;
+  const messages = [];
+  await runInterviewLoop({ interviewPath, ...io(), ask: async () => answers[n++] ?? null, say: () => {}, adapter: fakeAdapter(), repoDir: dir, ...sessionStore(), commit: (m) => messages.push(m) });
+  assert.deepEqual(messages, [
+    'bish: Describe the objective in a sentence.\n\nAnswer: my objective',
+    'bish: Who are the users?\n\nAnswer: pre-filled default',
+  ]);
+});

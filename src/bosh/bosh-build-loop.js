@@ -1,12 +1,14 @@
-// The Build Loop: a deterministic walk through `.bish-bash-bosh/plan.md`'s dependency-ordered checklist
-// (see src/bash/prompts/bash-loop.md for the format the Plan Loop's agent writes into it: one numbered line per
-// item, `<n>. [ ] Phase: <phase> Task: <task> Depends: <item numbers or None>`), with a single checkbox ticked only once that item has been
+// The Build Loop: a deterministic walk through `.bish-bash-bosh/plan.md`'s prioritised checklist
+// (see src/bash/prompts/bash-loop.md for the format the Plan Pass's agent writes into it: one numbered line per
+// item in priority order, `<n>. [ ] T: <name> - <detail> S: <specification ids>`), with a single checkbox ticked only once that item has been
 // implemented, independently verified and both gates have passed. Unlike the Interview Loop there is
 // no human input: each unprocessed item is simply handed to the agent in turn. Every call — build or
 // QA — starts a fresh agent context (no continuing session, unlike `bish`/`bash`): the agent is
 // instructed to read `.bish-bash-bosh/plan.md` and the project's own source/test files rather than rely
 // on memory of earlier calls.
 import { loadModePrompt } from '../shared/prompts.js';
+import { subject } from '../shared/git-commit.js';
+import { updateSpecStatus } from './bosh-spec-status.js';
 
 const CYAN = '\x1b[1;36m';
 const GREY = '\x1b[90m';
@@ -17,11 +19,10 @@ const RESET = '\x1b[0m';
 export const MAX_ATTEMPTS = 5;
 const MAX_FAILURE_CHARS = 4000;
 
-const LINE = /^(\d+)\.\s*\[([ x])\]\s*(?:Phase|P):\s*(.*?)\s*(?:Task|T):\s*(.*?)(?:\s+S:\s*(?:.*?))?(?:\s+(?:Depends|D):\s*(.*))?$/;
+const LINE = /^(\d+)\.\s*\[([ x])\]\s*T:\s*(.*?)(?:\s+S:\s*(.*))?$/;
 
 // Parses the numbered plan lines out of a plan.md's text. Returns one entry per well-formed
-// `<n>. [ ] P: <phase> T: <task> S: <spec ids> D: <item numbers or None>` line (the long `Phase:`/`Task:`/`Depends:` labels and a missing S are also accepted), with its line index so
-// the loop can rewrite it in place. `Depends` is optional (missing or `None` = no dependencies).
+// `<n>. [ ] T: <name> - <detail> S: <spec ids>` line, with its line index so the loop can rewrite it in place.
 export function parsePlanItems(text) {
   const lines = text.split('\n');
   const out = [];
@@ -31,20 +32,22 @@ export function parsePlanItems(text) {
     out.push({
       id: Number(m[1]),
       checked: m[2] === 'x',
-      phase: m[3].trim(),
-      task: m[4].trim(),
-      dependsOn: (m[5] ?? '').match(/\d+/g)?.map(Number) ?? [],
+      task: m[3].trim(),
+      specs: (m[4] ?? '').match(/\d+/g)?.map(Number) ?? [],
       lineIndex: i,
     });
   }
   return out;
 }
 
-// The next plan item to hand to the agent: the first unchecked line whose dependencies are all
-// checked. A dependency naming an item number that does not exist is ignored rather than blocking.
+// The next plan item to hand to the agent: the first unchecked line. The plan is written in priority order
+// (see src/bash/prompts/bash-loop.md), so file order is build order.
 export function nextPlanItem(items) {
-  const open = new Set(items.filter((i) => !i.checked).map((i) => i.id));
-  return items.find((i) => !i.checked && !i.dependsOn.some((d) => d !== i.id && open.has(d))) ?? null;
+  return items.find((i) => !i.checked) ?? null;
+}
+
+function itemParts(item) {
+  return ['## Task', item.task, ...(item.specs?.length ? ['## Specification ids', item.specs.join(', ')] : [])];
 }
 
 function withFailure(parts, failure) {
@@ -55,23 +58,23 @@ function withFailure(parts, failure) {
 // Step 1's prompt (src/bosh/prompts/bosh-tests.md): write the harness verification tests for this item only,
 // no implementation. A retry also carries the failure the harness found under `## Previous Failure`.
 export function buildTestLoopPrompt(item, failure) {
-  return withFailure([loadModePrompt('test-loop'), '## Phase', item.phase, '## Task', item.task], failure);
+  return withFailure([loadModePrompt('test-loop'), ...itemParts(item)], failure);
 }
 
 // Step 2's prompt (src/bosh/prompts/bosh-build.md): implement the item so the tests written in step 1 pass. A
 // retry also carries the failing test output under `## Previous Failure`, tail-truncated.
 export function buildBuildLoopPrompt(item, failure) {
-  return withFailure([loadModePrompt('build-loop'), '## Phase', item.phase, '## Task', item.task], failure);
+  return withFailure([loadModePrompt('build-loop'), ...itemParts(item)], failure);
 }
 
 // Step 3's prompt (src/bosh/prompts/bosh-qa.md): independently verify against interview.md/specification.md/
 // plan.md and the source, fixing bugs directly. A retry carries the previous failure the same way.
 export function buildQaLoopPrompt(item, failure) {
-  return withFailure([loadModePrompt('qa-loop'), '## Phase', item.phase, '## Task', item.task], failure);
+  return withFailure([loadModePrompt('qa-loop'), ...itemParts(item)], failure);
 }
 
 // Ticks a plan item's checkbox by line index, re-reading the file first since something else may have
-// changed it meanwhile. Only the checkbox flips, so the item's number and Depends survive. A line that
+// changed it meanwhile. Only the checkbox flips, so the item's number and text survive. A line that
 // no longer matches (gone, or changed beyond recognition) is left alone rather than erroring.
 function markProcessed(planPath, readFile, writeFile, lineIndex) {
   const text = readFile(planPath);
@@ -112,6 +115,8 @@ async function callAgent(adapter, repoDir, prompt, log, persona) {
 /**
  * @param {{
  *   planPath: string,
+ *   specPath?: string,
+ *   commit?: (message: string) => unknown,
  *   readFile: (p: string) => string,
  *   writeFile: (p: string, s: string) => void,
  *   say: (s: string) => void,
@@ -124,6 +129,8 @@ async function callAgent(adapter, repoDir, prompt, log, persona) {
  */
 export async function runBuildLoop({
   planPath,
+  specPath,
+  commit = () => {},
   readFile,
   writeFile,
   say,
@@ -152,18 +159,17 @@ export async function runBuildLoop({
   }
 
   let processed = 0;
+  let spec;
   for (;;) {
     const text = readFile(planPath);
     const items = parsePlanItems(text);
     const next = nextPlanItem(items);
     if (!next) {
-      const stuck = items.find((i) => !i.checked);
       if (items.length === 0) return { status: 'empty', processed };
-      if (!stuck) return { status: 'ok', processed, total: items.length };
-      return { status: 'blocked', processed, item: stuck, output: `no item can start: every unticked item depends on another unticked item (${items.filter((i) => !i.checked).map((i) => `${i.id} needs ${i.dependsOn.join(', ')}`).join('; ')})` };
+      return { status: 'ok', processed, total: items.length, spec };
     }
-    say(`\n${CYAN}Phase: ${next.phase}${RESET}\n`);
-    const fail = (output) => ({ status: 'failed', processed, item: next, output });
+    say(`\n${CYAN}${next.task.split(' - ')[0]}${RESET}\n`);
+    const fail = (output) => ({ status: 'failed', processed, item: next, output, spec });
 
     const before = listTests({ cwd: repoDir });
     // An item whose implementation survived an interrupted earlier run can never go red. So tests that still
@@ -194,11 +200,14 @@ export async function runBuildLoop({
     const qaFailure = await step('Verifying', async (previous) => {
       await callAgent(adapter, repoDir, buildQaLoopPrompt(next, previous), log, 'bosh/verifier');
       const result = runTests({ cwd: repoDir });
+      if (result.ok && specPath) spec = updateSpecStatus(specPath, readFile, writeFile, result.output);
       return result.ok ? '' : result.output;
     });
     if (qaFailure) return fail(qaFailure);
 
     markProcessed(planPath, readFile, writeFile, next.lineIndex);
     processed++;
+    const [name, ...detail] = next.task.split(' - ');
+    commit([`bosh: ${subject(name)}`, detail.join(' - '), next.specs.length ? `Specification items: ${next.specs.join(', ')}` : '', spec ? `Specification status: ${spec.verified.length} verified, ${spec.failing.length} failing, ${spec.uncovered.length} untested` : ''].filter(Boolean).join('\n\n'));
   }
 }

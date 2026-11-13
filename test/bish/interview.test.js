@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadModePrompt } from '../../src/shared/prompts.js';
 import { main } from '../../src/cli/cli.js';
-import { writeProjectConfig, commitProjectConfig, withCwd } from '../support/project.js';
+import { writeProjectConfig, commitProjectConfig, withCwd, initGitRepo } from '../support/project.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
@@ -132,12 +132,12 @@ test('the agent session is persisted in .bish-bash-bosh/config.yml, not a separa
 test('bish usage errors exit 2', async () => {
   const err = /** @type {string[]} */ ([]);
   const e = (/** @type {string} */ s) => { err.push(s); };
-  const missing = mkdtempSync(join(tmpdir(), 'bish-int-missing-'));
+  const missing = initGitRepo(mkdtempSync(join(tmpdir(), 'bish-int-missing-')));
   writeFileSync(join(missing, 'README.md'), '# target\n');
   assert.equal(await withCwd(missing, () => main(['bish'], { input: Readable.from([]), stdout: () => {}, stderr: e })), 2);
   assert.match(err.join(''), /no adapter given/);
 
-  const norole = mkdtempSync(join(tmpdir(), 'bish-int-norole-'));
+  const norole = initGitRepo(mkdtempSync(join(tmpdir(), 'bish-int-norole-')));
   writeFileSync(join(norole, 'README.md'), '# target\n');
   writeProjectConfig(norole, config({ adapter: 'missing' }));
   mkdirSync(join(norole, '.bish-bash-bosh'), { recursive: true });

@@ -1,5 +1,6 @@
 import { createInterface } from 'node:readline';
 import { loadProjectConfig, CONFIG_FILE } from '../shared/project-config.js';
+import { isGitRepo } from '../shared/git-commit.js';
 
 export const LOGO = [
   ' \x1b[0;31m╷  .   ╷  \x1b[0m \x1b[0;32m╷        ╷  \x1b[0m \x1b[0;34m╷        ╷  \x1b[0m',
@@ -25,7 +26,7 @@ export function helpText() {
     '',
     '  -bash [Solution Design & Implementation Plan]',
     '    Usage: -bash [--debug]',
-    '    Refuses to run until `.bish-bash-bosh/specification.md` exists (run `-bish` first). The very first run writes `.bish-bash-bosh/plan.md` from its template, then falls straight into the Plan Loop, which hands each unprocessed specification.md item to the agent in turn (one dependency-ordered checklist per item, appended to plan.md) until every item is processed.',
+    '    Refuses to run until `.bish-bash-bosh/specification.md` exists (run `-bish` first). The very first run writes `.bish-bash-bosh/plan.md` from its template, then makes one agent call that studies the whole specification and the existing code and writes a prioritised checklist of build tasks into plan.md (re-run to re-plan).',
     '    Prints a plain summary of items processed; exit 0 only when ok.',
     '',
     '  -bosh [Build/Test & Verify]',
@@ -193,6 +194,13 @@ export function parseRunArgs(cmd, argv) {
 }
 
 // Loads the project config, writing a labelled error (and returning null) on failure.
+// Every command needs the project to be a git repo, since the harness commits each loop's work.
+export function requireGitRepo(label, err) {
+  if (isGitRepo('.')) return true;
+  err(`${label}: the project must be a git repository (run \`git init\`): the harness commits each loop's work.\n`);
+  return false;
+}
+
 export function loadRunProject(label, err) {
   const project = loadProjectConfig('.');
   if (!project.ok) {

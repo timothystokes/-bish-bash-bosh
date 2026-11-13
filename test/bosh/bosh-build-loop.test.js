@@ -9,36 +9,28 @@ import { loadModePrompt } from '../../src/shared/prompts.js';
 const sample = [
   '# Plan',
   '',
-  '1. [ ] Phase: High Level Design. Task: Establish architectural constraints. Depends: None',
-  '2. [ ] Phase: Core. Task: Implement the login screen. Depends: 1',
-  '3. [x] Phase: Done already. Task: Already implemented. Depends: None',
+  '1. [ ] T: Establish architectural constraints',
+  '2. [ ] T: Implement the login screen',
+  '3. [x] T: Already implemented',
   '',
 ].join('\n');
 
-test('parsePlanItems reads each numbered `N. [ ] Phase: ... Task: ... Depends: ...` line', () => {
+test('parsePlanItems reads each numbered `N. [ ] T: <name> - <detail> S: <ids>` line', () => {
   const items = parsePlanItems(sample);
   assert.equal(items.length, 3);
-  assert.deepEqual(items[0], { id: 1, checked: false, phase: 'High Level Design.', task: 'Establish architectural constraints.', dependsOn: [], lineIndex: 2 });
-  assert.equal(items[1].task, 'Implement the login screen.');
-  assert.deepEqual(items[1].dependsOn, [1]);
+  assert.deepEqual(items[0], { id: 1, checked: false, task: 'Establish architectural constraints', specs: [], lineIndex: 2 });
+  assert.equal(items[1].task, 'Implement the login screen');
   assert.equal(items[2].checked, true);
+  assert.deepEqual(parsePlanItems('1. [ ] T: Make the board - detail. S: 1, 12\n2. [x] T: Pick moves').map((i) => [i.id, i.checked, i.task, i.specs]), [
+    [1, false, 'Make the board - detail.', [1, 12]],
+    [2, true, 'Pick moves', []],
+  ]);
 });
 
-test('nextPlanItem is the first item not yet checked, skipping already-processed ones', () => {
-  assert.equal(nextPlanItem(parsePlanItems(sample))?.phase, 'High Level Design.');
-  assert.equal(nextPlanItem(parsePlanItems(sample.replace('1. [ ] Phase: High Level Design.', '1. [x] Phase: High Level Design.')))?.phase, 'Core.');
-});
-
-test('parsePlanItems reads a multi-number Depends list, treats a missing or None Depends as no dependencies', () => {
-  const items = parsePlanItems('4. [ ] Phase: P. Task: T. Depends: 1, 3\n5. [ ] Phase: P. Task: No depends label.\n');
-  assert.deepEqual(items.map((i) => i.dependsOn), [[1, 3], []]);
-  assert.equal(items[1].task, 'No depends label.');
-});
-
-test('nextPlanItem skips an unticked item whose dependencies are not all ticked, taking a later ready one first', () => {
-  const items = parsePlanItems('1. [ ] Phase: A. Task: a. Depends: 2\n2. [ ] Phase: B. Task: b. Depends: None\n');
-  assert.equal(nextPlanItem(items).id, 2);
-  assert.equal(nextPlanItem(parsePlanItems('1. [ ] Phase: A. Task: a. Depends: 2\n2. [x] Phase: B. Task: b. Depends: None\n')).id, 1);
+test('nextPlanItem is the first item not yet checked, in file order', () => {
+  assert.equal(nextPlanItem(parsePlanItems(sample))?.id, 1);
+  assert.equal(nextPlanItem(parsePlanItems(sample.replace('1. [ ]', '1. [x]')))?.id, 2);
+  assert.equal(nextPlanItem(parsePlanItems('1. [x] T: a\n')), null);
 });
 
 function makeFile(text = sample) {
@@ -80,17 +72,13 @@ function harness(over = {}) {
 const run = (planPath, dir, adapter, extra = {}) =>
   runBuildLoop({ planPath, ...io(), say: () => {}, adapter, repoDir: dir, ...harness(), ...extra });
 
-test('runBuildLoop builds a dependency before its dependent, ticks only the checkbox, and reports blocked on a dependency cycle', async () => {
-  const { path, dir } = makeFile('1. [ ] Phase: A. Task: first. Depends: 2\n2. [ ] Phase: B. Task: second. Depends: None\n');
+test('runBuildLoop builds items in plan order and ticks only the checkbox', async () => {
+  const { path, dir } = makeFile('1. [ ] T: first\n2. [ ] T: second\n');
   const adapter = fakeAdapter();
   const res = await run(path, dir, adapter);
   assert.equal(res.status, 'ok');
-  assert.match(adapter.calls[0].prompt, /## Task\n\nsecond\./, 'the dependency is built first');
-  assert.equal(readFileSync(path, 'utf8'), '1. [x] Phase: A. Task: first. Depends: 2\n2. [x] Phase: B. Task: second. Depends: None\n');
-  writeFileSync(path, '1. [ ] Phase: A. Task: a. Depends: 2\n2. [ ] Phase: B. Task: b. Depends: 1\n');
-  const blocked = await run(path, dir, fakeAdapter());
-  assert.equal(blocked.status, 'blocked');
-  assert.match(blocked.output, /1 needs 2; 2 needs 1/);
+  assert.match(adapter.calls[0].prompt, /## Task\n\nfirst/, 'the first line is built first');
+  assert.equal(readFileSync(path, 'utf8'), '1. [x] T: first\n2. [x] T: second\n');
 });
 
 for (const [name, build, mode] of [
@@ -98,12 +86,12 @@ for (const [name, build, mode] of [
   ['buildBuildLoopPrompt', buildBuildLoopPrompt, 'build-loop'],
   ['buildQaLoopPrompt', buildQaLoopPrompt, 'qa-loop'],
 ]) {
-  test(`${name} prefaces its mode prompt onto the item's phase and task, and tail-truncates a long previous failure`, () => {
-    const p = build({ phase: 'Core.', task: 'Implement the login screen.' });
+  test(`${name} prefaces its mode prompt onto the item's task, and tail-truncates a long previous failure`, () => {
+    const p = build({ task: 'Implement the login screen.' });
     assert.ok(p.startsWith(loadModePrompt(mode)));
-    assert.match(p, /## Phase\n\nCore\.\n\n## Task\n\nImplement the login screen\./);
+    assert.match(p, /## Task\n\nImplement the login screen\./);
     assert.doesNotMatch(p, /\n\n## Previous Failure/);
-    const long = build({ phase: 'P', task: 'T' }, `${'x'.repeat(10000)}END`);
+    const long = build({ task: 'T' }, `${'x'.repeat(10000)}END`);
     assert.ok(long.endsWith('xEND'));
     assert.ok(long.length < loadModePrompt(mode).length + 4200);
   });
@@ -121,13 +109,13 @@ test('each item runs three fresh-context steps in order: write tests, implement,
   assert.ok(adapter.calls[0].prompt.startsWith(loadModePrompt('test-loop')));
   assert.ok(adapter.calls[1].prompt.startsWith(loadModePrompt('build-loop')));
   assert.ok(adapter.calls[2].prompt.startsWith(loadModePrompt('qa-loop')));
-  assert.match(adapter.calls[0].prompt, /## Task\n\nEstablish architectural constraints\./);
+  assert.match(adapter.calls[0].prompt, /## Task\n\nEstablish architectural constraints/);
   assert.equal(adapter.calls[0].cwd, dir);
   for (const call of adapter.calls) assert.ok(!Object.hasOwn(call, 'session'), 'no call opts into session tracking');
 });
 
 test('the red check runs only the new or changed test files; the green check runs the full suite', async () => {
-  const { path, dir } = makeFile('1. [ ] Phase: A. Task: a. Depends: None\n');
+  const { path, dir } = makeFile('1. [ ] T: a\n');
   const runs = [];
   await run(path, dir, fakeAdapter(), { runTests: (o) => { runs.push(o.files); return o.files ? { ok: false, output: 'red' } : { ok: true, output: '' }; } });
   assert.deepEqual(runs, [['/t/a.test.js'], undefined, undefined]);
@@ -145,7 +133,7 @@ test('a test step that adds or changes no test file is retried with that feedbac
 });
 
 test('new tests that already pass are rejected (must be red before implementing), then accepted on a retry that makes them fail', async () => {
-  const { path, dir } = makeFile('1. [ ] Phase: A. Task: a. Depends: None\n');
+  const { path, dir } = makeFile('1. [ ] T: a\n');
   let reds = 0;
   const adapter = fakeAdapter();
   const res = await run(path, dir, adapter, {
@@ -202,7 +190,7 @@ test('shows each item in colour with a grey status line before each step', async
   const { path, dir } = makeFile();
   const said = [];
   await run(path, dir, fakeAdapter(), { say: (s) => said.push(s) });
-  assert.match(said[0], /\x1b\[1;36mPhase: High Level Design\.\x1b\[0m/);
+  assert.match(said[0], /\x1b\[1;36mEstablish architectural constraints\x1b\[0m/);
   assert.match(said[1], /^\x1b\[90mWriting tests\.\.\.\x1b\[0m\n$/);
   assert.match(said[2], /^\x1b\[90mImplementing\.\.\.\x1b\[0m\n$/);
   assert.match(said[3], /^\x1b\[90mVerifying\.\.\.\x1b\[0m\n$/);
@@ -214,15 +202,15 @@ test('once every item is processed, a further call reports ok with nothing left 
   const adapter = fakeAdapter();
   const res = await run(path, dir, adapter);
   assert.equal(res.processed, 2);
-  assert.match(adapter.calls[0].prompt, /Establish architectural constraints\./);
+  assert.match(adapter.calls[0].prompt, /Establish architectural constraints/);
   assert.ok(adapter.calls[0].prompt.startsWith(loadModePrompt('test-loop')));
   const again = fakeAdapter();
-  assert.deepEqual(await run(path, dir, again), { status: 'ok', processed: 0, total: 3 });
+  assert.deepEqual(await run(path, dir, again), { status: 'ok', processed: 0, total: 3, spec: undefined });
   assert.equal(again.calls.length, 0);
 });
 
 test('log gets each full prompt (\'bosh\'), streamed reasoning (\'agent\') only when streamed, and failure output when a gate fails', async () => {
-  const { path, dir } = makeFile('1. [ ] Phase: A. Task: a. Depends: None\n');
+  const { path, dir } = makeFile('1. [ ] T: a\n');
   const logged = [];
   await run(path, dir, fakeAdapter((req) => { req.onReasoning?.('step one, '); req.onReasoning?.('step two'); return {}; }), { log: (s, t) => logged.push([s, t]) });
   assert.equal(logged[0][0], 'bosh/tester prompt');
@@ -238,24 +226,36 @@ test('log gets each full prompt (\'bosh\'), streamed reasoning (\'agent\') only 
   assert.ok(failing.some((l) => l[0] === 'bosh/harness' && l[1].includes('boom')));
 });
 
-test('parsePlanItems reads the short P/T/S/D line format as well as the long labels', () => {
-  const items = parsePlanItems([
-    '1. [ ] P: Core T: Make the board - detail. S: Q1, Q2 D: None',
-    '2. [x] P: Core T: Pick moves S: Q1 D: 1, 3',
-    '3. [ ] Phase: Core Task: Old style Depends: 1',
-  ].join('\n'));
-  assert.deepEqual(items.map((i) => [i.id, i.checked, i.phase, i.task, i.dependsOn]), [
-    [1, false, 'Core', 'Make the board - detail.', []],
-    [2, true, 'Core', 'Pick moves', [1, 3]],
-    [3, false, 'Core', 'Old style', [1]],
-  ]);
-});
-
 test('tests that still pass on the retry are accepted (the item was implemented by an earlier interrupted run) and the loop carries on', async () => {
-  const { path, dir } = makeFile('1. [ ] Phase: A. Task: a. Depends: None\n');
+  const { path, dir } = makeFile('1. [ ] T: a\n');
   const adapter = fakeAdapter();
   const res = await run(path, dir, adapter, { runTests: () => ({ ok: true, output: 'all green' }) });
   assert.equal(res.status, 'ok');
   assert.equal(adapter.calls.filter((c) => c.prompt.startsWith(loadModePrompt('test-loop'))).length, 2);
   assert.ok(adapter.calls.some((c) => c.prompt.startsWith(loadModePrompt('build-loop'))));
+});
+
+test('the plan item\'s S: ids reach the tester prompt, and a green full run ticks only spec items whose tagged tests all pass', async () => {
+  const { path, dir } = makeFile('1. [ ] T: a S: 1, 2\n');
+  const specPath = join(dir, 'specification.md');
+  writeFileSync(specPath, '1. [ ] C: one. B: x\n2. [ ] C: two. B: y\n3. [ ] C: three. B: z\n');
+  const adapter = fakeAdapter();
+  const output = '✔ [S1] works (2ms)\n✔ [S2, S1] also (1ms)\n✖ [S2] breaks (1ms)\nℹ pass 2\n';
+  const res = await run(path, dir, adapter, { specPath, runTests: ({ files }) => ({ ok: !!files ? false : true, output }) });
+  assert.match(adapter.calls[0].prompt, /## Specification ids\n\n1, 2/);
+  assert.equal(res.status, 'ok');
+  assert.deepEqual(res.spec, { verified: [1], failing: [2], uncovered: [3] });
+  assert.equal(readFileSync(specPath, 'utf8'), '1. [x] C: one. B: x\n2. [ ] C: two. B: y\n3. [ ] C: three. B: z\n');
+});
+
+test('the harness commits once per completed item, with the task and its specification ids as the message', async () => {
+  const { path, dir } = makeFile('1. [ ] T: Create index.html - the page shell S: 2, 3\n2. [ ] T: Style the grid\n');
+  const messages = [];
+  await run(path, dir, fakeAdapter(), { commit: (m) => messages.push(m) });
+  assert.equal(messages.length, 2);
+  assert.match(messages[0], /^bosh: Create index\.html\n\nthe page shell\n\nSpecification items: 2, 3/);
+  assert.match(messages[1], /^bosh: Style the grid/);
+  const failed = [];
+  await run(path, dir, fakeAdapter(), { runTests: () => ({ ok: false, output: 'x' }), commit: (m) => failed.push(m) });
+  assert.deepEqual(failed, [], 'nothing is committed for an item that did not pass');
 });

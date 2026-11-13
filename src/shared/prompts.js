@@ -31,10 +31,7 @@ export function loadInterviewIntro() {
   return readFileSync(join(srcDir, 'bish', 'prompts', 'bish-loop-intro.md'), 'utf8');
 }
 
-/** `src/bash/prompts/bash-intro.md`'s raw content, prefaced (trimmed, by the caller) onto the very first agent
- * prompt of a new Plan Loop session only (`src/bash/bash-plan-loop.js`) — mirrors `loadInterviewIntro`
- * above exactly, for the same reason: never on a later item, never again after a restart that resumes
- * the same persisted `bashSession` id. */
+/** `src/bash/prompts/bash-intro.md`'s raw content, prefaced onto the planning prompt (`src/bash/bash-plan-loop.js`). */
 export function loadPlanIntro() {
   return readFileSync(join(srcDir, 'bash', 'prompts', 'bash-intro.md'), 'utf8');
 }

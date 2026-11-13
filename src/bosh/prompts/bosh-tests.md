@@ -16,5 +16,6 @@ or the new tests did not fail before any implementation): fix that first.
    immediately and rejects tests that already pass. (If an earlier interrupted run already implemented this item in the
    project, say so and keep your tests; the harness accepts them on the second attempt.)
 3. Do NOT implement the item, and do not change any file outside `.bish-bash-bosh/tests/`. A fresh agent implements it next.
-4. Never weaken or delete an existing test.
-5. Stop.
+4. Start every test's name with the specification item numbers it vouches for, taken from the `## Specification ids` below, as `[S3] ...` or `[S3, S5] ...`. The harness ticks a specification item only when every test tagged with it passes.
+5. Never weaken or delete an existing test.
+6. Stop.

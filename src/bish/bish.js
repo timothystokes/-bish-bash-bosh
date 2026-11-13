@@ -8,7 +8,8 @@ import { runInterviewLoop } from './bish-interview-loop.js';
 import { runBootstrap, README_FILE } from './bish-bootstrap.js';
 import { createLogger } from './bish-log.js';
 import { runReverse } from './bish-reverse.js';
-import { debugAdapter, createAsker, askChoice, parseRunArgs, loadRunProject } from '../cli/cli-lib.js';
+import { commitAll } from '../shared/git-commit.js';
+import { debugAdapter, createAsker, askChoice, parseRunArgs, loadRunProject, requireGitRepo } from '../cli/cli-lib.js';
 import { formatInterviewLoopResult, formatReverseResult } from '../cli/cli-format.js';
 import { initProject, ADAPTER_CHOICES, listModels } from '../shared/init.js';
 import { CONFIG_FILE } from '../shared/project-config.js';
@@ -27,6 +28,7 @@ export async function runBish(argv, deps, out, err) {
     err(`${label}: ${parsed.error}\n`);
     return 2;
   }
+  if (!requireGitRepo(label, err)) return 2;
   if (!reverse && !existsSync(README_FILE)) {
     err(`${label}: ${README_FILE} not found in the project root; write one describing the project, then run bish again\n`);
     return 2;
@@ -110,6 +112,7 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
         for (const f of seeded.slice(0, 2)) rmSync(f, { force: true });
         throw e;
       }
+      commitAll(repo, 'bish: draft specification and interview questions from README.md');
       out(`Wrote ${SPEC_FILE} and ${INTERVIEW_FILE} from README.md.\nReview them, then run \`bish\` again to start the interview.\n`);
       return 0;
     }
@@ -132,6 +135,7 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
           config.bishSession = session;
           writeFileSync(project.configPath, stringifyYaml(config));
         },
+        commit: (message) => commitAll(repo, message),
         log: createLogger(join(repo, LOG_FILE)),
       });
       out(formatInterviewLoopResult(res));

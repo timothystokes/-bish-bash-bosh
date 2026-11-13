@@ -14,7 +14,7 @@ import { freshDir, initGitRepo, withCwd } from '../support/project.js';
 function proj() {
   const dir = freshDir('init-');
   writeFileSync(join(dir, 'README.md'), '# target\n');
-  return dir;
+  return initGitRepo(dir);
 }
 
 // An agent that does the bootstrap step: replaces both seeded templates, as src/bish/prompts/bish-bootstrap.md asks.
@@ -54,17 +54,18 @@ test('commits the config when run inside a git repo (so the tree is clean for bi
   assert.equal(execFileSync('git', ['-C', dir, 'status', '--porcelain'], { encoding: 'utf8' }).trim(), '');
 });
 
-test('automatic setup commits only config and preserves unrelated staged changes', async () => {
+test('automatic setup makes its own commit of only the config, before the harness commits the bootstrap', async () => {
   const dir = proj();
   initGitRepo(dir);
   writeFileSync(join(dir, 'owner-work.txt'), 'unfinished owner work\n');
   execFileSync('git', ['-C', dir, 'add', 'owner-work.txt']);
   const r = await withCwd(dir, () => run(['bish'], ['agent-x', 'model-y'], { registry: draftingRegistry }));
   assert.equal(r.code, 0, r.err);
-  const committed = execFileSync('git', ['-C', dir, 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', 'HEAD'], { encoding: 'utf8' }).trim();
+  const root = execFileSync('git', ['-C', dir, 'rev-list', '--max-parents=0', 'HEAD'], { encoding: 'utf8' }).trim();
+  const committed = execFileSync('git', ['-C', dir, 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', root], { encoding: 'utf8' }).trim();
   assert.equal(committed, '.bish-bash-bosh/config.yml');
-  const staged = execFileSync('git', ['-C', dir, 'diff', '--cached', '--name-only'], { encoding: 'utf8' }).trim();
-  assert.equal(staged, 'owner-work.txt');
+  const head = execFileSync('git', ['-C', dir, 'log', '-1', '--format=%s'], { encoding: 'utf8' }).trim();
+  assert.match(head, /^bish: draft specification and interview questions/);
 });
 
 test('refuses to run if .bish-bash-bosh/config.yml already exists (no silent overwrite)', () => {
@@ -121,13 +122,15 @@ test('first bish asks for a single adapter/model, commits config and seeds and d
   assert.equal(execFileSync('git', ['-C', dir, 'show', 'HEAD:.bish-bash-bosh/config.yml'], { encoding: 'utf8' }), readFileSync(join(dir, '.bish-bash-bosh', 'config.yml'), 'utf8'));
 });
 
-test('first bish without git leaves the config uncommitted, with guidance', async () => {
-  const dir = proj();
-  const r = await withCwd(dir, () => run(['bish'], ['copilot', 'm1'], { registry: draftingRegistry }));
-  assert.equal(r.code, 0, r.err);
-  assert.match(r.out, /Wrote \.bish-bash-bosh\/config\.yml \(adapter: copilot, model: m1\)\./);
-  assert.match(r.out, /Commit it before running bish\/bosh/);
-  assert.match(r.out, /git add \.bish-bash-bosh\/config\.yml && git commit/);
+test('every command refuses a project that is not a git repository', async () => {
+  for (const cmd of ['bish', 'bash', 'bosh']) {
+    const dir = freshDir('nogit-');
+    writeFileSync(join(dir, 'README.md'), '# target\n');
+    const r = await withCwd(dir, () => run([cmd], []));
+    assert.equal(r.code, 2, cmd);
+    assert.match(r.err, /must be a git repository/, cmd);
+    assert.ok(!existsSync(join(dir, '.bish-bash-bosh')), cmd);
+  }
 });
 
 test('first bish picks adapter/model by number from the suggested list', async () => {

@@ -4,6 +4,7 @@
 // agent. Finding the next question to ask only ever looks at that one checkbox; the loop never reads
 // or writes anything else about a question's history.
 import { loadModePrompt, loadInterviewIntro } from '../shared/prompts.js';
+import { subject } from '../shared/git-commit.js';
 
 const CYAN = '\x1b[1;36m';
 const YELLOW = '\x1b[33m';
@@ -101,6 +102,7 @@ function markProcessed(interviewPath, readFile, writeFile, id) {
  *   repoDir?: string,
  *   loadSession?: () => unknown,
  *   saveSession?: (session: unknown) => void,
+ *   commit?: (message: string) => unknown,
  *   log?: (source: string, text: string) => void,
  * }} opts
  */
@@ -114,6 +116,7 @@ export async function runInterviewLoop({
   repoDir,
   loadSession = () => undefined,
   saveSession = (/** @type {unknown} */ _session) => {},
+  commit = () => {},
   log = (/** @type {string} */ _source, /** @type {string} */ _text) => {},
 }) {
   let answered = 0;
@@ -155,5 +158,6 @@ export async function runInterviewLoop({
 
     markProcessed(interviewPath, readFile, writeFile, next.id);
     answered++;
+    commit(`bish: ${subject(next.question)}\n\nAnswer: ${answer}`);
   }
 }

@@ -7,13 +7,13 @@ import { join } from 'node:path';
 import { runReverse, buildReversePrompt } from '../../src/bish/bish-reverse.js';
 import { loadModePrompt } from '../../src/shared/prompts.js';
 import { main } from '../../src/cli/cli.js';
-import { writeProjectConfig, commitProjectConfig, withCwd } from '../support/project.js';
+import { writeProjectConfig, commitProjectConfig, withCwd, initGitRepo } from '../support/project.js';
 
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ ...a) =>
   execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8' }).trim();
 
 function makeRepo() {
-  const dir = mkdtempSync(join(tmpdir(), 'bish-rev-'));
+  const dir = initGitRepo(mkdtempSync(join(tmpdir(), 'bish-rev-')));
   git(dir, 'init', '-q', '-b', 'main');
   git(dir, 'config', 'user.email', 't@example.com');
   git(dir, 'config', 'user.name', 'T');
@@ -131,7 +131,7 @@ test('bish --reverse uses the configured adapter; usage errors exit 2', async ()
   assert.equal(bad, 1);
 
   const err = /** @type {string[]} */ ([]);
-  const noRoleDir = mkdtempSync(join(tmpdir(), 'bish-rev-norole-'));
+  const noRoleDir = initGitRepo(mkdtempSync(join(tmpdir(), 'bish-rev-norole-')));
   writeProjectConfig(noRoleDir, config({ adapter: 'missing' }));
   assert.equal(await withCwd(noRoleDir, () => main(['bish', '--reverse'], { registry, stdout: () => {}, stderr: (s) => { err.push(s); } })), 2);
   assert.match(err.join(''), /unknown adapter 'missing'/);

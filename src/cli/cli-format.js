@@ -14,23 +14,28 @@ export function formatInterviewLoopResult(res) {
   return `Paused after ${plural(answered, 'question')}: ${plural(res.remaining, 'question')} left. Run \`-bish\` again to continue.\n`;
 }
 
-// `-bash`'s Plan Loop (runPlanLoop): {status, processed}. Unlike the Interview Loop there is no
-// pause state: every unprocessed specification item is handed to the agent in one run.
+// `-bash`'s single planning pass (runPlanLoop): {status, items, open}.
 export function formatPlanLoopResult(res) {
-  return `Plan complete: ${plural(res.processed, 'item')} processed this run.\n`;
+  return `Plan ready: ${plural(res.items, 'item')} in .bish-bash-bosh/plan.md, ${res.open} left to build. Run \`-bosh\` next.\n`;
 }
 
-// `-bosh`'s Build Loop (runBuildLoop): {status, processed}; 'blocked' when unticked items remain but none has all its dependencies ticked. Same shape and the same reasoning as
-// formatPlanLoopResult above: every unprocessed plan.md item is handed to the agent in one run.
+// `-bosh`'s Build Loop (runBuildLoop): {status, processed}.
+function formatSpecStatus(spec) {
+  if (!spec) return '';
+  const ids = (list) => (list.length ? ` (${list.join(', ')})` : '');
+  return `Specification: ${spec.verified.length} verified${ids(spec.verified)}, ${spec.failing.length} failing${ids(spec.failing)}, ${spec.uncovered.length} with no tagged tests${ids(spec.uncovered)}.\n`;
+}
+
 export function formatBuildLoopResult(res) {
-  if (res.status === 'blocked') {
-    return `Build stopped after ${plural(res.processed, 'item')}: ${res.output}. Fix the Depends lines in plan.md, then run \`-bosh\` again.\n`;
-  }
+  return formatBuildLoopMain(res) + formatSpecStatus(res.spec);
+}
+
+function formatBuildLoopMain(res) {
   if (res.status === 'empty') {
-    return 'Nothing to build: .bish-bash-bosh/plan.md has no checklist items (lines like `1. [ ] P: … T: … S: … D: …`). Run `-bash` to create the plan.\n';
+    return 'Nothing to build: .bish-bash-bosh/plan.md has no checklist items (lines like `1. [ ] T: <name> - <detail> S: <ids>`). Run `-bash` to create the plan.\n';
   }
   if (res.status === 'failed') {
-    return `Build stopped after ${plural(res.processed, 'item')}: tests failed (or QA kept failing) on "${res.item.phase}: ${res.item.task}" (unticked; run \`-bosh\` again to retry).\n${res.output}\n`;
+    return `Build stopped after ${plural(res.processed, 'item')}: tests failed (or QA kept failing) on "${res.item.task}" (unticked; run \`-bosh\` again to retry).\n${res.output}\n`;
   }
   if (res.processed === 0 && res.total) return `Nothing to build: all ${plural(res.total, 'plan item')} in plan.md are already ticked.\n`;
   return `Build complete: ${plural(res.processed, 'item')} processed this run.\n`;
