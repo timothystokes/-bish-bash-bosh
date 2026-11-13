@@ -23,8 +23,8 @@ The following specifications from '.bish-bash-bosh/specification.md' directly re
 
 # Instructions
 
-1. Write or change the project files that would be required to make this item's tests pass. 
+ALL user specified requirements MUST be implemented in the users main project folder not in .bish-bash-bosh
 
-2. Build exactly what those tests focus on as the definition of done for this item.
+Build exactly what those tests focus on as the definition of done for this item.
 
-3. Provide your assurance that you feel the work you have done will satisfy the test scenarios for this item OR provide feedback if you feel you can't satisfy the tests as they are for some reason, as a final line starting with `TEST FEEDBACK:`.
+Provide your assurance that you feel the work you have done will satisfy the test scenarios for this item OR provide feedback if you feel you can't satisfy the tests as they are for some reason, as a final line starting with `TEST FEEDBACK:`.

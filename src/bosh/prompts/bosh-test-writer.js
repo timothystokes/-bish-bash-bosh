@@ -1,4 +1,4 @@
-export default (item, feedback, testfile, specrows) => `
+export default (item, feedback, testfile, specrows, questions) => `
 You are a Test Writer and part of an agentic software development harness called -bish-bash-bosh. 
 
 Your job is to consider the following implementation item in relation to the current state of the implementation and the specifications and update (but never execute) this test file '${testfile}' which will be used later to ensure -bish-bash-bosh has implemented the item correctly.
@@ -8,9 +8,16 @@ ${item}
 
 # Context
 
+The user's own description of what is being built is in \`README.md\`.
+
 ${specrows
     ? `The following specifications from '.bish-bash-bosh/specification.md' directly relate to this item:
 ${specrows}` : ''
+}
+
+${questions
+    ? `The following questions and answers from '.bish-bash-bosh/interview.md' drove those specifications:
+${questions}` : ''
 }
 
 ${feedback ? `There is also some feedback for you from other processes:

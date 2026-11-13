@@ -8,12 +8,18 @@ Your job is to consider the following implementation item in relation to the cur
 
 # Context
 
+The user's own description of what is being built is in `README.md`.
+
 The following specifications from '.bish-bash-bosh/specification.md' directly relate to this item:
 3. [ ] C: <constraint> B: <benefit> Q: TBC
 
 
 
+
+
 # Instructions
+
+ALL user specified requirements to be tested MUST be implemented in the users main project folder not in .bish-bash-bosh
 
 There is an expectation that your test scenarios should initially fail following the principles of TDD.
 

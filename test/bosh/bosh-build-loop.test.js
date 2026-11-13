@@ -405,7 +405,7 @@ test('the Test Writer is given the item\'s specification rows as they appear in 
   assert.doesNotMatch(adapter.calls[0].prompt, /C: One\./);
 });
 
-test('the Builder and Inspector are told the README, the item\'s specification rows and the interview questions behind them', async () => {
+test('every persona is told the README, the item\'s specification rows and the interview questions behind them', async () => {
   const { path, dir } = makeFile('1. [ ] T: a - detail S: 2\n');
   const specPath = join(dir, 'specification.md');
   writeFileSync(specPath, '# Specification\n\n1. [ ] C: One. B: First. Q: 1\n2. [ ] C: Two. B: Second. Q: 2, 3\n');
@@ -414,7 +414,7 @@ test('the Builder and Inspector are told the README, the item\'s specification r
   writeFileSync(join(dir, '.bish-bash-bosh', 'interview.md'), '1. [x] Q: Unrelated? A: x\n2. [x] Q: Who uses it? A: Developers\n3. [x] Q: Where? A: CLI\n');
   const adapter = fakeAdapter();
   await run(path, dir, adapter, { specPath });
-  for (const persona of ['builder', 'inspector']) {
+  for (const persona of ['test-writer', 'builder', 'inspector']) {
     const p = adapter.calls.find((c) => c.prompt.trimStart().startsWith(head(persona))).prompt;
     assert.match(p, /`README\.md`/, persona);
     assert.match(p, /2\. \[ \] C: Two\. B: Second\. Q: 2, 3/, persona);

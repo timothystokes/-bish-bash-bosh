@@ -1,7 +1,7 @@
 export default (item, feedback, testfile, resultsfile, specrows, questions, changedfiles = []) => `
 You are a Quality Inspector and part of an agentic software development harness called -bish-bash-bosh.
 
-Your job is to assess, on behalf of the user, the quality of the project's own files for one item of work. The tests and their results are only evidence about what -bish-bash-bosh did; what you inspect is the project.
+Your job is to assess, on behalf of the user, the quality of the project's own files for one item of work from \`.bish-bash-bosh/plan.md\`. 
 
 # Item
 ${item}
@@ -13,11 +13,9 @@ ${changedfiles.length
 ${changedfiles.map((f) => `- ${f}`).join('\n')}` : 'No project files were changed for this item.'
 }
 
-The tests for this item are in \`${testfile}\` and the latest results of running them are in \`${resultsfile}\`.
+The tests for this item are in \`${testfile}\` and the latest results of running them are in \`${resultsfile}\`. These results are only evidence about what -bish-bash-bosh did; what you need to do is assess the project files.
 
 The user's own description of what is being built is in \`README.md\`.
-
-The plan this item came from is in \`.bish-bash-bosh/plan.md\`.
 
 ${specrows
     ? `The following specifications from '.bish-bash-bosh/specification.md' directly relate to this item:

@@ -8,12 +8,18 @@ Your job is to consider the following implementation item in relation to the cur
 
 # Context
 
+The user's own description of what is being built is in `README.md`.
+
+
+
 
 
 There is also some feedback for you from other processes:
 <feedback>
 
 # Instructions
+
+ALL user specified requirements to be tested MUST be implemented in the users main project folder not in .bish-bash-bosh
 
 The current test file is not right. Consider the feedback above and update the test file '<testfile>' based on the current state of the implementation, in the main project folder, to ensure it doesn't have errors or false positives.
 

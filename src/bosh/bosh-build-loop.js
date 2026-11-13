@@ -113,8 +113,8 @@ function clip(failure) {
 
 // Step 1's prompt (src/bosh/prompts/bosh-test-writer.js): write the harness verification tests for this item only,
 // no implementation. A retry also carries the failure the harness found under `## Feedback`.
-export function buildTestLoopPrompt(item, failure, specText = '') {
-  return testWriterPrompt(describeItem(item), clip(failure ?? ''), testFileFor(item), specRowsFor(item, specText));
+export function buildTestLoopPrompt(item, failure, specrows = '', questions = '') {
+  return testWriterPrompt(describeItem(item), clip(failure ?? ''), testFileFor(item), specrows, questions);
 }
 
 // Step 2's prompt (src/bosh/prompts/bosh-builder.js): implement the item so the tests written in step 1 pass. A
@@ -263,7 +263,7 @@ export async function runBuildLoop({
         // pass on the retry are accepted (the Inspector then checks the work) instead of failing the item.
         let alreadyGreen = 0;
         const redFailure = await step('Test Writer', async (previous) => {
-          const { violations } = await callAgent(adapter, repoDir, buildTestLoopPrompt(next, previous, specPath ? readFile(specPath) : ''), log, 'bosh/test-writer', 'test-writer');
+          const { violations } = await callAgent(adapter, repoDir, buildTestLoopPrompt(next, previous, ...contextFor(next, { repoDir, specPath, readFile })), log, 'bosh/test-writer', 'test-writer');
           if (violations.length) return describeViolations('test-writer', violations);
           const after = listTests({ cwd: repoDir });
           const touched = [...after].filter(([path, stamp]) => before.get(path) !== stamp).map(([path]) => path);
