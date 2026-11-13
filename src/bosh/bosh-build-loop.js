@@ -10,6 +10,7 @@ import { describeTestErrors } from './bosh-test-runner.js';
 import testWriterPrompt from './prompts/bosh-test-writer.js';
 import builderPrompt from './prompts/bosh-builder.js';
 import { join } from 'node:path';
+import testFileTemplate from './templates/bosh-test-file.js';
 import inspectorPrompt from './prompts/bosh-inspector.js';
 import { subject } from '../shared/git-commit.js';
 import { updateSpecStatus } from './bosh-spec-status.js';
@@ -55,8 +56,8 @@ const specTag = (specs) => `[${specs.map((n) => `S${n}`).join(', ')}]`;
 
 // The item text handed to every build persona: the task and its specification ids.
 function describeItem(item) {
-  const specs = item.specs?.length ? [`## Specification ids\n\n${item.specs.map((n) => `S${n}`).join(', ')}: start the name of every test with them, as \`${specTag(item.specs)} ...\`.`] : [];
-  return ['## Task', item.task, ...specs].join('\n\n');
+  const specs = item.specs?.length ? [`Specification ids ${item.specs.map((n) => `S${n}`).join(', ')}: start the name of every test with them, as \`${specTag(item.specs)} ...\`.`] : [];
+  return [item.task, ...specs].join('\n\n');
 }
 
 // The one test file for an item, named from its number, task and specification ids, so every step and retry agrees on it.
@@ -64,6 +65,16 @@ export function testFileFor(item) {
   const slug = item.task.split(' - ')[0].toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50).replace(/-+$/, '') || 'item';
   const specs = item.specs?.length ? `.${item.specs.map((n) => `s${n}`).join('-')}` : '';
   return `.bish-bash-bosh/tests/${String(item.id).padStart(2, '0')}-${slug}${specs}.test.js`;
+}
+
+// Writes the item's starter test file unless an earlier run already left one.
+function ensureTestFile(repoDir, item, readFile, writeFile) {
+  const path = join(repoDir, testFileFor(item));
+  try {
+    readFile(path);
+  } catch {
+    writeFile(path, testFileTemplate(item.task.split(' - ')[0], item.specs ?? []));
+  }
 }
 
 function clip(failure) {
@@ -197,6 +208,7 @@ export async function runBuildLoop({
 
     // The Builder never edits tests: when it finds one defective it sends feedback, and the Test Writer fixes it
     // before the Builder runs again (at most MAX_TEST_ROUNDS times per item).
+    ensureTestFile(repoDir, next, readFile, writeFile);
     let testFeedback = '';
     let greenFailure = '';
     let latestResults = '';

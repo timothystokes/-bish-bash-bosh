@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path';
 import { parsePlanItems, nextPlanItem, runBuildLoop, buildTestLoopPrompt, buildBuildLoopPrompt, buildQaLoopPrompt, testFileFor, TEST_RESULTS_FILE, MAX_ATTEMPTS } from '../../src/bosh/bosh-build-loop.js';
 
 // What each persona's prompt opens with.
-const head = (mode) => ({ 'test-writer': 'You are a Test Writer', builder: 'You are the Builder', inspector: 'You are a Quality Inspector' })[mode];
+const head = (mode) => ({ 'test-writer': 'You are a Test Writer', builder: 'You are a software Builder', inspector: 'You are a Quality Inspector' })[mode];
 
 const sample = [
   '# Plan',
@@ -79,7 +79,7 @@ test('runBuildLoop builds items in plan order and ticks only the checkbox', asyn
   const adapter = fakeAdapter();
   const res = await run(path, dir, adapter);
   assert.equal(res.status, 'ok');
-  assert.match(adapter.calls[0].prompt, /## Task\n\nfirst/, 'the first line is built first');
+  assert.match(adapter.calls[0].prompt, /first/, 'the first line is built first');
   assert.equal(readFileSync(path, 'utf8'), '1. [x] T: first\n2. [x] T: second\n');
 });
 
@@ -91,7 +91,7 @@ for (const [name, build, mode] of [
   test(`${name} prefaces its mode prompt onto the item's task, and tail-truncates a long previous failure`, () => {
     const p = build({ task: 'Implement the login screen.' });
     assert.ok(p.trimStart().startsWith(head(mode)));
-    assert.match(p, /## Task\n\nImplement the login screen\./);
+    assert.match(p, /Implement the login screen\./);
     assert.doesNotMatch(p, /# Feedback/);
     const long = build({ task: 'T' }, `${'x'.repeat(10000)}END`);
     assert.match(long, /xEND\n/);
@@ -111,7 +111,7 @@ test('each item runs three fresh-context steps in order: write tests, implement,
   assert.ok(adapter.calls[0].prompt.trimStart().startsWith(head('test-writer')));
   assert.ok(adapter.calls[1].prompt.trimStart().startsWith(head('builder')));
   assert.ok(adapter.calls[2].prompt.trimStart().startsWith(head('inspector')));
-  assert.match(adapter.calls[0].prompt, /## Task\n\nEstablish architectural constraints/);
+  assert.match(adapter.calls[0].prompt, /Establish architectural constraints/);
   assert.equal(adapter.calls[0].cwd, dir);
   for (const call of adapter.calls) assert.ok(!Object.hasOwn(call, 'session'), 'no call opts into session tracking');
 });
@@ -244,7 +244,7 @@ test('the plan item\'s S: ids reach the tester prompt, and a green full run tick
   const adapter = fakeAdapter();
   const output = '✔ [S1] works (2ms)\n✔ [S2, S1] also (1ms)\n✖ [S2] breaks (1ms)\nℹ pass 2\n';
   const res = await run(path, dir, adapter, { specPath, runTests: ({ files }) => ({ ok: !!files ? false : true, output }) });
-  assert.match(adapter.calls[0].prompt, /## Specification ids\n\nS1, S2/);
+  assert.match(adapter.calls[0].prompt, /Specification ids S1, S2/);
   assert.equal(res.status, 'ok');
   assert.deepEqual(res.spec, { verified: [1], failing: [2], uncovered: [3] });
   assert.equal(readFileSync(specPath, 'utf8'), '1. [x] C: one. B: x\n2. [ ] C: two. B: y\n3. [ ] C: three. B: z\n');
@@ -284,14 +284,14 @@ test('a Builder TEST FEEDBACK reply goes back to the Test Writer, then the Build
   const adapter = {
     async run(req) {
       prompts.push(req.prompt);
-      if (req.prompt.includes('You are the Builder')) return { transcript: ++builds === 1 ? 'The probe is broken.\nTEST FEEDBACK: t.test.js: board is not defined' : 'done' };
+      if (req.prompt.includes('You are a software Builder')) return { transcript: ++builds === 1 ? 'The probe is broken.\nTEST FEEDBACK: t.test.js: board is not defined' : 'done' };
       return { transcript: '' };
     },
   };
   let stamp = 0;
   const res = await run(path, dir, adapter, { listTests: () => new Map([['t.test.js', String(stamp++)]]) });
   assert.equal(res.status, 'ok');
-  const who = prompts.map((p) => /You are (?:the|a) (?:Quality )?(Test Writer|Builder|Inspector)/.exec(p)[1]);
+  const who = prompts.map((p) => /You are (?:the|a) (?:Quality |software )?(Test Writer|Builder|Inspector)/.exec(p)[1]);
   assert.deepEqual(who.slice(0, 4), ['Test Writer', 'Builder', 'Test Writer', 'Builder']);
   assert.match(prompts[2], /t\.test\.js: board is not defined/);
 });
@@ -318,4 +318,17 @@ test('the Inspector is pointed at a results file holding the latest full-suite o
   assert.equal(out.status, 'ok');
   assert.ok(adapter.calls.at(-1).prompt.includes(TEST_RESULTS_FILE));
   assert.equal(readFileSync(join(dir, TEST_RESULTS_FILE), 'utf8'), 'SUITE OUTPUT');
+});
+
+test('each item gets a starter test file with the harness import and its spec tag, unless one already exists', async () => {
+  const { path, dir } = makeFile('1. [ ] T: a - detail S: 3\n');
+  const item = parsePlanItems(readFileSync(path, 'utf8'))[0];
+  let seen = '';
+  const adapter = fakeAdapter((req, n) => {
+    if (n === 1) seen = readFileSync(join(dir, testFileFor(item)), 'utf8');
+    return {};
+  });
+  await run(path, dir, adapter);
+  assert.match(seen, /from '\.\.\/test-harness\.js'/);
+  assert.match(seen, /\[S3\]/);
 });

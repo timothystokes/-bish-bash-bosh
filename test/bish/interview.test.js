@@ -60,8 +60,8 @@ test('bish on a fresh repo seeds the stores from their templates, has the agent 
   const out = /** @type {string[]} */ ([]);
   // the very first run seeds from the templates and makes one bootstrap agent call: no run folder
   const seedCode = await withCwd(dir, () =>
-    main(['bish'], { registry, identity, stdout: (s) => { out.push(s); }, stderr: () => {} }));
-  assert.equal(seedCode, 0);
+    main(['bish'], { registry, identity, input: Readable.from([]), stdout: (s) => { out.push(s); }, stderr: () => {} }));
+  assert.equal(seedCode, 1, 'the interview carries straight on and pauses at EOF before its first answer');
   assert.equal(seed.prompts.length, 1, 'one bootstrap agent call');
   assert.equal(seed.prompts[0], analystInitPrompt());
   assert.match(out.join(''), /Wrote \.bish-bash-bosh\/specification\.md and \.bish-bash-bosh\/interview\.md from README\.md/);

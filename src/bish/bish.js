@@ -75,7 +75,7 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
   // file from their templates, creates an empty bish-log.md (every prompt sent to the agent and every
   // piece of its own output shown in the console gets appended there from then on, see bish-log.js),
   // then makes one agent call (src/bish/prompts/bish-analyst-init.js) that turns README.md into a baseline spec and
-  // the first interview questions. It stops there so the owner can review before the interview starts.
+  // the first interview questions. The interview then carries straight on in the same run; the owner can stop at any question.
   const firstRun = !reverse && !existsSync(join(repo, INTERVIEW_FILE));
   // A restart after the first run: both files should already exist; self-heal spec.md alone if it
   // was somehow lost, rather than failing a run the owner can otherwise just continue.
@@ -113,8 +113,7 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
         throw e;
       }
       commitAll(repo, 'bish: draft specification and interview questions from README.md');
-      out(`Wrote ${SPEC_FILE} and ${INTERVIEW_FILE} from README.md.\nReview them, then run \`bish\` again to start the interview.\n`);
-      return 0;
+      out(`Wrote ${SPEC_FILE} and ${INTERVIEW_FILE} from README.md. Starting the interview...\n`);
     }
     if (!reverse) {
       // Each round's answer is captured by the deterministic checkbox walk below; the agent only

@@ -4,11 +4,13 @@ You are doing a single pass requirements capture process, for a new software del
 
 The files `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` were just created and now it's up to you to do the following steps .
 
-1. Update `.bish-bash-bosh/specification.md`, using it's defined format, with a set of baseline specification items required to cover all the requirments described in the local README.md
+1. Prepend a top level heading `# Objective` to the very top of `.bish-bash-bosh/specification.md`, followed by one paragraph summarising the user's broad objective from the local README.md. Later steps of the harness read it for context.
 
-2. Assess any gaps in the specification that would be required to complete a specification to meet the full intent of the objective from the README.md
+2. Update `.bish-bash-bosh/specification.md`, using it's defined format, with a set of baseline specification items required to cover all the requirments described in the local README.md
 
-3. Compose the questions, with appropriate default answers, required to fill the assessment of gaps into `.bish-bash-bosh/interview.md` using it's defined format.
+3. Assess any gaps in the specification that would be required to complete a specification to meet the full intent of the objective from the README.md
+
+4. Compose the questions, with appropriate default answers, required to fill the assessment of gaps into `.bish-bash-bosh/interview.md` using it's defined format.
 
 ## Working with the files
 

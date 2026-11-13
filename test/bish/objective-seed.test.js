@@ -53,8 +53,8 @@ test('bish on a fresh project seeds interview.md, then the Interview Loop asks i
   // first run seeds .bish-bash-bosh/interview.md from the template and has the agent draft it from README.md
   let seed = '';
   const seedCode = await withCwd(repo, () =>
-    main(['bish'], { registry: { 'agent-x': draftingAdapter }, input: Readable.from(['\n']), stdout: (s) => (seed += s), stderr: () => {} }));
-  assert.equal(seedCode, 0, seed);
+    main(['bish'], { registry: { 'agent-x': draftingAdapter }, input: Readable.from([]), stdout: (s) => (seed += s), stderr: () => {} }));
+  assert.equal(seedCode, 1, seed);
   assert.equal(git(repo, 'log', '-1', '--format=%s'), 'bish: draft specification and interview questions from README.md', 'the harness committed the draft');
   let out = '';
   /** @type {string[]} */

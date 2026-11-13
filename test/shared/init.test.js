@@ -20,6 +20,8 @@ function proj() {
 // An agent that does the bootstrap step: replaces both seeded templates, as src/bish/prompts/bish-analyst-init.js asks.
 const drafting = () => ({
   async run(req) {
+    // Only the bootstrap call drafts; the interview that follows in the same run gets an agent that does nothing.
+    if (!req.prompt.startsWith('# Initial Specification')) return { exitStatus: 0, transcript: '', changedFiles: [] };
     writeFileSync(join(req.cwd, '.bish-bash-bosh', 'specification.md'), '# Specification\n\n1. [ ] C: Greet. B: Friendly.\n');
     writeFileSync(join(req.cwd, '.bish-bash-bosh', 'interview.md'), '# Interview\n\n1. [ ] Q: Who uses it? A: Developers\n');
     return { exitStatus: 0, transcript: '', changedFiles: [] };
@@ -60,7 +62,7 @@ test('automatic setup makes its own commit of only the config, before the harnes
   writeFileSync(join(dir, 'owner-work.txt'), 'unfinished owner work\n');
   execFileSync('git', ['-C', dir, 'add', 'owner-work.txt']);
   const r = await withCwd(dir, () => run(['bish'], ['agent-x', 'model-y'], { registry: draftingRegistry }));
-  assert.equal(r.code, 0, r.err);
+  assert.equal(r.code, 1, r.err); // the interview then pauses at its first unanswered question
   const root = execFileSync('git', ['-C', dir, 'rev-list', '--max-parents=0', 'HEAD'], { encoding: 'utf8' }).trim();
   const committed = execFileSync('git', ['-C', dir, 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', root], { encoding: 'utf8' }).trim();
   assert.equal(committed, '.bish-bash-bosh/config.yml');
@@ -108,7 +110,7 @@ test('first bish asks for a single adapter/model, commits config and seeds and d
   const dir = proj();
   initGitRepo(dir);
   const r = await withCwd(dir, () => run(['bish'], ['copilot', 'm1'], { registry: draftingRegistry }));
-  assert.equal(r.code, 0, r.err);
+  assert.equal(r.code, 1, r.err); // the interview then pauses at its first unanswered question
   assert.match(r.out, /adapter.*model/s, 'prompts are shown');
   assert.doesNotMatch(r.out, /interview adapter|reverse adapter|build adapter|qa adapter/, 'one prompt, not one per role');
   assert.match(r.out, /Wrote and committed \.bish-bash-bosh\/config\.yml \(adapter: copilot, model: m1\)/);
@@ -118,7 +120,7 @@ test('first bish asks for a single adapter/model, commits config and seeds and d
   for (const file of ['interview.md', 'specification.md', 'bish-log.md']) {
     assert.ok(existsSync(join(dir, '.bish-bash-bosh', file)), file);
   }
-  assert.match(r.out, /run `bish` again to start the interview/);
+  assert.match(r.out, /Starting the interview/);
   assert.equal(execFileSync('git', ['-C', dir, 'show', 'HEAD:.bish-bash-bosh/config.yml'], { encoding: 'utf8' }), readFileSync(join(dir, '.bish-bash-bosh', 'config.yml'), 'utf8'));
 });
 
@@ -136,7 +138,7 @@ test('every command refuses a project that is not a git repository', async () =>
 test('first bish picks adapter/model by number from the suggested list', async () => {
   const dir = proj();
   const r = await withCwd(dir, () => run(['bish'], ['1', '2'], { registry: draftingRegistry, listModels: async () => ['auto', { value: 'live-1', label: 'live-1  (low cost)' }] }));
-  assert.equal(r.code, 0, r.err);
+  assert.equal(r.code, 1, r.err); // the interview then pauses at its first unanswered question
   const cfg = parseYaml(readFileSync(join(dir, '.bish-bash-bosh', 'config.yml'), 'utf8'));
   assert.equal(cfg.adapter, 'copilot');
   assert.equal(cfg.model, 'live-1');
@@ -185,7 +187,7 @@ test('bish uses an existing valid config without prompting or rewriting it', asy
   const path = join(dir, '.bish-bash-bosh', 'config.yml');
   const original = readFileSync(path, 'utf8');
   const r = await withCwd(dir, () => run(['bish'], [], { registry: draftingRegistry }));
-  assert.equal(r.code, 0, r.err);
+  assert.equal(r.code, 1, r.err); // the interview then pauses at its first unanswered question
   assert.doesNotMatch(r.out, /adapter \(1-/);
   assert.equal(readFileSync(path, 'utf8'), original);
   assert.ok(existsSync(join(dir, '.bish-bash-bosh', 'interview.md')));
