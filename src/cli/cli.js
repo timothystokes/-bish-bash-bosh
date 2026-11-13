@@ -9,7 +9,7 @@ export { helpText, parseStepArgs, readlineOptions, LOGO };
 export async function main(argv, deps = {}) {
   const out = deps.stdout ?? ((s) => process.stdout.write(s));
   const err = deps.stderr ?? ((s) => process.stderr.write(s));
-  // Human-facing chatter (like the interview's "Thinking..." banner) goes to stderr so stdout stays pure
+  // Human-facing chatter (like the interview's "Analyst thinking..." banner) goes to stderr so stdout stays pure
   // JSON (or pure help text for --help/no-args) for every command, per the CLI's stdout/stderr contract.
   err(`${LOGO}\n`);
   if (argv.length === 0 || argv.includes('--help') || argv.includes('-h')) {

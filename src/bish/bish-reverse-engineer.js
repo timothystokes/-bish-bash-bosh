@@ -4,8 +4,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateConfig } from '../shared/config.js';
 import { checkRepoGate, harnessIdentity } from '../shared/repo-gate.js';
-import { parseSpecificationItems } from '../bash/bash-plan-loop.js';
-import { loadModePrompt } from '../shared/prompts.js';
+import { parseSpecificationItems } from '../bash/bash-planner.js';
+import reverseEngineerPrompt from './prompts/bish-reverse-engineer.js';
 import { LOCK_FILE } from '../shared/run-lock.js';
 import { formatTranscript } from '../adapters/adapter.js';
 
@@ -15,13 +15,10 @@ const templatesDir = join(dirname(fileURLToPath(import.meta.url)), 'templates');
 export const SPEC_PATH = '.bish-bash-bosh/specification.md';
 
 export function buildReversePrompt(repoDir, focus) {
-  return [
-    loadModePrompt('reverse'),
-    '## Focus',
+  return reverseEngineerPrompt(
     focus && focus.trim() !== '' ? focus.trim() : 'Whole codebase',
-    '## Specification template (src/bish/templates/bish-specification.md)',
     readFileSync(join(templatesDir, 'bish-specification.md'), 'utf8').trimEnd(),
-  ].join('\n\n');
+  );
 }
 
 const git = (dir, ...args) =>

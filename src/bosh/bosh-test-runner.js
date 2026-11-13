@@ -2,7 +2,7 @@
 // code-enforced gate `bosh`'s Build Loop uses before ticking a plan.md item (never trusting the
 // agent's own claim that its work passed). Requires at least one `*.test.js` file to exist anywhere
 // under `.bish-bash-bosh/tests/` — a directory that is missing or has no test file in it yet is treated
-// as a failing gate, since every item is expected to add one (see src/bosh/prompts/bosh-build.md).
+// as a failing gate, since every item is expected to add one (see src/bosh/prompts/bosh-test-writer.js).
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -48,4 +48,30 @@ export function runTestSuite(repoDir, only) {
   const res = spawnSync(process.execPath, ['--test', ...files], { cwd: repoDir, encoding: 'utf8', env });
   const output = `${res.stdout ?? ''}${res.stderr ?? ''}`;
   return { ok: res.status === 0, output };
+}
+
+// Sorts the failing tests in a run's spec-reporter output by kind. `assertions`: the test ran and an assertion failed
+// (behaviour wrong or missing). `errors`: the test itself is broken (it threw something other than an assertion, the file
+// crashed, or a probe it ran died with a ReferenceError/SyntaxError that surfaced as a failed exit-code assertion).
+/** @param {string} output @returns {{ assertions: {name: string, error: string}[], errors: {name: string, error: string}[] }} */
+export function classifyFailures(output) {
+  const kinds = { assertions: [], errors: [] };
+  for (const block of output.split(/^test at .*$/m).slice(1)) {
+    const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+    const name = (lines[0] ?? '').replace(/^✖\s*/, '').replace(/\s+\([\d.]+ms\)$/, '');
+    const error = lines[1] ?? '';
+    if (!name || /subtests? failed/.test(error)) continue;
+    const probe = lines.slice(1, 14).find((l) => /\b(ReferenceError|SyntaxError)\b/.test(l));
+    const broken = !error.startsWith('AssertionError [ERR_ASSERTION]') || probe;
+    (broken ? kinds.errors : kinds.assertions).push({ name, error: (probe ?? error).slice(0, 200) });
+  }
+  return kinds;
+}
+
+// Feedback text describing which failures are errors in the tests themselves, or '' when every failure is an assertion.
+/** @param {string} output */
+export function describeTestErrors(output) {
+  const { errors } = classifyFailures(output);
+  if (errors.length === 0) return '';
+  return `These tests are broken (they error instead of failing an assertion):\n${errors.map((e) => `- ${e.name}: ${e.error}`).join('\n')}\n`;
 }

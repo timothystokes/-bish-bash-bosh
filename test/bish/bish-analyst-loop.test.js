@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseInterview, nextQuestion, runInterviewLoop, buildInterviewLoopPrompt } from '../../src/bish/bish-interview-loop.js';
-import { loadModePrompt, loadInterviewIntro } from '../../src/shared/prompts.js';
+import { parseInterview, nextQuestion, runInterviewLoop, buildInterviewLoopPrompt } from '../../src/bish/bish-analyst-loop.js';
+import analystIntroPrompt from '../../src/bish/prompts/bish-analyst-intro.js';
+import analystLoopPrompt from '../../src/bish/prompts/bish-analyst-loop.js';
+const loadInterviewIntro = analystIntroPrompt;
 
 const sample = [
   '# Interview',
@@ -37,9 +39,9 @@ test('nextQuestion is the first line not yet checked, skipping already-processed
   assert.equal(nextQuestion(parseInterview(sample.replace('1. [ ] Q: Describe the objective in a sentence. A: ', '1. [x] Q: Describe the objective in a sentence. A: x'))).id, 2);
 });
 
-test('buildInterviewLoopPrompt prefaces src/bish/prompts/bish-loop.md onto this round\'s question and answer', () => {
+test('buildInterviewLoopPrompt prefaces src/bish/prompts/bish-analyst-loop.js onto this round\'s question and answer', () => {
   const p = buildInterviewLoopPrompt('Describe the objective.', 'Ship a toy.');
-  assert.ok(p.startsWith(loadModePrompt('interview')));
+  assert.ok(p.startsWith(analystLoopPrompt('').trimEnd()));
   assert.match(p, /## Question\n\nDescribe the objective\.\n\n## Answer\n\nShip a toy\./);
 });
 
@@ -108,7 +110,7 @@ test('EOF (null from ask) pauses without marking the current question or calling
   assert.equal(adapter.calls.length, 0);
 });
 
-test('the question and the prompt are shown in color, distinguishing Q from A, with any existing default passed to ask separately (for a real terminal to pre-fill in grey, not printed as bracketed text); color is reset once the answer is in, and a "Thinking..." line is shown before the agent is called', async () => {
+test('the question and the prompt are shown in color, distinguishing Q from A, with any existing default passed to ask separately (for a real terminal to pre-fill in grey, not printed as bracketed text); color is reset once the answer is in, and a "Analyst thinking..." line is shown before the agent is called', async () => {
   const { path: interviewPath, dir } = makeFile();
   /** @type {string[]} */
   const said = [];
@@ -124,11 +126,11 @@ test('the question and the prompt are shown in color, distinguishing Q from A, w
   assert.match(prompts[1], /^\x1b\[33mA: $/);
   assert.equal(defaults[1], 'pre-filled default', 'the second question\'s existing default is handed to ask, not baked into the prompt text');
   assert.equal(said[1], '\x1b[0m', 'color is reset right after each answer, so later output is not left yellow');
-  assert.equal(said[2], '\x1b[90mThinking...\n', 'a "Thinking..." line, shown dim/grey, right before the agent is called, with its own trailing newline so any live reasoning text streams starting on the next line');
+  assert.equal(said[2], '\x1b[90mAnalyst thinking...\n', 'a "Analyst thinking..." line, shown dim/grey, right before the agent is called, with its own trailing newline so any live reasoning text streams starting on the next line');
   assert.equal(said[3], '\x1b[0m\n', 'color is reset and the line ended once the agent call has finished');
 });
 
-test('the agent\'s own live reasoning text streams on the line after "Thinking...", in the same grey, as it arrives', async () => {
+test('the agent\'s own live reasoning text streams on the line after "Analyst thinking...", in the same grey, as it arrives', async () => {
   const { path: interviewPath, dir } = makeFile();
   /** @type {string[]} */
   const said = [];
@@ -144,10 +146,10 @@ test('the agent\'s own live reasoning text streams on the line after "Thinking..
   };
   await runInterviewLoop({ interviewPath, ...io(), ask: async () => 'a', say: (s) => said.push(s), adapter, repoDir: dir, ...sessionStore() });
   assert.equal(typeof adapter.calls[0].onReasoning, 'function', 'the adapter request carries an onReasoning callback');
-  assert.deepEqual(said.slice(2, 5), ['\x1b[90mThinking...\n', "I'm", ' thinking this through'], 'reasoning text is forwarded to say() plain, inheriting the grey already set by "Thinking..."');
+  assert.deepEqual(said.slice(2, 5), ['\x1b[90mAnalyst thinking...\n', "I'm", ' thinking this through'], 'reasoning text is forwarded to say() plain, inheriting the grey already set by "Analyst thinking..."');
 });
 
-test('log is called once with the full prompt sent (\'bish\') and once with the full accumulated reasoning text (\'agent\'), plain text, never the Q/A/"Thinking..." lines shown on screen', async () => {
+test('log is called once with the full prompt sent (\'bish\') and once with the full accumulated reasoning text (\'agent\'), plain text, never the Q/A/"Analyst thinking..." lines shown on screen', async () => {
   const { path: interviewPath, dir } = makeFile();
   /** @type {[string, string][]} */
   const logged = [];
@@ -160,9 +162,9 @@ test('log is called once with the full prompt sent (\'bish\') and once with the 
     interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir,
     log: (source, text) => logged.push([source, text]), ...sessionStore(),
   });
-  assert.equal(logged[0][0], 'bish/interviewer prompt');
+  assert.equal(logged[0][0], 'bish/analyst prompt');
   assert.match(logged[0][1], /## Question\n\nDescribe the objective in a sentence\.\n\n## Answer\n\na/);
-  assert.deepEqual(logged[1], ['bish/interviewer response', 'step one, step two']);
+  assert.deepEqual(logged[1], ['bish/analyst response', 'step one, step two']);
 });
 
 test('log is only called with the "bish" entry, never an "agent" one, when the adapter never streams any reasoning text', async () => {
@@ -174,11 +176,11 @@ test('log is only called with the "bish" entry, never an "agent" one, when the a
     interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir,
     log: (source, text) => logged.push([source, text]), ...sessionStore(),
   });
-  assert.deepEqual(logged[0], ['bish/interviewer prompt', logged[0][1]]);
+  assert.deepEqual(logged[0], ['bish/analyst prompt', logged[0][1]]);
   assert.ok(!logged.some((l) => l[0].endsWith('response')), 'no "agent" entry is logged when the adapter never streams any reasoning text');
 });
 
-test('buildInterviewLoopPrompt only prefaces bish-loop-intro.md when includeIntro is passed, and puts it above everything else', () => {
+test('buildInterviewLoopPrompt only prefaces bish-analyst-intro.js when includeIntro is passed, and puts it above everything else', () => {
   const withIntro = buildInterviewLoopPrompt('Q', 'A', { includeIntro: true });
   const withoutIntro = buildInterviewLoopPrompt('Q', 'A');
   assert.ok(withIntro.startsWith(loadInterviewIntro().trimEnd()));
@@ -186,7 +188,7 @@ test('buildInterviewLoopPrompt only prefaces bish-loop-intro.md when includeIntr
   assert.equal(withoutIntro.includes(loadInterviewIntro().trimEnd()), false);
 });
 
-test('bish-loop-intro.md is prefaced onto the agent prompt only on the very first round of a brand-new session, never on a later round in the same loop', async () => {
+test('bish-analyst-intro.js is prefaced onto the agent prompt only on the very first round of a brand-new session, never on a later round in the same loop', async () => {
   const { path: interviewPath, dir } = makeFile();
   const adapter = fakeAdapter((req) => ({ session: req.session ? `${req.session}+` : 's1' }));
   await runInterviewLoop({ interviewPath, ...io(), ask: async () => 'a', say: () => {}, adapter, repoDir: dir, ...sessionStore() });
@@ -194,7 +196,7 @@ test('bish-loop-intro.md is prefaced onto the agent prompt only on the very firs
   assert.equal(adapter.calls[1].prompt.startsWith(loadInterviewIntro().trimEnd()), false, 'second round of the same session: no intro');
 });
 
-test('bish-loop-intro.md is not re-included after a restart that resumes an already-persisted session', async () => {
+test('bish-analyst-intro.js is not re-included after a restart that resumes an already-persisted session', async () => {
   const { path: interviewPath, dir } = makeFile();
   const adapter = fakeAdapter();
   const session = sessionStore();

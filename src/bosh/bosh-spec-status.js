@@ -2,7 +2,7 @@
 // specification.md item numbers. After a green full-suite run, a spec item is ticked when it has at least one tagged
 // test and every tagged test passed; it is unticked when a tagged test fails. Items with no tagged test are left as
 // they are and reported as uncovered. Reads Node's spec-reporter output (`✔ name (3ms)` / `✖ name (3ms)`).
-import { parseSpecificationItems } from '../bash/bash-plan-loop.js';
+import { parseSpecificationItems } from '../bash/bash-planner.js';
 
 const RESULT = /^\s*(✔|✖)\s+(.+?)(?:\s+\([\d.]+ms\))?\s*$/;
 const TAG = /^\[((?:\s*S\d+\s*,?)+)\]/;

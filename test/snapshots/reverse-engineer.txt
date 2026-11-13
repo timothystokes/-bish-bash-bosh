@@ -3,3 +3,12 @@ You are the reverse step: recover this repo's behaviour from its source as a spe
 - Describe what the code does today: its behaviour, interfaces, non-functional requirements (performance, security, testing approaches) and constraints. Never invent requirements the code does not support.
 - Change only `.bish-bash-bosh/specification.md`. Do not change source, config or tests.
 - Install missing tools yourself; only a missing credential blocks.
+
+## Focus
+
+<focus>
+
+## Specification template (src/bish/templates/bish-specification.md)
+
+<template>
+

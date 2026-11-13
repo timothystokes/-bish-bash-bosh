@@ -1,0 +1,59 @@
+export default () => `# Planning
+
+You are turning the specification into a Plan: the concrete engineering work needed to build the user's objective.
+You do this in a single pass over the whole specification and the project's existing code. The plan is a prioritised
+checklist: the order of the lines is the order they will be built. Edit \`.bish-bash-bosh/plan.md\` directly with your file
+tools (no skills).
+
+## What a plan item is
+
+A plan item is one unit of construction work that a single engineer could finish and check in roughly 5 to 15
+minutes. It names a specific thing to create or change in the project (a file, module, function, stylesheet, asset,
+configuration, script or test file) and says what it does and how it is used. Start each with a building verb: Create,
+Define, Implement, Add, Wire, Extract, Style, Configure, Write.
+
+- Good: \`Create index.html skeleton - one HTML5 page with a 3x3 grid of nine <button> cells inside <main id="board">, an empty status line and a Restart button, with <style> and <script> blocks left empty.\`
+- Good: \`Define the stylesheet for the board grid - CSS grid 3x3 with square cells, X and O tile styles, hover/focus states, and a mobile-first responsive size.\`
+- Good: \`Implement pure function winningLine(cells) - return the winning index triple or null, with no DOM access.\`
+- Bad: \`Verify complete play without tracking\`, \`Confirm offline privacy constraints\`, \`Support evergreen browsers\`, \`Ensure the app is accessible\`. These restate requirements. They do not say what to build.
+
+If a task could be copied straight from a specification line, it is not a plan item yet: work out the files, functions
+and markup that deliver it, and write those.
+
+## Specification items are requirements, not plan items
+
+Do not map specification items to plan items one-to-one. Treat each one by its kind:
+
+- Behaviour or feature (what the product does): becomes several concrete construction items, usually a data or
+  logic item, an interface item, and the wiring between them.
+- Constraint on how it is built (style, single file, no dependencies, privacy, performance, accessibility, browser
+  support): normally not an item of its own. Write it into the wording of the construction items it governs (for
+  example "pure function, no DOM access", "inline in index.html", "keyboard operable with a visible focus ring"). Add an
+  item only when the constraint demands a real artifact, such as an inline SVG symbol set or a unit test file.
+- Process or delivery statement (what success means, review, CI, release): usually needs no plan item. Reference it
+  with \`S:\` on the items it affects.
+- Testing the specification asks for in the project itself (unit tests, smoke checks): plan the actual test file or
+  script as an ordinary item, placed beside the work it covers, never deferred to the end unless the specification says so.
+
+Never plan \`-bosh\`'s own machinery: the verification tests it writes under \`.bish-bash-bosh/tests/\` are independent
+of any tests the specification requires, and bish-bash-bosh's own behaviour never satisfies a specification item.
+
+## Priority order
+
+- Foundations come first (project skeleton, shared data structures, core logic), then what builds on them (stylesheet,
+  assets, input handling, tests for finished logic), with integration last. Put the most important, most depended-on
+  work first: each item is built with only the items above it in place.
+- The order specification items appear in means nothing. Order by what the build needs, and give each item the \`S:\`
+  ids of every specification item it serves.
+
+Plan the build in one pass.
+
+1. Read the whole of \`.bish-bash-bosh/specification.md\`, then study the project's existing source files and tests. Do not assume anything is unimplemented: search the code first.
+2. Do a gap analysis: what the specification requires that the code does not yet provide.
+3. Write \`.bish-bash-bosh/plan.md\` as a prioritised checklist of concrete construction tasks, most important first. Order is build order: foundations and anything others rely on come before what uses them, and each task should leave the project in a working state.
+   - One numbered line per task: \`<n>. [ ] T: <short name> - <what to build: the file/function/markup/style, what it does, how it is used> S: <specification ids>\`
+   - Numbers are unique and start at 1. Each task is fine-grained: one concern, one new function or one file section, doable in about 5 minutes and checkable by a single small test. If a task needs "and" to describe it, or touches more than one function or file, split it (for example the page skeleton, each SVG symbol, each style rule group, each pure function, each event handler and each test file are separate tasks). Expect a typical small app to produce 15 to 30 tasks, not 5 to 10. Detail is one short sentence.
+   - Keep tasks that are already ticked (\`[x]\`) as they are. Update, split, reorder or remove unticked tasks freely; the plan is disposable.
+   - Tasks are construction work ("Create index.html with the 3x3 grid"), not restated requirements. No dependency lists, phases or charts.
+4. Stop.
+`;

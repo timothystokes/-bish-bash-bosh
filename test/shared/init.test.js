@@ -17,7 +17,7 @@ function proj() {
   return initGitRepo(dir);
 }
 
-// An agent that does the bootstrap step: replaces both seeded templates, as src/bish/prompts/bish-bootstrap.md asks.
+// An agent that does the bootstrap step: replaces both seeded templates, as src/bish/prompts/bish-analyst-init.js asks.
 const drafting = () => ({
   async run(req) {
     writeFileSync(join(req.cwd, '.bish-bash-bosh', 'specification.md'), '# Specification\n\n1. [ ] C: Greet. B: Friendly.\n');

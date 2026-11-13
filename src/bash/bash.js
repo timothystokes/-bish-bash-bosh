@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveAdapter, defaultRegistry } from '../adapters/index.js';
 import { acquireRunLock } from '../shared/run-lock.js';
-import { runPlanLoop } from './bash-plan-loop.js';
+import { runPlanLoop } from './bash-planner.js';
 import { createLogger } from '../bish/bish-log.js';
 import { debugAdapter, parseRunArgs, loadRunProject, requireGitRepo } from '../cli/cli-lib.js';
 import { commitAll, subject } from '../shared/git-commit.js';

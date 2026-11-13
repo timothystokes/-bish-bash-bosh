@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadModePrompt } from '../../src/shared/prompts.js';
+import analystInitPrompt from '../../src/bish/prompts/bish-analyst-init.js';
 import { main } from '../../src/cli/cli.js';
 import { writeProjectConfig, commitProjectConfig, withCwd, initGitRepo } from '../support/project.js';
 
@@ -63,10 +63,10 @@ test('bish on a fresh repo seeds the stores from their templates, has the agent 
     main(['bish'], { registry, identity, stdout: (s) => { out.push(s); }, stderr: () => {} }));
   assert.equal(seedCode, 0);
   assert.equal(seed.prompts.length, 1, 'one bootstrap agent call');
-  assert.equal(seed.prompts[0], loadModePrompt('bootstrap'));
+  assert.equal(seed.prompts[0], analystInitPrompt());
   assert.match(out.join(''), /Wrote \.bish-bash-bosh\/specification\.md and \.bish-bash-bosh\/interview\.md from README\.md/);
   assert.match(readFileSync(join(dir, '.bish-bash-bosh', 'specification.md'), 'utf8'), /Greet the user/);
-  assert.match(readFileSync(join(dir, '.bish-bash-bosh', 'bish-log.md'), 'utf8'), /bish\/bootstrap prompt: .*Initial Specification/s, 'the bootstrap prompt is logged');
+  assert.match(readFileSync(join(dir, '.bish-bash-bosh', 'bish-log.md'), 'utf8'), /bish\/analyst prompt: .*Initial Specification/s, 'the bootstrap prompt is logged');
   assert.ok(!existsSync(join(dir, '.bish-bash-bosh', 'runs')), 'no run folder on the bootstrap run');
   // a second, custom question with a pre-filled default so the loop's resume/default behaviour can be exercised
   writeFileSync(
@@ -87,7 +87,7 @@ test('bish on a fresh repo seeds the stores from their templates, has the agent 
   assert.match(afterFirst, /1\. \[x\] Q: What is the objective\? A: Build a greeter/, 'checked, and the answer is written back, once handed to and processed by the agent');
   assert.match(afterFirst, /2\. \[ \] Q: Who uses the greeter\? A: Developers/, 'the second question is untouched, not yet asked');
   const logAfterFirst = readFileSync(join(dir, '.bish-bash-bosh', 'bish-log.md'), 'utf8');
-  assert.match(logAfterFirst, /\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] bish\/interviewer prompt: .*## Answer\n\nBuild a greeter/s, 'the full prompt sent to the agent is logged, plain text with a timestamp');
+  assert.match(logAfterFirst, /\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] bish\/analyst prompt: .*## Answer\n\nBuild a greeter/s, 'the full prompt sent to the agent is logged, plain text with a timestamp');
   out.length = 0;
   const done = await withCwd(dir, () =>
     main(['bish'], { registry, identity, input: Readable.from(['\n']), stdout: (s) => { out.push(s); }, stderr: () => {} }));
@@ -250,7 +250,7 @@ test('if the bootstrap agent leaves the templates untouched, bish fails and disc
   assert.equal(code, 2);
   assert.match(err.join(''), /specification\.md unchanged/);
   for (const f of ['interview.md', 'specification.md']) assert.ok(!existsSync(join(dir, '.bish-bash-bosh', f)), f);
-  assert.match(readFileSync(join(dir, '.bish-bash-bosh', 'bish-log.md'), 'utf8'), /bish\/bootstrap prompt:/, 'the log is kept so the failed call can be read');
+  assert.match(readFileSync(join(dir, '.bish-bash-bosh', 'bish-log.md'), 'utf8'), /bish\/analyst prompt:/, 'the log is kept so the failed call can be read');
 });
 
 test('a failed bootstrap reports the agent\'s exit status and last output so the reason is visible', async () => {

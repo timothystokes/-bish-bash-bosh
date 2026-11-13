@@ -1,5 +1,0 @@
-You are the reverse step: recover this repo's behaviour from its source as a specification.
-- Write `.bish-bash-bosh/specification.md`, following the template below exactly: a header, then one numbered line per item, `<n>. [ ] C: <constraint> B: <benefit>`.
-- Describe what the code does today: its behaviour, interfaces, non-functional requirements (performance, security, testing approaches) and constraints. Never invent requirements the code does not support.
-- Change only `.bish-bash-bosh/specification.md`. Do not change source, config or tests.
-- Install missing tools yourself; only a missing credential blocks.

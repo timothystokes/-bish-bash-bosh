@@ -2,7 +2,7 @@
 // code and writes (or refreshes) `.bish-bash-bosh/plan.md`, a prioritised checklist of concrete construction
 // tasks, which `-bosh` then works through from the top. The plan is disposable: running `-bash` again simply
 // re-plans against the code as it now stands. The harness only checks that the result has at least one item.
-import { loadModePrompt, loadPlanIntro } from '../shared/prompts.js';
+import plannerPrompt from './prompts/bash-planner.js';
 import { parsePlanItems } from '../bosh/bosh-build-loop.js';
 
 const LINE = /^(\d+)\.\s*\[([ x])\]\s*C\s*(?:\([^)]*\))?:\s*(.*?)\s*B\s*(?:\([^)]*\))?:\s*(.*)$/;
@@ -29,9 +29,9 @@ export function parseSpecificationItems(text) {
   return out;
 }
 
-// The planner's prompt: src/bash/prompts/bash-intro.md (what a plan item is) then bash-loop.md (the procedure).
+// The planner's prompt: src/bash/prompts/bash-planner.js (what a plan item is, then the procedure).
 export function buildPlanPrompt() {
-  return [loadPlanIntro().trimEnd(), loadModePrompt('plan-loop')].join('\n\n');
+  return plannerPrompt();
 }
 
 // One planning call in a fresh context (no `session` key), then a check that plan.md holds at least one item in the
@@ -47,7 +47,7 @@ export function buildPlanPrompt() {
  * }} opts
  */
 export async function runPlanLoop({ planPath, readFile, say, adapter, repoDir, log = (/** @type {string} */ _source, /** @type {string} */ _text) => {} }) {
-  say('\x1b[90mPlanning from the whole specification and the current code...\x1b[0m\n');
+  say('\x1b[90mPlanner: working from the whole specification and the current code...\x1b[0m\n');
   const prompt = buildPlanPrompt();
   log('bash/planner prompt', prompt);
   let reasoning = '';

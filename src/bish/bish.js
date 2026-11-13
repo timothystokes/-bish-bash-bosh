@@ -4,10 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { stringify as stringifyYaml } from 'yaml';
 import { resolveAdapter, defaultRegistry } from '../adapters/index.js';
 import { acquireRunLock } from '../shared/run-lock.js';
-import { runInterviewLoop } from './bish-interview-loop.js';
-import { runBootstrap, README_FILE } from './bish-bootstrap.js';
+import { runInterviewLoop } from './bish-analyst-loop.js';
+import { runBootstrap, README_FILE } from './bish-analyst-init.js';
 import { createLogger } from './bish-log.js';
-import { runReverse } from './bish-reverse.js';
+import { runReverse } from './bish-reverse-engineer.js';
 import { commitAll } from '../shared/git-commit.js';
 import { debugAdapter, createAsker, askChoice, parseRunArgs, loadRunProject, requireGitRepo } from '../cli/cli-lib.js';
 import { formatInterviewLoopResult, formatReverseResult } from '../cli/cli-format.js';
@@ -74,7 +74,7 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
   // The very first `bish` run in a project (no interview.md yet) seeds the interview store and spec
   // file from their templates, creates an empty bish-log.md (every prompt sent to the agent and every
   // piece of its own output shown in the console gets appended there from then on, see bish-log.js),
-  // then makes one agent call (src/bish/prompts/bish-bootstrap.md) that turns README.md into a baseline spec and
+  // then makes one agent call (src/bish/prompts/bish-analyst-init.js) that turns README.md into a baseline spec and
   // the first interview questions. It stops there so the owner can review before the interview starts.
   const firstRun = !reverse && !existsSync(join(repo, INTERVIEW_FILE));
   // A restart after the first run: both files should already exist; self-heal spec.md alone if it
@@ -118,7 +118,7 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
     }
     if (!reverse) {
       // Each round's answer is captured by the deterministic checkbox walk below; the agent only
-      // sees one question/answer at a time (src/bish/prompts/bish-loop.md), with the same session
+      // sees one question/answer at a time (src/bish/prompts/bish-analyst-loop.js), with the same session
       // (persisted to config.yml's `bishSession` field, distinct from other phases, which
       // never use it) carrying the rest of the conversation's context across rounds and across
       // separate `bish` invocations.

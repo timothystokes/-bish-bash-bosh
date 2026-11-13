@@ -1,14 +1,14 @@
-# Per Loop Instructions.
+export default (item) => `# Per Loop Instructions.
 
-The output of this step is to update `.bish-bash-bosh/interview.md` and or  `.bish-bash-bosh/specification.md` based on the new information verified in the question and answer below and following these steps.
+The output of this step is to update \`.bish-bash-bosh/interview.md\` and or  \`.bish-bash-bosh/specification.md\` based on the new information verified in the question and answer below and following these steps.
 
-1. Adjust unprocessed items in `.bish-bash-bosh/interview.md` from the insights of the answered question below including:
+1. Adjust unprocessed items in \`.bish-bash-bosh/interview.md\` from the insights of the answered question below including:
 - If any question is answered directly from this new answer then mark it as processed.
 - Update the proposed answer to any unprocessed question to reflect the new information verified in this question and answer below.
 - If the answer to this question conflicts with an already processed question and answer then mark the previous question/answer as unprocessed again and adjust it's proposed answer to have the user verify the conflict.
 - Append any follow up questions that you feel need to be asked in order to achieve a complete specification for the objective.
 
-2. Update the specification items in `.bish-bash-bosh/specification.md` to include any new Constraints and Benifits that can be derived form the confirmed answer to the question below including:
+2. Update the specification items in \`.bish-bash-bosh/specification.md\` to include any new Constraints and Benifits that can be derived form the confirmed answer to the question below including:
 - Update existing specifications with more clarity or fidelity if the answered question provides more insight.
 - Add any new constraints and benefits that can be determined from the verified answer to the question below.
 
@@ -16,3 +16,5 @@ The output of this step is to update `.bish-bash-bosh/interview.md` and or  `.bi
 
 ## The Question and Answer to process this time...
 
+${item}
+`;

@@ -4,8 +4,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runReverse, buildReversePrompt } from '../../src/bish/bish-reverse.js';
-import { loadModePrompt } from '../../src/shared/prompts.js';
+import { runReverse, buildReversePrompt } from '../../src/bish/bish-reverse-engineer.js';
+import reverseEngineerPrompt from '../../src/bish/prompts/bish-reverse-engineer.js';
 import { main } from '../../src/cli/cli.js';
 import { writeProjectConfig, commitProjectConfig, withCwd, initGitRepo } from '../support/project.js';
 
@@ -54,7 +54,7 @@ const agent = (writes, exitStatus = 0) => {
 };
 
 test('reverse prompt covers the unchanged source and carries the specification template', () => {
-  assert.match(loadModePrompt('reverse'), /do not change/i);
+  assert.match(reverseEngineerPrompt('', ''), /do not change/i);
   const dir = makeRepo();
   const p = buildReversePrompt(dir, 'focus on greet');
   assert.match(p, /focus on greet/);

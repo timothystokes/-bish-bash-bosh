@@ -1,18 +1,14 @@
-# Initial Specification
+export default () => `# Interview
 
-You are doing a single pass requirements capture process, for a new software delivery objective, which you will find described in the local README.md file.
+You are helping to capture requirements for a new solution using an interview loop based on the local .bish-bash-bosh/interview.md file.
 
-The files `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` were just created and now it's up to you to do the following steps .
-
-1. Update `.bish-bash-bosh/specification.md`, using it's defined format, with a set of baseline specification items required to cover all the requirments described in the local README.md
-
-2. Assess any gaps in the specification that would be required to complete a specification to meet the full intent of the objective from the README.md
-
-3. Compose the questions, with appropriate default answers, required to fill the assessment of gaps into `.bish-bash-bosh/interview.md` using it's defined format.
+The loop is controlled by a harness which will invoke you, passing the details of a question with a verified answer. Your goal per invocation is to interactively update the local .bish-bash-bosh/specification.md file. The question and answer you receive will be prefixed with specific instruction per loop. Once you have processed the one question and answer then you stop and allow the harness to capture the next answer and invoke you again.
 
 ## Working with the files
 
-Edit `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` directly, using your normal file read/edit tools, and nothing else: no skills, no searching, no other files. Their entire format is the numbered checklist lines already in each file.
+To edit the \`.bish-bash-bosh/interview.md\` file use normal file read/edit tools to update one or more lines using the format \`<n>. [ ] Q: <question> A: <answer>\` where Q: is the question and A: is the proposed answer to that question.
+
+To edit the \`.bish-bash-bosh/specification.md\` file use normal file read/edit tools to update one or more lines using the format \`<n>. [ ] C: <constraint> B: <benefit> Q: <related questions>\` where C: means the constraint and B: is the described benefit of applying that constraint and Q: is a list of the question numbers that drove the definition of the specification item.
 
 ## PRIME DIRECTIVE 
 
@@ -34,3 +30,4 @@ In determining specific questions to ask, consider these broad areas of concern 
 - Are there current risks being carried or new risks introduced by this objective?
 - What UX/UI and visual style is important to meet this objective?
 - What language, coding style and standards should this solution align to?
+`;

@@ -4,8 +4,8 @@ import { writeFileSync, mkdtempSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseSpecificationItems, runPlanLoop, buildPlanPrompt } from '../../src/bash/bash-plan-loop.js';
-import { loadModePrompt, loadPlanIntro } from '../../src/shared/prompts.js';
+import { parseSpecificationItems, runPlanLoop, buildPlanPrompt } from '../../src/bash/bash-planner.js';
+import plannerPrompt from '../../src/bash/prompts/bash-planner.js';
 
 test('parseSpecificationItems reads each numbered `N. [ ] C: ... B: ...` line, tolerating a `C (Q1):` reference', () => {
   const items = parseSpecificationItems([
@@ -19,10 +19,9 @@ test('parseSpecificationItems reads each numbered `N. [ ] C: ... B: ...` line, t
   ]);
 });
 
-test('buildPlanPrompt is the intro followed by the single planning prompt', () => {
+test('buildPlanPrompt is the single planning prompt', () => {
   const p = buildPlanPrompt();
-  assert.ok(p.startsWith(loadPlanIntro().trimEnd()));
-  assert.ok(p.endsWith(loadModePrompt('plan-loop')));
+  assert.equal(p, plannerPrompt());
 });
 
 function setup(planText) {

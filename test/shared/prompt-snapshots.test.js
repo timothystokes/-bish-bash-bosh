@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MODES, loadModePrompt, loadInterviewIntro } from '../../src/shared/prompts.js';
+import analystInit from '../../src/bish/prompts/bish-analyst-init.js';
+import analystLoop from '../../src/bish/prompts/bish-analyst-loop.js';
+import reverseEngineer from '../../src/bish/prompts/bish-reverse-engineer.js';
+import planner from '../../src/bash/prompts/bash-planner.js';
+import testWriter from '../../src/bosh/prompts/bosh-test-writer.js';
+import builder from '../../src/bosh/prompts/bosh-builder.js';
+import inspector from '../../src/bosh/prompts/bosh-inspector.js';
+import analystIntro from '../../src/bish/prompts/bish-analyst-intro.js';
 
 const snapDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'snapshots');
 
@@ -22,17 +29,27 @@ function matchSnapshot(name, actual) {
   assert.equal(`${actual}\n`, readFileSync(file, 'utf8'), `prompt ${name} changed: review it, then UPDATE_SNAPSHOTS=1 npm test`);
 }
 
-for (const mode of MODES) {
-  test(`snapshot: ${mode} prompt`, () => matchSnapshot(mode, loadModePrompt(mode)));
+// Each prompt function rendered with placeholder arguments; the build personas also with feedback.
+const SNAPSHOTS = {
+  'analyst-init': () => analystInit(),
+  'analyst-loop': () => analystLoop('<item>'),
+  'reverse-engineer': () => reverseEngineer('<focus>', '<template>'),
+  planner: () => planner(),
+  'test-writer': () => testWriter('<item>', '', '<testfile>', '<resultsfile>'),
+  'test-writer-feedback': () => testWriter('<item>', '<feedback>', '<testfile>', '<resultsfile>'),
+  builder: () => builder('<item>', '', '<testfile>', '<resultsfile>'),
+  'builder-feedback': () => builder('<item>', '<feedback>', '<testfile>', '<resultsfile>'),
+  inspector: () => inspector('<item>', '', '<testfile>', '<resultsfile>'),
+  'inspector-feedback': () => inspector('<item>', '<feedback>', '<testfile>', '<resultsfile>'),
+};
+for (const [name, render] of Object.entries(SNAPSHOTS)) {
+  test(`snapshot: ${name} prompt`, () => matchSnapshot(name, render()));
 }
 
-test('bish-loop.md tells the agent to update specification.md, adjust unprocessed questions and append follow-up questions in the store\'s own line format, then stop (the line format lives in the intro)', () => {
-  assert.match(loadInterviewIntro(), /\[ \] Q: <question> A: <answer>/);
-  const kit = readFileSync(join(snapDir, '..', '..', 'src', 'bish', 'prompts', 'bish-loop.md'), 'utf8');
-  for (const text of [loadModePrompt('interview'), kit]) {
-    assert.match(text, /specification\.md/i);
-    assert.match(text, /interview\.md/i);
-    assert.match(text, /stop/i);
-  }
+test('the analyst prompts tell the agent to update specification.md, adjust unprocessed questions and append follow-up questions in the store\'s own line format, then stop (the line format lives in the intro)', () => {
+  assert.match(analystIntro(), /\[ \] Q: <question> A: <answer>/);
+  const text = analystLoop('<item>');
+  assert.match(text, /specification\.md/i);
+  assert.match(text, /interview\.md/i);
+  assert.match(text, /stop/i);
 });
-
