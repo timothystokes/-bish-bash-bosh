@@ -133,8 +133,8 @@ export async function runInterviewLoop({
     let answer;
     let reply;
     if (!next) {
-      say(`\n${CYAN}Q: ${NEW_REQUIREMENT_QUESTION}${RESET}\n`);
-      reply = await ask(`${YELLOW}A: `, 'no');
+      say(`\n${CYAN}Q${questions.reduce((max, q) => Math.max(max, q.id), 0) + 1}: ${NEW_REQUIREMENT_QUESTION}${RESET}\n`);
+      reply = await ask(YELLOW, 'no');
       say(RESET);
       if (reply === null || NO.has(reply.trim().toLowerCase())) return { status: 'ok', answered };
       answer = reply.trim();
@@ -145,8 +145,8 @@ export async function runInterviewLoop({
       writeFile(interviewPath, lines.join('\n'));
       next = { id, question: NEW_REQUIREMENT_QUESTION };
     } else {
-      say(`\n${CYAN}Q: ${next.question}${RESET}\n`);
-      reply = await ask(`${YELLOW}A: `, next.answer);
+      say(`\n${CYAN}Q${next.id}: ${next.question}${RESET}\n`);
+      reply = await ask(YELLOW, next.answer);
       say(RESET);
       if (reply === null) {
         const remaining = parseInterview(readFile(interviewPath)).filter((q) => !q.checked).length;

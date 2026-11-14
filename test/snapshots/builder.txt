@@ -27,4 +27,4 @@ ALL user specified requirements MUST be implemented in the users main project fo
 
 Build exactly what those tests focus on as the definition of done for this item.
 
-Provide your assurance that you feel the work you have done will satisfy the test scenarios for this item OR provide feedback if you feel you can't satisfy the tests as they are for some reason, as a final line starting with `TEST FEEDBACK:`.
+Finish with a short statement of assurance that the work you have done will satisfy the test scenarios for this item. Only if you cannot satisfy the tests as they are, because a test is defective, add a final line starting with `TEST FEEDBACK:` describing what is wrong with the test. Never use `TEST FEEDBACK:` for your assurance: that line sends the item back to the Test Writer.

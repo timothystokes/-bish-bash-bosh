@@ -110,7 +110,8 @@ function lastColor(prompt) {
 // On a real terminal, `defaultValue` is shown in grey as a suggestion ahead of the cursor, in the
 // prompt's own color otherwise (so typed text matches it) — not actually in the editable line, since an
 // owner must be able to erase the whole thing in a single Backspace/Delete, not character by character.
-// The first keypress other than Enter clears that suggestion and marks the line "touched"; Enter with
+// The first keypress other than Enter clears that suggestion and marks the line "touched" (an arrow, Home or End
+// instead turns it into real editable text, so a nearly right default can be adjusted); Enter with
 // no other keypress first submits the suggestion verbatim, exactly as if the owner had typed it —
 // recoloring the grey suggestion to the prompt's own color as it is accepted, so it no longer reads as
 // a mere suggestion. Piped input has no such line to edit, so `defaultValue` is ignored there — the
@@ -144,8 +145,19 @@ export function createAsker(input, out, output = process.stdout) {
     }
     let touched = false;
     let settled = false;
+    // The suggestion can wrap over several rows on a narrow terminal, so working out where it started, and
+    // clearing all of it, must allow for that rather than assume one row.
+    const cols = output.columns || Infinity;
+    const promptLen = prompt.replace(/\x1b\[[0-9;]*m/g, '').length;
+    const total = promptLen + defaultValue.length;
+    const wraps = total > cols;
+    const backToStart = wraps
+      ? `${Math.floor((total - 1) / cols) - Math.floor(promptLen / cols) > 0 ? `\x1b[${Math.floor((total - 1) / cols) - Math.floor(promptLen / cols)}A` : ''}\x1b[${(promptLen % cols) + 1}G`
+      : `\x1b[${defaultValue.length}D`;
+    const clearSuggestion = wraps ? '\x1b[0J' : '\x1b[0K';
     output.write(`${GREY}${defaultValue}${lastColor(prompt)}`);
-    output.write(`\x1b[${defaultValue.length}D`);
+    output.write(backToStart);
+    const editKeys = new Set(['left', 'right', 'home', 'end']);
     const onKeypress = (_ch, key) => {
       if (touched || settled) return;
       if (key && (key.name === 'return' || key.name === 'enter')) {
@@ -153,11 +165,15 @@ export function createAsker(input, out, output = process.stdout) {
         // cursor is still sitting in front of it, unmoved since it was first drawn), so it reads
         // exactly as if it had been typed, rather than staying visibly grey once accepted.
         settled = true;
+        output.write(clearSuggestion);
         output.write(`${lastColor(prompt)}${defaultValue}`);
         return;
       }
       touched = true;
-      output.write('\x1b[0K');
+      output.write(clearSuggestion);
+      // An arrow, Home or End first means the owner wants to adjust the suggestion rather than replace it, so it
+      // becomes real editable text (readline then applies the key to it); any other first key types over it.
+      if (key && (editKeys.has(key.name) || (key.ctrl && (key.name === 'a' || key.name === 'e')))) rl.write(defaultValue);
     };
     input.prependListener('keypress', onKeypress);
     try {

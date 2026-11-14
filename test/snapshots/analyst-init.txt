@@ -14,7 +14,7 @@ The files `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` 
 
 ## Working with the files
 
-Edit `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` directly, using your normal file read/edit tools, and nothing else: no skills, no searching, no other files. Their entire format is the numbered checklist lines already in each file.
+Edit `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` directly, using your normal file read/edit tools. You may read the local README.md for the objective but edit only those two files; use no skills and no searching. Their entire format is the numbered checklist lines already in each file.
 
 ## PRIME DIRECTIVE 
 
@@ -24,16 +24,25 @@ Do not conflate the workings of -bish-bash-bosh with the specified requirements 
 
 In determining specific questions to ask, consider these broad areas of concern and how they apply specifically to the users objective as each question and answer is prepared and as each specification item is captured.
 
-- How does this solution align with the users strategy?
-- What architectural constraints must be applied to ensure the success of this solution?
-- What Product or Customer metric are expection to be met through the implementation of this solution?
-- How is the user's objective built, verified and deployed through formal quality and security gates and release approvals and how much automation should be applied?
-- What aspects of security should be considered for this type of solution?
-- What operational processes and observability apply to this solution?
-- Are there regulatory or industry compliance expectations that need to be met?
-- What perfomance, scalability and availability needs to be met?
-- Are there change management aspect that need to be coordinated for this objective?
-- Are there current risks being carried or new risks introduced by this objective?
-- What UX/UI and visual style is important to meet this objective?
-- What language, coding style and standards should this solution align to?
+- STRATEGY
+- ARCHTECTURE
+- PRODUCT METRICS
+- BUILD AND CONTINUOUS DELIVERY
+- DEPLOYMENT
+- SECURITY AND VULNERABILITIES
+- QUALITY AND TESTING
+- OPERATIONS AND OBSERVABILITY
+- REGULATORY AND INDUSTRY COMPLIANCE
+- PERFORMANCE
+- CHANGE MANAGEMENT
+- COST MANAGEMENT
+- SCALABILITY AND AVAILABILITY
+- RISK MANAGEMENT
+- USER EXPERIENCE (UX) AND DESIGN
+- DATA MANAGEMENT
+- LEGAL AND CONTRACTUAL CONSIDERATIONS
+- TECHNOLOGY AND TOOLS
+- ENVIRONMENT AND SUSTAINABILITY
+- BUSINESS VALUE
+- ETHICAL CONSIDERATIONS
 

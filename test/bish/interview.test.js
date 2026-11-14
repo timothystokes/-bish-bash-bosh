@@ -227,6 +227,34 @@ test("createAsker: on a real terminal, a question's existing default is shown as
   }
 });
 
+test('createAsker: an arrow key as the first action turns the suggestion into editable text; a suggestion wider than the terminal is cleared and returned to across rows', async () => {
+  const { createAsker } = await import('../../src/cli/cli-lib.js');
+  let chunks = [];
+  const output = (columns) => Object.assign(new Writable({ write(chunk, _enc, cb) { chunks.push(String(chunk)); cb(); } }), { isTTY: true, columns });
+  const wait = () => new Promise((r) => setTimeout(r, 20));
+
+  const input = Object.assign(new Readable({ read() {} }), { isTTY: true });
+  const reply = createAsker(input, () => {}, output(80)).ask('\x1b[33mA: ', 'Developers');
+  await wait();
+  input.push('\x1b[D');
+  await wait();
+  input.push('X');
+  input.push('\r');
+  assert.equal(await reply, 'DeveloperXs', 'the default stays, with the cursor one place in from its end');
+
+  chunks = [];
+  const narrow = Object.assign(new Readable({ read() {} }), { isTTY: true });
+  const wrapped = createAsker(narrow, () => {}, output(10)).ask('\x1b[33mA: ', 'Developers');
+  await wait();
+  assert.ok(chunks.includes('\x1b[1A\x1b[4G'), 'the cursor goes back up a row to just after the prompt');
+  chunks = [];
+  narrow.push('Z');
+  await wait();
+  assert.ok(chunks.includes('\x1b[0J'), 'typing over a wrapped suggestion clears every row of it');
+  narrow.push('\r');
+  assert.equal(await wrapped, 'Z');
+});
+
 test('bish refuses to start without a README.md in the project root, before asking for config or calling the agent', async () => {
   const dir = makeRepo();
   rmSync(join(dir, 'README.md'));

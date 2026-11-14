@@ -212,10 +212,10 @@ export async function runBuildLoop({
   // A line for work the harness itself does between the agents, in the same grey as the agent steps.
   const harness = (what) => say(`${GREY}Harness: ${what}...${RESET}\n`);
   // Runs one step up to MAX_ATTEMPTS times; `attempt(previousFailure)` returns '' on success or the failure text.
-  async function step(label, attempt, seed = '') {
+  async function step(label, attempt, seed = '', note = '') {
     let previous = seed;
     for (let n = 1; n <= MAX_ATTEMPTS; n++) {
-      say(`${GREY}${label}${n > 1 ? ` (trying again with feedback)` : ''}...${RESET}\n`);
+      say(`${GREY}${label}${n > 1 ? ' (trying again with feedback)' : note ? ` (${note})` : ''}...${RESET}\n`);
       let failure;
       try {
         failure = await attempt(previous);
@@ -280,7 +280,7 @@ export async function runBuildLoop({
           }
           if (red.ok) return `The new tests (${touched.join(', ')}) already pass before any implementation, so they prove nothing: make them fail for the right reason (the item's behaviour missing). If the project's files already implement this item, say so in your reply and keep the tests as they are.\n${red.output}`;
           return '';
-        }, testFeedback);
+        }, testFeedback, testFeedback ? 'with feedback from the Builder' : '');
         if (redFailure) return fail(redFailure, 'Test Writer');
         testFeedback = '';
         needTests = false;
@@ -298,11 +298,12 @@ export async function runBuildLoop({
         if (!result.ok) return `${describeTestErrors(result.output)}${result.output}`;
         // The deliverable is the project itself, so an item can't pass on harness files alone.
         return projectFiles.size === 0 && !implementedAlready ? 'None of the project\'s own files was added or changed. The item\'s deliverables live in the project folder, outside .bish-bash-bosh/: implement the item there.' : '';
-      });
+      }, '', inspection ? 'with feedback from the Inspector' : '');
       if (greenFailure) return fail(greenFailure, 'Builder');
       if (testFeedback) {
         log('bosh/harness', `Builder sent feedback on the tests (round ${++testRounds} of ${MAX_TEST_ROUNDS}):\n${testFeedback}`);
         if (testRounds >= MAX_TEST_ROUNDS) return fail(`The Builder still reports a defective test after ${MAX_TEST_ROUNDS} fixes: ${testFeedback}`, 'Builder');
+        harness('The Builder reports a defective test, sending it back to the Test Writer');
         needTests = true;
         continue;
       }
@@ -323,6 +324,7 @@ export async function runBuildLoop({
         break;
       }
       inspection = verdict.feedback;
+      harness('The Inspector has feedback, sending it back to the Builder');
       log('bosh/harness', `Inspector sent feedback (round ${++inspectionRounds} of ${MAX_INSPECTION_ROUNDS}):\n${inspection}`);
       if (inspectionRounds >= MAX_INSPECTION_ROUNDS) return fail(`The Inspector still had feedback after ${MAX_INSPECTION_ROUNDS} rounds: ${inspection}`, 'Inspector');
     }
