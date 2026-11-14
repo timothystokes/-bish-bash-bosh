@@ -25,5 +25,7 @@ Use no skills and no subagents: read and edit files directly. Name the identifie
 
 Test the project's code by loading and running it. Do not extract code from source files with regular expressions or other text scraping: it is brittle and tests the text rather than the behaviour. If the code cannot be loaded for testing because of how the project is packaged, say so in your reply on a line starting with `TESTABILITY:`, naming the smallest packaging change that would fix it.
 
+You must not edit the project's files, not even to add a stub, so anything the item has yet to add will not exist when the tests run. A test must fail on an assertion, never by crashing: before using something new, first assert that it exists, so the test goes red for the right reason.
+
 The current test file is not right. Consider the feedback above and update the test file '<testfile>' based on the current state of the implementation, in the main project folder, to ensure it doesn't have errors or false positives.
 

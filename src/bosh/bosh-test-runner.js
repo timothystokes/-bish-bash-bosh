@@ -73,5 +73,5 @@ export function classifyFailures(output) {
 export function describeTestErrors(output) {
   const { errors } = classifyFailures(output);
   if (errors.length === 0) return '';
-  return `These tests are broken (they error instead of failing an assertion):\n${errors.map((e) => `- ${e.name}: ${e.error}`).join('\n')}\n`;
+  return `These tests are broken (they crash instead of failing an assertion; if something the item adds does not exist yet, assert that it exists before using it, and do not edit project files):\n${errors.map((e) => `- ${e.name}: ${e.error}`).join('\n')}\n`;
 }
