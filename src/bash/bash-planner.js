@@ -43,15 +43,16 @@ export function buildPlanPrompt() {
  *   say: (s: string) => void,
  *   adapter: { run: (req: object) => Promise<{ transcript?: string }> },
  *   repoDir?: string,
+ *   model?: string,
  *   log?: (source: string, text: string) => void,
  * }} opts
  */
-export async function runPlanLoop({ planPath, readFile, say, adapter, repoDir, log = (/** @type {string} */ _source, /** @type {string} */ _text) => {} }) {
+export async function runPlanLoop({ planPath, readFile, say, adapter, repoDir, model = undefined, log = (/** @type {string} */ _source, /** @type {string} */ _text) => {} }) {
   say('\x1b[90mPlanner: working from the whole specification and the current code...\x1b[0m\n');
   const prompt = buildPlanPrompt();
   log('bash/planner prompt', prompt);
   let reasoning = '';
-  const result = await adapter.run({ prompt, cwd: repoDir, limits: {}, onReasoning: (/** @type {string} */ chunk) => { reasoning += chunk; } });
+  const result = await adapter.run({ prompt, cwd: repoDir, limits: {}, ...(model ? { model } : {}), onReasoning: (/** @type {string} */ chunk) => { reasoning += chunk; } });
   const response = reasoning || result?.transcript || '';
   if (response) log('bash/planner response', response);
   const items = parsePlanItems(readFile(planPath));

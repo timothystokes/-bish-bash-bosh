@@ -75,3 +75,37 @@ export function describeTestErrors(output) {
   if (errors.length === 0) return '';
   return `These tests are broken (they crash instead of failing an assertion; if something the item adds does not exist yet, assert that it exists before using it, and do not edit project files):\n${errors.map((e) => `- ${e.name}: ${e.error}`).join('\n')}\n`;
 }
+
+// The test files (as project-relative paths) that have at least one failing test in a run's spec-reporter output.
+/** @param {string} output @returns {Set<string>} */
+export function failingTestFiles(output) {
+  const files = new Set();
+  for (const m of output.matchAll(/^test at (.+?):\d+:\d+$/gm)) files.add(m[1]);
+  return files;
+}
+
+const MAX_SUMMARY_CHARS = 3000;
+
+// A compact account of a failed run for an agent's prompt: the counts, then each failing test once with its file and
+// first error lines. The full output (a line per passing test) stays in the results file. Falls back to the output
+// with its passing lines dropped when no failing test could be parsed (for example a crashed file).
+/** @param {string} output */
+export function summarizeTestOutput(output) {
+  const count = (label) => /** @type {string} */ (new RegExp(`^ℹ ${label} (\\d+)`, 'm').exec(output)?.[1] ?? '?');
+  const head = count('tests') === '?' ? '' : `Tests: ${count('tests')}, passed: ${count('pass')}, failed: ${count('fail')}.\n`;
+  const parts = output.split(/^test at (.+)$/m);
+  const seen = new Set();
+  const entries = [];
+  for (let i = 1; i < parts.length; i += 2) {
+    const lines = parts[i + 1].split('\n').map((l) => l.trim()).filter(Boolean);
+    const name = (lines[0] ?? '').replace(/^✖\s*/, '').replace(/\s+\([\d.]+ms\)$/, '');
+    if (!name || /subtests? failed/.test(lines[1] ?? '') || seen.has(`${parts[i]}|${name}`)) continue;
+    seen.add(`${parts[i]}|${name}`);
+    const detail = lines.slice(1).filter((l) => !/^at /.test(l)).slice(0, 4).map((l) => l.slice(0, 200)).join(' / ');
+    entries.push(`- ${name} [${parts[i]}]: ${detail}`);
+  }
+  const body = entries.length
+    ? entries.join('\n')
+    : output.split('\n').filter((l) => !l.startsWith('✔')).join('\n').slice(-MAX_SUMMARY_CHARS);
+  return `${head}${body.length > MAX_SUMMARY_CHARS ? `${body.slice(0, MAX_SUMMARY_CHARS)}...` : body}`;
+}

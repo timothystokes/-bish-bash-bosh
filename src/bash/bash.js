@@ -53,6 +53,7 @@ export async function runBash(cmd, argv, deps, out, err) {
       say: out,
       adapter,
       repoDir: repo,
+      model: config.roleModels?.planner,
       log: createLogger(join(repo, LOG_FILE)),
     });
     out(formatPlanLoopResult(res));

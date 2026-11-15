@@ -50,7 +50,7 @@ export function createCodexAdapter(opts = {}) {
       const resumeId = tracking && req.session ? req.session : undefined;
       const { code, stdout, stderr, timedOut, changedFiles } = await runProcessAgent({
         command,
-        args: [...prefix, ...buildCodexArgs({ prompt, model: opts.model, resumeId })],
+        args: [...prefix, ...buildCodexArgs({ prompt, model: req.model ?? opts.model, resumeId })],
         cwd,
         env: opts.env,
         maxWallClockSeconds: limits.maxWallClockSeconds,

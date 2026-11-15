@@ -104,7 +104,7 @@ export function createCopilotAdapter(opts = {}) {
       const { prompt, cwd, limits, onOutput = undefined, onReasoning = undefined } = req;
       const tracking = Object.hasOwn(req, 'session');
       const sessionId = tracking ? req.session || randomUUID() : undefined;
-      const args = [...prefix, ...buildCopilotArgs({ prompt, model: opts.model, sessionId })];
+      const args = [...prefix, ...buildCopilotArgs({ prompt, model: req.model ?? opts.model, sessionId })];
       const live = dropEphemeralEvents(onOutput);
       const reasoning = createReasoningSink(onReasoning);
       const write = (!live && !reasoning) ? undefined : (stream, chunk) => {

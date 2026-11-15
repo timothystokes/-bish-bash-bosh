@@ -6,7 +6,8 @@
 // QA — starts a fresh agent context (no continuing session, unlike `bish`/`bash`): the agent is
 // instructed to read `.bish-bash-bosh/plan.md` and the project's own source/test files rather than rely
 // on memory of earlier calls.
-import { describeTestErrors } from './bosh-test-runner.js';
+import { describeTestErrors, failingTestFiles, summarizeTestOutput } from './bosh-test-runner.js';
+import testRepairPrompt from './prompts/bosh-test-repair.js';
 import testWriterPrompt from './prompts/bosh-test-writer.js';
 import builderPrompt from './prompts/bosh-builder.js';
 import { join } from 'node:path';
@@ -144,15 +145,17 @@ function markProcessed(planPath, readFile, writeFile, lineIndex) {
 
 // Runs one agent call under its role's write zone: whatever it changed outside the zone is reverted and reported.
 // Returns { reply, changed, violations }.
-async function callAgent(adapter, repoDir, prompt, log, persona, role) {
+async function callAgent(adapter, repoDir, prompt, log, persona, role, model = undefined, say = () => {}) {
   log(`${persona} prompt`, prompt);
   let reasoning = '';
   // No `session` key: every call (build or QA) is opted out of session tracking, so each one is a
   // fresh agent context with no memory of any earlier call in this loop (see adapters/*.js: session
   // tracking is opt-in via `Object.hasOwn(req, 'session')`).
   const before = takeSnapshot(repoDir);
-  const res = await adapter.run({ prompt, cwd: repoDir, limits: {}, onReasoning: (chunk) => { reasoning += chunk; } });
+  const checking = () => say(`${GREY}Harness: Checking that the ${persona.replace('bosh/', '').replace('-', ' ')} only changed its own files...${RESET}\n`);
+  const res = await adapter.run({ prompt, cwd: repoDir, limits: {}, ...(model ? { model } : {}), onReasoning: (chunk) => { reasoning += chunk; } });
   if (reasoning) log(`${persona} response`, reasoning);
+  checking();
   const { changed, violations } = enforce(repoDir, before, role);
   return { reply: `${res?.transcript ?? ''}\n${reasoning}`, changed, violations };
 }
@@ -193,6 +196,7 @@ export function testFeedbackFrom(reply) {
  *   say: (s: string) => void,
  *   adapter: { run: (req: object) => Promise<object> },
  *   repoDir?: string,
+ *   models?: Record<string, string>,
  *   runTests: (opts: { cwd: string, files?: string[] }) => { ok: boolean, output: string },
  *   listTests: (opts: { cwd: string }) => Map<string, string>,
  *   log?: (source: string, text: string) => void,
@@ -207,6 +211,7 @@ export async function runBuildLoop({
   say,
   adapter,
   repoDir,
+  models = {},
   runTests,
   listTests,
   log = (/** @type {string} */ _source, /** @type {string} */ _text) => {},
@@ -226,9 +231,24 @@ export async function runBuildLoop({
       }
       if (!failure) return '';
       log('bosh/harness', `${label} attempt ${n} got feedback:\n${failure}`);
+      if (n < MAX_ATTEMPTS) harness(`Sending ${label} back to try again because: ${failure.split('\n').find((l) => l.trim())?.trim().slice(0, 200)}`);
       previous = failure;
     }
     return previous;
+  }
+
+  // Hands earlier items' failing test files to a Test Writer pass that updates stale ones to the current implementation.
+  // Returns '' once done, or the failure text when the Test Writer reports a real regression (the Builder must fix that).
+  async function repairEarlierTests(files, output, item) {
+    const summary = summarizeTestOutput(output);
+    for (const file of files) {
+      harness(`Repairing the stale test file ${file}`);
+      const { reply, violations } = await callAgent(adapter, repoDir, testRepairPrompt(file, summary, describeItem(item)), log, 'bosh/test-repair', 'test-writer', models?.['test-writer'], say);
+      if (violations.length) return describeViolations('test-writer', violations);
+      const regression = /^[ \t>*-]*REGRESSION:[ \t]*(.*)$/m.exec(reply);
+      if (regression) return `An earlier item's behaviour is broken by this change; fix the implementation so it works again, do not edit tests: ${regression[1]}\n${summary}`;
+    }
+    return '';
   }
 
   let processed = 0;
@@ -258,6 +278,7 @@ export async function runBuildLoop({
     let inspectionRounds = 0;
     let implementedAlready = false;
     const projectFiles = new Set();
+    let earlierFailures = 0;
     for (;;) {
       if (needTests) {
         const before = listTests({ cwd: repoDir });
@@ -265,15 +286,15 @@ export async function runBuildLoop({
         // pass on the retry are accepted (the Inspector then checks the work) instead of failing the item.
         let alreadyGreen = 0;
         const redFailure = await step('Test Writer', async (previous) => {
-          const { reply, violations } = await callAgent(adapter, repoDir, buildTestLoopPrompt(next, previous, ...contextFor(next, { repoDir, specPath, readFile })), log, 'bosh/test-writer', 'test-writer');
+          const { reply, violations } = await callAgent(adapter, repoDir, buildTestLoopPrompt(next, previous, ...contextFor(next, { repoDir, specPath, readFile })), log, 'bosh/test-writer', 'test-writer', models?.['test-writer'], say);
           if (violations.length) return describeViolations('test-writer', violations);
           const after = listTests({ cwd: repoDir });
           const touched = [...after].filter(([path, stamp]) => before.get(path) !== stamp).map(([path]) => path);
           if (touched.length === 0) return 'No test file under .bish-bash-bosh/tests/ was added or changed: write or fix at least one test for this item.';
-          harness('Testing the new tests, expecting them to fail');
+          harness('Running the new tests, expecting them to fail');
           const red = runTests({ cwd: repoDir, files: touched });
           const broken = red.ok ? '' : describeTestErrors(red.output);
-          if (broken) return `${broken}Fix the tests so they run and fail on an assertion because the item's behaviour is missing.\n${red.output}`;
+          if (broken) return `${broken}Fix the tests so they run and fail on an assertion because the item's behaviour is missing.\n${summarizeTestOutput(red.output)}`;
           if (red.ok && testFeedback) return '';
           if (red.ok && ALREADY_IMPLEMENTED.test(reply)) {
             implementedAlready = true;
@@ -294,15 +315,26 @@ export async function runBuildLoop({
       }
 
       const greenFailure = await step('Builder', async (previous) => {
-        const built = await callAgent(adapter, repoDir, buildBuildLoopPrompt(next, previous, ...contextFor(next, { repoDir, specPath, readFile }), inspection), log, 'bosh/builder', 'builder');
+        const built = await callAgent(adapter, repoDir, buildBuildLoopPrompt(next, previous, ...contextFor(next, { repoDir, specPath, readFile }), inspection), log, 'bosh/builder', 'builder', models?.builder, say);
         built.changed.forEach((file) => projectFiles.add(file));
         if (built.violations.length) return `${describeViolations('builder', built.violations)} If a test is defective, end your reply with a line starting with TEST FEEDBACK: instead of editing it.`;
         testFeedback = testFeedbackFrom(built.reply);
         if (testFeedback) return '';
-        harness('Testing the whole suite');
-        const result = runTests({ cwd: repoDir });
+        harness('Running the whole test suite');
+        let result = runTests({ cwd: repoDir });
         latestResults = result.output;
-        if (!result.ok) return `${describeTestErrors(result.output)}${result.output}`;
+        if (!result.ok) {
+          // Failures confined to earlier items' test files that the Builder cannot touch would otherwise stall the item for good.
+          const own = join(repoDir, testFileFor(next)).split('\\').join('/');
+          const stale = [...failingTestFiles(result.output)].filter((f) => join(repoDir, f).split('\\').join('/') !== own);
+          if (stale.length > 0 && stale.length === failingTestFiles(result.output).size && ++earlierFailures >= 2) {
+            const repaired = await repairEarlierTests(stale, result.output, next);
+            if (repaired) return repaired;
+            result = runTests({ cwd: repoDir });
+            latestResults = result.output;
+          }
+          if (!result.ok) return `${describeTestErrors(result.output)}${summarizeTestOutput(result.output)}`;
+        }
         // The deliverable is the project itself, so an item can't pass on harness files alone.
         return projectFiles.size === 0 && !implementedAlready ? 'None of the project\'s own files was added or changed. The item\'s deliverables live in the project folder, outside .bish-bash-bosh/: implement the item there.' : '';
       }, '', inspection ? 'with feedback from the Inspector' : '');
@@ -320,7 +352,7 @@ export async function runBuildLoop({
         // The Inspector reads the latest full-suite output from a results file the harness writes before it runs.
         harness('Writing the test results for the Inspector');
         writeFile(join(repoDir, TEST_RESULTS_FILE), latestResults);
-        const inspected = await callAgent(adapter, repoDir, buildQaLoopPrompt(next, previous, ...contextFor(next, { repoDir, specPath, readFile }), [...projectFiles], items.filter((i) => !i.checked && i.id !== next.id)), log, 'bosh/inspector', 'inspector');
+        const inspected = await callAgent(adapter, repoDir, buildQaLoopPrompt(next, previous, ...contextFor(next, { repoDir, specPath, readFile }), [...projectFiles], items.filter((i) => !i.checked && i.id !== next.id)), log, 'bosh/inspector', 'inspector', models?.inspector, say);
         if (inspected.violations.length) return describeViolations('inspector', inspected.violations);
         verdict = parseVerdict(inspected.reply);
         return verdict.approved || verdict.feedback ? '' : 'End your reply with APPROVED (and a VERIFIED: line) or with a line starting with FEEDBACK: describing what must change.';
@@ -336,10 +368,11 @@ export async function runBuildLoop({
       if (inspectionRounds >= MAX_INSPECTION_ROUNDS) return fail(`The Inspector still had feedback after ${MAX_INSPECTION_ROUNDS} rounds: ${inspection}`, 'Inspector');
     }
 
-    markProcessed(planPath, readFile, writeFile, next.lineIndex);
-    processed++;
     const [name, ...detail] = next.task.split(' - ');
     harness('Committing');
+    // Commit first: a failed commit throws, leaving the item unticked so a later run does it again.
     commit([`bosh: ${subject(name)}`, detail.join(' - '), next.specs.length ? `Specification items: ${next.specs.join(', ')}` : '', spec ? `Specification status: ${spec.verified.length} verified, ${spec.uncovered.length} not yet verified` : ''].filter(Boolean).join('\n\n'));
+    markProcessed(planPath, readFile, writeFile, next.lineIndex);
+    processed++;
   }
 }

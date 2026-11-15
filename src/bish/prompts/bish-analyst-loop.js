@@ -1,6 +1,6 @@
 import dials from './interview-dials.js';
 
-export default (item, settings) => `# Per Loop Instructions.
+export default (item, settings, budget = undefined) => `# Per Loop Instructions.
 
 The output of this step is to update \`.bish-bash-bosh/interview.md\` and or  \`.bish-bash-bosh/specification.md\` based on the new information verified in the question and answer below and following these steps.
 
@@ -18,7 +18,11 @@ The output of this step is to update \`.bish-bash-bosh/interview.md\` and or  \`
 
 3. STOP!
 
-## The Question and Answer to process this time...
+${budget ? `## Specification budget
+
+This session has used ${budget.used} of its ${budget.max} new specification items.${budget.used >= budget.max ? ' The budget is spent: add no new specification items and no questions that would need them. Only refine existing items and answer follow-ups already recorded; anything further belongs to a later session.' : ` ${budget.max - budget.used} remain: spend them on the most important requirements and merge related ones.`}
+
+` : ''}## The Question and Answer to process this time...
 
 ${item}
 `;

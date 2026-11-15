@@ -268,3 +268,8 @@ test('the accuracy (default 5) and curiosity (default 4) settings are stated in 
   assert.equal(full.match(/Accuracy 9 of 10/g).length, 2, 'in the intro and in the loop instructions');
   assert.doesNotMatch(full, /at most (one|two|three)/);
 });
+
+test('the analyst prompt reports the session\'s specification budget and stops new items once it is spent', () => {
+  assert.match(buildInterviewLoopPrompt('q', 'a', { budget: { used: 10, max: 60 } }), /used 10 of its 60 new specification items\. 50 remain/);
+  assert.match(buildInterviewLoopPrompt('q', 'a', { budget: { used: 60, max: 60 } }), /budget is spent: add no new specification items/);
+});

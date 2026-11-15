@@ -58,6 +58,7 @@ export async function runBosh(cmd, argv, deps, out, err) {
       say: out,
       adapter,
       repoDir: repo,
+      models: config.roleModels,
       runTests: ({ cwd, files }) => runTestSuite(cwd, files),
       listTests: ({ cwd }) => listTestFiles(cwd),
       log: createLogger(join(repo, LOG_FILE)),

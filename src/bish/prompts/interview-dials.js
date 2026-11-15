@@ -1,16 +1,20 @@
 export const DEFAULT_CURIOSITY = 4;
 export const DEFAULT_ACCURACY = 5;
+export const DEFAULT_SPEC_BUDGET = 60;
 
 const clamp = (v, fallback) => Math.min(10, Math.max(1, Math.round(Number(v) || fallback)));
 
 // The two settings as the interview will use them, defaults filled in.
 export const effectiveSettings = ({ curiosity, accuracy } = {}) => ({ accuracy: clamp(accuracy, DEFAULT_ACCURACY), curiosity: clamp(curiosity, DEFAULT_CURIOSITY) });
+// The most specification items one session may add (config `specBudget`).
+export const specBudget = ({ specBudget: b } = {}) => (Number.isInteger(b) && b >= 1 ? b : DEFAULT_SPEC_BUDGET);
+
 const band = (n, bands) => bands.find(([max]) => n <= max)[1];
 
 // Turns the two 1-10 interview settings into guidance. Neither sets a number of questions: accuracy is how
 // specific the specification must be before a gap counts as closed, curiosity is how far the agent
 // follows the ramifications of each answer. A question is only ever raised for a real gap.
-export default ({ curiosity, accuracy } = {}) => {
+export default ({ curiosity, accuracy, specBudget: budget } = {}) => {
   const c = clamp(curiosity, DEFAULT_CURIOSITY);
   const d = clamp(accuracy, DEFAULT_ACCURACY);
   const accuracyText = band(d, [
@@ -27,5 +31,6 @@ export default ({ curiosity, accuracy } = {}) => {
     [8, 'Explore the wider ramifications of an answer: edge cases, failure modes and interactions with other decisions.'],
     [10, 'Explore every ramification of an answer, including second order effects and the questions the user may not have thought to ask.'],
   ]);
-  return `Accuracy ${d} of 10: ${accuracyText}\nCuriosity ${c} of 10: ${curiosityText}\nOnly ask a question for a real gap at these levels, never to fill a quota. Where the builder could sensibly choose for themselves at this level of accuracy, make that choice in the specification rather than asking.`;
+  const max = specBudget({ specBudget: budget });
+  return `Accuracy ${d} of 10: ${accuracyText}\nCuriosity ${c} of 10: ${curiosityText}\nOnly ask a question for a real gap at these levels, never to fill a quota. Where the builder could sensibly choose for themselves at this level of accuracy, make that choice in the specification rather than asking.\nSession scope: this session may add at most ${max} specification items in total. More functionality can be added in a later session, so capture the core of what the user asked for now, merge closely related requirements into one item, and defer nice-to-haves rather than specifying everything at once.`;
 };

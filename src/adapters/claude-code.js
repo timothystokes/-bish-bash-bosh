@@ -41,7 +41,7 @@ export function createClaudeCodeAdapter(opts = {}) {
       const sessionId = tracking ? (resume ? req.session : randomUUID()) : undefined;
       const { code, stdout, stderr, timedOut, changedFiles } = await runProcessAgent({
         command,
-        args: [...prefix, ...buildClaudeArgs({ prompt, model: opts.model, sessionId, resume })],
+        args: [...prefix, ...buildClaudeArgs({ prompt, model: req.model ?? opts.model, sessionId, resume })],
         cwd,
         env: opts.env,
         maxWallClockSeconds: limits.maxWallClockSeconds,

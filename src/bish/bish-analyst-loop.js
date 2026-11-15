@@ -4,9 +4,10 @@
 // agent. Finding the next question to ask only ever looks at that one checkbox; the loop never reads
 // or writes anything else about a question's history.
 import analystIntroPrompt from './prompts/bish-analyst-intro.js';
-import { effectiveSettings } from './prompts/interview-dials.js';
+import { effectiveSettings, specBudget } from './prompts/interview-dials.js';
 import analystLoopPrompt from './prompts/bish-analyst-loop.js';
 import { subject } from '../shared/git-commit.js';
+import { parseSpecificationItems } from '../bash/bash-planner.js';
 
 const CYAN = '\x1b[1;36m';
 const YELLOW = '\x1b[33m';
@@ -54,10 +55,10 @@ export function nextQuestion(questions) {
 // `includeIntro` prefaces src/bish/prompts/bish-analyst-intro.js onto the very top of all of that: the caller
 // passes it only for the first round of a brand-new session (see runInterviewLoop below), never for
 // a later round or a restart that resumes the same persisted session.
-export function buildInterviewLoopPrompt(question, answer, { includeIntro = false, settings } = {}) {
+export function buildInterviewLoopPrompt(question, answer, { includeIntro = false, settings, budget = undefined } = {}) {
   const parts = [];
   if (includeIntro) parts.push(analystIntroPrompt(settings).trimEnd());
-  parts.push(analystLoopPrompt(['## Question', question, '## Answer', answer].join('\n\n'), settings));
+  parts.push(analystLoopPrompt(['## Question', question, '## Answer', answer].join('\n\n'), settings, budget));
   return parts.join('\n\n');
 }
 
@@ -107,6 +108,8 @@ function markProcessed(interviewPath, readFile, writeFile, id) {
  *   say: (s: string) => void,
  *   adapter: { run: (req: object) => Promise<{ session?: unknown }> },
  *   repoDir?: string,
+ *   specPath?: string,
+ *   specBaseline?: number,
  *   loadSession?: () => unknown,
  *   saveSession?: (session: unknown) => void,
  *   commit?: (message: string) => unknown,
@@ -121,6 +124,8 @@ export async function runInterviewLoop({
   say,
   adapter,
   repoDir,
+  specPath = undefined,
+  specBaseline = undefined,
   settings = {},
   saveSettings = (/** @type {unknown} */ _settings) => {},
   loadSession = () => undefined,
@@ -129,6 +134,15 @@ export async function runInterviewLoop({
   log = (/** @type {string} */ _source, /** @type {string} */ _text) => {},
 }) {
   let answered = 0;
+  // A session may add at most `specBudget` specification items; the count starts from the baseline (items there before it began).
+  const countSpec = () => {
+    try {
+      return parseSpecificationItems(readFile(specPath)).length;
+    } catch {
+      return 0;
+    }
+  };
+  const baseline = specPath ? specBaseline ?? countSpec() : 0;
   // Offered to the asker so accuracy and curiosity can be changed from the keyboard while answering.
   const dials = {
     get: () => effectiveSettings(settings),
@@ -171,7 +185,7 @@ export async function runInterviewLoop({
 
     say(`${GREY}Analyst thinking...\n`);
     const session = loadSession();
-    const prompt = buildInterviewLoopPrompt(next.question, answer, { includeIntro: session === undefined, settings });
+    const prompt = buildInterviewLoopPrompt(next.question, answer, { includeIntro: session === undefined, settings, budget: specPath ? { used: Math.max(0, countSpec() - baseline), max: specBudget(settings) } : undefined });
     log('bish/analyst prompt', prompt);
     let reasoning = '';
     const result = await adapter.run({

@@ -40,7 +40,7 @@ ${feedback}` : ''
 
 ALL user specified requirements to be assessed MUST have been implemented in the users main project folder not in .bish-bash-bosh. Anything inside \`.bish-bash-bosh/\` belongs to the harness: it is git-ignored and never part of the solution, so ignore it when reviewing diffs or status.
 
-Use no skills and no subagents: read the files directly. Judge only what this item delivers.
+Use no skills and no subagents: read the files directly. Judge only what this item delivers: send it back only for a defect in what this item, as named above, is meant to build, or for a listed specification row it claims to satisfy that is plainly not met. Do not ask for behaviour that belongs to another plan item or to a specification row not listed above, and do not ask for refactoring, style or extra tests. Prefer APPROVED when the item's own behaviour works; leave \`VERIFIED:\` out for rows you could not confirm.
 
 Respond with your approval or provide feedback about what aspect of the implementation is lacking or could be improved. End your reply with either:
 - \`APPROVED\`, followed by a line \`VERIFIED: S1, S2\` listing the specification items above that the project's files now satisfy, or

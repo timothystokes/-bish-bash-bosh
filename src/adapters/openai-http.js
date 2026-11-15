@@ -46,7 +46,7 @@ export function createOpenAiHttpAdapter(opts = {}) {
       });
       const headers = { 'content-type': 'application/json', ...(opts.apiKeyEnv && env[opts.apiKeyEnv] ? { authorization: `Bearer ${env[opts.apiKeyEnv]}` } : {}) };
       const body = JSON.stringify({
-        model: opts.model,
+        model: req.model ?? opts.model,
         messages: [
           { role: 'system', content: FILE_PROTOCOL },
           ...history,

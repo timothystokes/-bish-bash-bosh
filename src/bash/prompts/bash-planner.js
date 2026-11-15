@@ -26,12 +26,15 @@ Do not map specification items to plan items one-to-one. Treat each one by its k
 
 - Behaviour or feature (what the product does): becomes several concrete construction items, usually a data or
   logic item, an interface item, and the wiring between them.
+  Each item must leave its piece reachable from the product's entry point (the wiring is part of the item that adds
+  the piece, not a later clean-up), so a finished item works end to end.
 - Constraint on how it is built (style, single file, no dependencies, privacy, performance, accessibility, browser
   support): normally not an item of its own. Write it into the wording of the construction items it governs (for
   example "pure function, no DOM access", "inline in index.html", "keyboard operable with a visible focus ring"). Add an
   item only when the constraint demands a real artifact, such as an inline SVG symbol set or a unit test file.
 - Process or delivery statement (what success means, review, CI, release): usually needs no plan item. Reference it
   with \`S:\` on the items it affects.
+- Do not plan tests for code that another plan item builds: \`-bosh\` writes and runs a test for every item by itself, so "Test X coverage" items that only re-test earlier items duplicate that work. Plan test files only for what the specification itself requires of the delivered project (see the next point).
 - Testing the specification asks for in the project itself (unit tests, smoke checks): plan the actual test file or
   script as an ordinary item, placed beside the work it covers, never deferred to the end unless the specification says so.
   Think critically about testability: if the delivery shape the specification chose (for example all code inline in one

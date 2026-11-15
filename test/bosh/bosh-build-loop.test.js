@@ -247,15 +247,18 @@ test('shows each item in colour with a grey status line before each step', async
   const said = [];
   await run(path, dir, fakeAdapter(), { say: (s) => said.push(s) });
   assert.match(said[0], /\x1b\[1;36mEstablish architectural constraints\x1b\[0m/);
-  const lines = said.slice(0, 9).map((l) => l.replace(/\x1b\[\d+(;\d+)?m/g, '').trim());
+  const lines = said.slice(0, 12).map((l) => l.replace(/\x1b\[\d+(;\d+)?m/g, '').trim());
   assert.deepEqual(lines.slice(1), [
     'Harness: Preparing the test file...',
     'Test Writer...',
-    'Harness: Testing the new tests, expecting them to fail...',
+    'Harness: Checking that the test writer only changed its own files...',
+    'Harness: Running the new tests, expecting them to fail...',
     'Builder...',
-    'Harness: Testing the whole suite...',
+    'Harness: Checking that the builder only changed its own files...',
+    'Harness: Running the whole test suite...',
     'Inspector...',
     'Harness: Writing the test results for the Inspector...',
+    'Harness: Checking that the inspector only changed its own files...',
     'Harness: Committing...',
   ]);
   assert.match(said[1], /^\x1b\[90mHarness: /, 'harness steps are grey like the agent steps');
@@ -431,4 +434,36 @@ test('every persona is told the README, the item\'s specification rows and the i
     assert.match(p, /2\. \[x\] Q: Who uses it\? A: Developers\n3\. \[x\] Q: Where\? A: CLI/, persona);
     assert.doesNotMatch(p, /Unrelated|C: One\./, persona);
   }
+});
+
+test('failures only in earlier items\' test files go to a test-repair pass after a second failed build, then the suite is rerun', async () => {
+  const { path, dir } = makeFile('1. [ ] T: first\n');
+  const adapter = fakeAdapter();
+  let full = 0;
+  const res = await run(path, dir, adapter, {
+    runTests: ({ files }) => {
+      if (files) return { ok: false, output: 'red' };
+      full++;
+      return full <= 2 ? { ok: false, output: 'test at .bish-bash-bosh/tests/00-old.test.js:1:1\n✖ old (1ms)\n  AssertionError [ERR_ASSERTION]: x' } : { ok: true, output: '' };
+    },
+  });
+  assert.equal(res.status, 'ok');
+  const repair = adapter.calls.find((c) => c.prompt.includes('repair one test file'));
+  assert.ok(repair, 'a repair pass ran');
+  assert.match(repair.prompt, /\.bish-bash-bosh\/tests\/00-old\.test\.js/);
+});
+
+test('a role model from `models` is passed to that role\'s agent calls only', async () => {
+  const { path, dir } = makeFile('1. [ ] T: first\n');
+  const adapter = fakeAdapter();
+  await run(path, dir, adapter, { models: { builder: 'big-model' } });
+  const byRole = (name) => adapter.calls.filter((c) => c.prompt.trimStart().startsWith(head(name)));
+  assert.ok(byRole('builder').every((c) => c.model === 'big-model'));
+  assert.ok(byRole('inspector').every((c) => !('model' in c)));
+});
+
+test('an item whose commit fails stays unticked', async () => {
+  const { path, dir } = makeFile('1. [ ] T: first\n');
+  await assert.rejects(run(path, dir, fakeAdapter(), { commit: () => { throw new Error('git commit failed'); } }), /git commit failed/);
+  assert.equal(parsePlanItems(readFileSync(path, 'utf8'))[0].checked, false);
 });
