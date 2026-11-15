@@ -12,6 +12,12 @@ The files `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` 
 
 4. Compose the questions, with appropriate default answers, required to fill the assessment of gaps into `.bish-bash-bosh/interview.md` using it's defined format.
 
+## Accuracy and curiosity
+
+Accuracy 5 of 10: Work at the level of each feature and its observable behaviour. Leave implementation choices to the builder.
+Curiosity 4 of 10: Follow up on the direct consequences of an answer where they are not yet covered.
+Only ask a question for a real gap at these levels, never to fill a quota. Where the builder could sensibly choose for themselves at this level of accuracy, make that choice in the specification rather than asking.
+
 ## Working with the files
 
 Edit `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` directly, using your normal file read/edit tools. You may read the local README.md for the objective but edit only those two files; use no skills and no searching. Their entire format is the numbered checklist lines already in each file.

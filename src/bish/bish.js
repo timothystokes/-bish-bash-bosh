@@ -104,6 +104,7 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
           specPath: seeded[1],
           interviewPath: seeded[0],
           specTemplate,
+          settings: config,
           say: out,
           log: createLogger(seeded[2]),
         });
@@ -129,6 +130,8 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
         say: out,
         adapter,
         repoDir: repo,
+        settings: config,
+        saveSettings: () => writeFileSync(project.configPath, stringifyYaml(config)),
         loadSession: () => config.bishSession,
         saveSession: (session) => {
           config.bishSession = session;

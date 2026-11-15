@@ -260,3 +260,11 @@ test('the harness commits after each completed round, with the question and answ
     'bish: Who are the users?\n\nAnswer: pre-filled default',
   ]);
 });
+
+test('the accuracy (default 5) and curiosity (default 4) settings are stated in every interview prompt, and never as a number of questions', () => {
+  assert.match(buildInterviewLoopPrompt('Q', 'A'), /Accuracy 5 of 10[\s\S]*Curiosity 4 of 10/);
+  assert.match(buildInterviewLoopPrompt('Q', 'A', { settings: { accuracy: 1, curiosity: 10 } }), /Accuracy 1 of 10[\s\S]*Curiosity 10 of 10/);
+  const full = buildInterviewLoopPrompt('Q', 'A', { includeIntro: true, settings: { accuracy: 9, curiosity: 2 } });
+  assert.equal(full.match(/Accuracy 9 of 10/g).length, 2, 'in the intro and in the loop instructions');
+  assert.doesNotMatch(full, /at most (one|two|three)/);
+});

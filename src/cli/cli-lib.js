@@ -83,7 +83,7 @@ export function debugAdapter(adapter, label, debug, out) {
  * @param {NodeJS.WritableStream} [output]
  */
 export function readlineOptions(input, output = process.stdout) {
-  return input.isTTY ? { input, output, terminal: true } : { input };
+  return input.isTTY ? { input, output, terminal: true, historySize: 0, escapeCodeTimeout: 50 } : { input };
 }
 
 // Undo terminal modes a child process may have left on: kitty keyboard protocol, modifyOtherKeys, bracketed paste;
@@ -95,6 +95,66 @@ export function resetTty(input) {
 }
 
 const GREY = '\x1b[90m';
+
+// The interview's fixed bottom line: the tool name and the two settings, pinned below a scroll region so
+// the questions and answers scroll above it. [esc] enters adjust mode, where Left/Right pick a setting
+// and Up/Down change it, and [esc] again saves. In adjust mode readline's own key listeners are
+// detached so nothing can edit the answer being typed; they are put back on leaving it.
+function createFooter(input, output, dials) {
+  const rows = output.rows;
+  let installed = false;
+  let adjusting = false;
+  let selected = 'accuracy';
+  let held = [];
+  let own = [];
+  const text = () => {
+    const v = dials.get();
+    const item = (name) => (adjusting && selected === name ? `\x1b[7m ${name} ${v[name]} \x1b[27m` : ` ${name} ${v[name]} `);
+    const hint = adjusting ? '\u2190\u2192 select \u00b7 \u2191\u2193 change \u00b7 [esc] to save' : '[esc] to adjust';
+    return `\x1b[0m\x1b[1;31m-bish\x1b[32m-bash\x1b[34m-bosh\x1b[0m${GREY} \u2502${item('accuracy')}\u00b7${item('curiosity')}\u2502 ${hint}\x1b[0m`;
+  };
+  const draw = () => output.write(`\x1b7\x1b[${rows};1H\x1b[2K${text()}\x1b8`);
+  const remove = () => {
+    if (!installed) return;
+    installed = false;
+    input.removeListener('keypress', onKey);
+    output.write(`\x1b7\x1b[r\x1b[${rows};1H\x1b[2K\x1b8`);
+  };
+  const onKey = (_ch, key) => {
+    if (!key) return;
+    if (!adjusting) {
+      if (key.name !== 'escape') return;
+      adjusting = true;
+      held = input.listeners('keypress').filter((l) => l !== onKey && !own.includes(l));
+      for (const l of held) input.removeListener('keypress', l);
+    } else if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+      adjusting = false;
+      for (const l of held) input.on('keypress', l);
+      held = [];
+    } else if (key.name === 'left' || key.name === 'right') selected = selected === 'accuracy' ? 'curiosity' : 'accuracy';
+    else if (key.name === 'up') dials.adjust(selected, 1);
+    else if (key.name === 'down') dials.adjust(selected, -1);
+    draw();
+  };
+  return {
+    // True when the key belongs to the footer and must not be treated as typing.
+    owns: (key) => adjusting || key?.name === 'escape',
+    // `ownListeners` are the asker's own keypress listeners, which stay attached in adjust mode.
+    attach(ownListeners) {
+      if (!installed) {
+        // Make sure the cursor is not on the last row, then reserve that row below the scroll region.
+        output.write(`\n\x1b[A\x1b7\x1b[1;${rows - 1}r\x1b8`);
+        installed = true;
+        process.once('exit', remove);
+      }
+      own = ownListeners;
+      input.prependListener('keypress', onKey);
+      draw();
+    },
+    detach: () => input.removeListener('keypress', onKey),
+    remove,
+  };
+}
 
 // The last SGR (color) escape sequence appearing anywhere in `prompt` — i.e. whatever color is
 // still active once the prompt's own text has been printed, so the grey default and the owner's
@@ -125,7 +185,8 @@ export function createAsker(input, out, output = process.stdout) {
   const tty = input.isTTY === true;
   const shared = tty ? undefined : createInterface(readlineOptions(input));
   const sharedLines = shared?.[Symbol.asyncIterator]();
-  const ask = async (prompt, defaultValue) => {
+  let shownFooter;
+  const ask = async (prompt, defaultValue, dials) => {
     if (sharedLines) {
       out(prompt);
       const next = await sharedLines.next();
@@ -133,6 +194,9 @@ export function createAsker(input, out, output = process.stdout) {
     }
     resetTty(input);
     const rl = createInterface(readlineOptions(input, output));
+    const footer = dials && output.rows ? (shownFooter ??= createFooter(input, output, dials)) : undefined;
+    const ownListeners = [];
+    footer?.attach(ownListeners);
     rl.setPrompt(prompt);
     rl.prompt();
     if (!defaultValue) {
@@ -140,6 +204,7 @@ export function createAsker(input, out, output = process.stdout) {
         for await (const line of rl) return line;
         return null;
       } finally {
+        footer?.detach();
         rl.close();
       }
     }
@@ -159,7 +224,7 @@ export function createAsker(input, out, output = process.stdout) {
     output.write(backToStart);
     const editKeys = new Set(['left', 'right', 'home', 'end']);
     const onKeypress = (_ch, key) => {
-      if (touched || settled) return;
+      if (touched || settled || footer?.owns(key)) return;
       if (key && (key.name === 'return' || key.name === 'enter')) {
         // Accepting the grey suggestion as-is: recolor it to match the prompt's own color (the
         // cursor is still sitting in front of it, unmoved since it was first drawn), so it reads
@@ -176,15 +241,17 @@ export function createAsker(input, out, output = process.stdout) {
       if (key && (editKeys.has(key.name) || (key.ctrl && (key.name === 'a' || key.name === 'e')))) rl.write(defaultValue);
     };
     input.prependListener('keypress', onKeypress);
+    ownListeners.push(onKeypress);
     try {
       for await (const line of rl) return touched ? line : (line === '' ? defaultValue : line);
       return null;
     } finally {
       input.removeListener('keypress', onKeypress);
+      footer?.detach();
       rl.close();
     }
   };
-  return { ask, close: () => shared?.close() };
+  return { ask, close: () => { shownFooter?.remove(); shared?.close(); } };
 }
 
 // Prompt with a numbered list of suggested choices (e.g. `bish`'s adapter/model picker): prints the

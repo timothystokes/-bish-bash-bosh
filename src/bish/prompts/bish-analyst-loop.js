@@ -1,4 +1,6 @@
-export default (item) => `# Per Loop Instructions.
+import dials from './interview-dials.js';
+
+export default (item, settings) => `# Per Loop Instructions.
 
 The output of this step is to update \`.bish-bash-bosh/interview.md\` and or  \`.bish-bash-bosh/specification.md\` based on the new information verified in the question and answer below and following these steps.
 
@@ -7,7 +9,7 @@ The output of this step is to update \`.bish-bash-bosh/interview.md\` and or  \`
 - Update the proposed answer to any unprocessed question to reflect the new information verified in this question and answer below.
 - If the answer to this question conflicts with an already processed question and answer then mark the previous question/answer as unprocessed again and adjust it's proposed answer to have the user verify the conflict.
 - Add any follow up questions for -bish-bash-bosh to ask the user later, in order to achieve a complete specification for the objective, including a challenge to any answer that departs from general best practice (the proposed answer being the best-practice approach, with a brief reason) or that makes another of the user's requirements (such as unit testing) impractical, with a practical alternative as the proposed answer. Read the whole of \`.bish-bash-bosh/interview.md\` first and never append a question that is already in it (processed or not), however it is worded.
-- Be curious. Each answer is new information, so ask what a builder would still have to guess in order to build the right and complete thing: what the answer implies for other parts of the solution, its edge cases and failure modes, how it interacts with the existing specification items and processed answers, and what a user would expect to see, do or be protected from. An answer that introduces a new requirement, a new concept or a changed direction deserves several follow up questions of its own (its behaviour, its boundaries, its interaction with what is already specified, and how it will be verified), not just a specification item. Follow up questions are cheap and a wrong guess during the build is expensive, so when in doubt, ask. Only add none if you can name nothing a builder would have to guess.
+- Apply the interview settings: ${dials(settings).replace(/\n/g, ' ')} An answer that introduces a new requirement, concept or changed direction should be explored at those levels.
 - The question below is already recorded in \`.bish-bash-bosh/interview.md\` and the harness marks it processed. Do not remove, renumber or re-add it, and do not rewrite the file from an earlier copy: edit it in place.
 
 2. Update the specification items in \`.bish-bash-bosh/specification.md\` to include any new Constraints and Benifits that can be derived form the confirmed answer to the question below including:

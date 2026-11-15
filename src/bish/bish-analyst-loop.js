@@ -4,6 +4,7 @@
 // agent. Finding the next question to ask only ever looks at that one checkbox; the loop never reads
 // or writes anything else about a question's history.
 import analystIntroPrompt from './prompts/bish-analyst-intro.js';
+import { effectiveSettings } from './prompts/interview-dials.js';
 import analystLoopPrompt from './prompts/bish-analyst-loop.js';
 import { subject } from '../shared/git-commit.js';
 
@@ -53,10 +54,10 @@ export function nextQuestion(questions) {
 // `includeIntro` prefaces src/bish/prompts/bish-analyst-intro.js onto the very top of all of that: the caller
 // passes it only for the first round of a brand-new session (see runInterviewLoop below), never for
 // a later round or a restart that resumes the same persisted session.
-export function buildInterviewLoopPrompt(question, answer, { includeIntro = false } = {}) {
+export function buildInterviewLoopPrompt(question, answer, { includeIntro = false, settings } = {}) {
   const parts = [];
-  if (includeIntro) parts.push(analystIntroPrompt().trimEnd());
-  parts.push(analystLoopPrompt(['## Question', question, '## Answer', answer].join('\n\n')));
+  if (includeIntro) parts.push(analystIntroPrompt(settings).trimEnd());
+  parts.push(analystLoopPrompt(['## Question', question, '## Answer', answer].join('\n\n'), settings));
   return parts.join('\n\n');
 }
 
@@ -120,12 +121,22 @@ export async function runInterviewLoop({
   say,
   adapter,
   repoDir,
+  settings = {},
+  saveSettings = (/** @type {unknown} */ _settings) => {},
   loadSession = () => undefined,
   saveSession = (/** @type {unknown} */ _session) => {},
   commit = () => {},
   log = (/** @type {string} */ _source, /** @type {string} */ _text) => {},
 }) {
   let answered = 0;
+  // Offered to the asker so accuracy and curiosity can be changed from the keyboard while answering.
+  const dials = {
+    get: () => effectiveSettings(settings),
+    adjust: (name, delta) => {
+      settings[name] = Math.min(10, Math.max(1, effectiveSettings(settings)[name] + delta));
+      saveSettings(settings);
+    },
+  };
   for (;;) {
     const text = readFile(interviewPath);
     const questions = parseInterview(text);
@@ -146,7 +157,7 @@ export async function runInterviewLoop({
       next = { id, question: NEW_REQUIREMENT_QUESTION };
     } else {
       say(`\n${CYAN}Q${next.id}: ${next.question}${RESET}\n`);
-      reply = await ask(YELLOW, next.answer);
+      reply = await ask(YELLOW, next.answer, dials);
       say(RESET);
       if (reply === null) {
         const remaining = parseInterview(readFile(interviewPath)).filter((q) => !q.checked).length;
@@ -160,7 +171,7 @@ export async function runInterviewLoop({
 
     say(`${GREY}Analyst thinking...\n`);
     const session = loadSession();
-    const prompt = buildInterviewLoopPrompt(next.question, answer, { includeIntro: session === undefined });
+    const prompt = buildInterviewLoopPrompt(next.question, answer, { includeIntro: session === undefined, settings });
     log('bish/analyst prompt', prompt);
     let reasoning = '';
     const result = await adapter.run({

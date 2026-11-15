@@ -1,4 +1,6 @@
-export default () => `# Initial Specification
+import dials from './interview-dials.js';
+
+export default (settings) => `# Initial Specification
 
 You are doing a single pass requirements capture process, for a new software delivery objective, which you will find described in the local README.md file.
 
@@ -11,6 +13,10 @@ The files \`.bish-bash-bosh/specification.md\` and \`.bish-bash-bosh/interview.m
 3. Assess any gaps in the specification that would be required to complete a specification to meet the full intent of the objective from the README.md. Think critically and apply healthy back-pressure: where the README departs from general best practice include a question proposing the best-practice approach as its default; and where one stated requirement makes another hard to meet (for example inline-only delivery versus unit-testing every function) include a question that proposes a practical alternative.
 
 4. Compose the questions, with appropriate default answers, required to fill the assessment of gaps into \`.bish-bash-bosh/interview.md\` using it's defined format.
+
+## Accuracy and curiosity
+
+${dials(settings)}
 
 ## Working with the files
 

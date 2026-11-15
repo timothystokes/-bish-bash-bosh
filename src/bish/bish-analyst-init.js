@@ -6,15 +6,15 @@ import { parseInterview, nextQuestion } from './bish-analyst-loop.js';
 
 export const README_FILE = 'README.md';
 
-export function buildBootstrapPrompt() {
-  return analystInitPrompt();
+export function buildBootstrapPrompt(settings) {
+  return analystInitPrompt(settings);
 }
 
 // Runs the agent once, then checks it actually did both jobs: the specification differs from its
 // template and the interview has at least one unprocessed question. Throws otherwise, so the caller
 // can discard the seeded files and the next `bish` run retries this step.
-export async function runBootstrap({ adapter, repoDir, readFile, specPath, interviewPath, specTemplate, say = (/** @type {string} */ _s) => {}, log = (/** @type {string} */ _src, /** @type {string} */ _text) => {} }) {
-  const prompt = buildBootstrapPrompt();
+export async function runBootstrap({ adapter, repoDir, readFile, specPath, interviewPath, specTemplate, settings, say = (/** @type {string} */ _s) => {}, log = (/** @type {string} */ _src, /** @type {string} */ _text) => {} }) {
+  const prompt = buildBootstrapPrompt(settings);
   log('bish/analyst prompt', prompt);
   say('\x1b[90mReading README.md to draft the baseline specification and first questions...\n');
   let reasoning = '';

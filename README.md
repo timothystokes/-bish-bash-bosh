@@ -44,6 +44,15 @@ The project must be a git repository. The harness (never the agents) commits, an
 3. `-bosh`: for each unticked plan item, in order, the Test Writer writes failing tests, the Builder implements until they pass, and the Inspector checks the project's files on the user's behalf. The Test Writer can only change `.bish-bash-bosh/tests/`, the Builder only the project's own files, and the Inspector nothing (the harness reverts anything else). The Builder must change at least one project file, and the Inspector either approves (listing the specification items it verified, which the harness ticks) or sends feedback back to the Builder. The item is then ticked and committed.
 4. Re-run `-bosh` to resume after a failure or interruption. It picks up at the first unticked item.
 
+### Accuracy and curiosity
+
+Two optional settings in `.bish-bash-bosh/config.yml`, each from 1 to 10, tune the interview. They never set a number of questions: a question is only asked for a real gap.
+
+- `accuracy` (default 5): how specific the specification must be before a gap counts as closed, from broad intent (1) to exact, verifiable behaviour (10).
+- `curiosity` (default 4): how far the interview follows the ramifications of each answer, from taking it at face value (1) to exploring every ramification (10).
+
+During the interview a fixed line at the bottom of the terminal shows `-bish-bash-bosh` and both settings. Press `esc` to adjust: Left/Right select a setting, Up/Down change it, and `esc` again saves it to `config.yml` (it applies from the next answer). Nothing typed in adjust mode touches your answer or the suggested default.
+
 ### Changing direction
 
 Nothing detects a stale plan. If the specification changes (a new `-bish` round or a manual edit), the project is changed by hand, or an item keeps failing because it is wrong or too big, delete `.bish-bash-bosh/plan.md` and run `-bash` again, then `-bosh`.

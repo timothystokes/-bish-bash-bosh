@@ -289,3 +289,38 @@ test('a failed bootstrap reports the agent\'s exit status and last output so the
   assert.equal(code, 2);
   assert.match(err.join(''), /\(agent exit status 1\)\nLast agent output:\nmodel not available/);
 });
+
+test('createAsker: a fixed bottom line shows the settings; [esc] enters adjust mode where arrows select and change them, [esc] saves, and the answer is never touched', async () => {
+  const { createAsker } = await import('../../src/cli/cli-lib.js');
+  /** @type {string[]} */
+  let chunks = [];
+  const output = Object.assign(new Writable({ write(chunk, _enc, cb) { chunks.push(String(chunk)); cb(); } }), { isTTY: true, columns: 80, rows: 24 });
+  const values = { accuracy: 5, curiosity: 4 };
+  const dials = { get: () => values, adjust: (name, delta) => { values[name] += delta; } };
+  const input = Object.assign(new Readable({ read() {} }), { isTTY: true });
+  const { ask, close } = createAsker(input, () => {}, output);
+  const wait = () => new Promise((r) => setTimeout(r, 120));
+  const reply = ask('\x1b[33m', 'Developers', dials);
+  await wait();
+  const all = () => chunks.join('');
+  assert.match(all(), /\x1b\[1;23r/, 'the last row is reserved below a scroll region');
+  assert.match(all(), /-bish[^\n]*-bash[^\n]*-bosh[^\n]*accuracy 5[^\n]*curiosity 4[^\n]*\[esc\] to adjust/);
+  input.push('\x1b');
+  await wait();
+  assert.match(all(), /\[esc\] to save/);
+  input.push('\x1b[A');
+  input.push('\x1b[C');
+  input.push('\x1b[B');
+  input.push('x');
+  input.push('\r');
+  await wait();
+  assert.deepEqual(values, { accuracy: 6, curiosity: 3 }, 'Up changes the selected setting, Right selects the next, Down changes it');
+  input.push('\x1b');
+  await wait();
+  assert.match(all(), /\[esc\] to adjust\x1b\[0m\x1b8$/, 'esc saves and returns to the normal line');
+  input.push('\r');
+  assert.equal(await reply, 'Developers', 'adjusting never touched the answer: typing and Enter in adjust mode were ignored');
+  chunks = [];
+  close();
+  assert.match(all(), /\x1b\[r/, 'the scroll region is released when the interview ends');
+});
