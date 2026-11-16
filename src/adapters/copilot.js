@@ -27,6 +27,7 @@ export function parseCopilotOutput(stdout) {
     }
     const d = ev?.data ?? {};
     if (ev?.type === 'assistant.message' && typeof d.content === 'string') parts.push(d.content);
+    else if (ev?.type === 'session.error' && d.message) parts.push(`[error] ${d.message}`);
   }
   return { transcript: parts.join('\n') };
 }

@@ -579,3 +579,13 @@ test('an item whose commit fails stays unticked', async () => {
   await assert.rejects(run(path, dir, fakeAdapter(), { commit: () => { throw new Error('git commit failed'); } }), /git commit failed/);
   assert.equal(parsePlanItems(readFileSync(path, 'utf8'))[0].checked, false);
 });
+
+test('a failing agent process stops the run at once with its error, without retries or the Repairer', async () => {
+  const { path, dir } = makeFile();
+  let calls = 0;
+  const adapter = { run: async () => { calls++; return { exitStatus: 1, transcript: '[error] Model "x" is not available.', changedFiles: [] }; } };
+  const res = await run(path, dir, adapter);
+  assert.equal(res.status, 'failed');
+  assert.equal(calls, 1);
+  assert.match(res.output, /agent failed to run.*not available/s);
+});

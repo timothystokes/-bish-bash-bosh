@@ -145,6 +145,9 @@ function markProcessed(planPath, readFile, writeFile, lineIndex) {
   writeFile(planPath, lines.join('\n'));
 }
 
+// The agent process itself failed (bad model, auth, crash): retrying or repairing cannot help, so the run stops at once.
+export class AgentFailure extends Error {}
+
 // Runs one agent call under its role's write zone: whatever it changed outside the zone is reverted and reported.
 // Returns { reply, changed, violations }.
 async function callAgent(adapter, repoDir, prompt, log, persona, role, model = undefined, say = () => {}, trail = []) {
@@ -156,6 +159,11 @@ async function callAgent(adapter, repoDir, prompt, log, persona, role, model = u
   const before = takeSnapshot(repoDir);
   const checking = () => say(`${GREY}Harness: Checking that the ${persona.replace('bosh/', '').replace('-', ' ')} only changed its own files...${RESET}\n`);
   const res = await adapter.run({ prompt, cwd: repoDir, limits: {}, ...(model ? { model } : {}), onReasoning: (chunk) => { reasoning += chunk; } });
+  if (res && Number.isInteger(res.exitStatus) && res.exitStatus !== 0) {
+    const detail = (res.transcript ?? '').trim().slice(-1500) || '(no output)';
+    log(`${persona} FAILED`, `exit status ${res.exitStatus}\n${detail}`);
+    throw new AgentFailure(`The ${persona.replace('bosh/', '')} agent failed to run (exit status ${res.exitStatus}${model ? `, model "${model}"` : ''}). Check the adapter and model in .bish-bash-bosh/config.yml.\n${detail}`);
+  }
   if (reasoning) log(`${persona} response`, reasoning);
   if (res?.transcript && res.transcript !== reasoning) log(`${persona} reply`, res.transcript);
   checking();
@@ -209,7 +217,18 @@ export function testFeedbackFrom(reply) {
  *   log?: (source: string, text: string) => void,
  * }} opts
  */
-export async function runBuildLoop({
+export async function runBuildLoop(opts) {
+  const processedRef = opts.processedRef = { n: 0 };
+  try {
+    return await runBuildLoopInner(opts);
+  } catch (e) {
+    if (!(e instanceof AgentFailure)) throw e;
+    return { status: 'failed', processed: processedRef.n, item: undefined, output: e.message, agentFailure: true };
+  }
+}
+
+async function runBuildLoopInner({
+  processedRef,
   planPath,
   specPath,
   commit = () => {},
@@ -236,6 +255,7 @@ export async function runBuildLoop({
       try {
         failure = await attempt(previous);
       } catch (e) {
+        if (e instanceof AgentFailure) throw e;
         failure = `${label} threw an error: ${e?.message ?? e}`;
       }
       if (!failure) return '';
@@ -485,5 +505,6 @@ export async function runBuildLoop({
     commit([`bosh: ${subject(name)}`, detail.join(' - '), next.specs.length ? `Specification items: ${next.specs.join(', ')}` : '', spec ? `Specification status: ${spec.verified.length} verified, ${spec.uncovered.length} not yet verified` : ''].filter(Boolean).join('\n\n'));
     markProcessed(planPath, readFile, writeFile, next.lineIndex);
     processed++;
+    processedRef.n = processed;
   }
 }
