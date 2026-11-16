@@ -74,7 +74,8 @@ test('main pins the branded settings footer for every phase command', async () =
     assert.match(text, /Agent: f \| Model: m/);
     if (command === 'bish') assert.match(text, /Accuracy: 5 \| Curiosity: 4/);
     else {
-      assert.match(text, /Retries: 5/);
+      if (command === 'bosh') assert.match(text, /Retries: 5/);
+      else assert.doesNotMatch(text, /Retries/, 'bash is a single call and does not retry');
       assert.doesNotMatch(text, /Accuracy|Curiosity/, `${command} has no interview settings`);
     }
     assert.match(text, /Esc settings/);
@@ -96,7 +97,7 @@ test('the footer accepts Escape and setting keys outside a readline prompt', () 
   const footer = createTerminalFooter(input, output, {
     get: () => settings,
     adjust: (name, delta) => { settings[name] += delta; },
-  }, { command: 'bash', mode: 'Plan' });
+  }, { command: 'bosh', mode: 'Plan' });
 
   footer.show();
   input.emit('keypress', undefined, { name: 'escape' });
@@ -140,9 +141,10 @@ test('settings adjusted from the footer persist while another phase is running',
 
   await started;
   input.emit('keypress', undefined, { name: 'escape' });
+  input.emit('keypress', undefined, { name: 'left' }); // Model -> Agent
   input.emit('keypress', undefined, { name: 'up' });
   input.emit('keypress', undefined, { name: 'escape' });
-  assert.equal(parseYaml(readFileSync(configPath, 'utf8')).retries, 6);
+  assert.notEqual(parseYaml(readFileSync(configPath, 'utf8')).adapter, 'f');
   releaseAgent();
   assert.equal(await run, 0);
 });
@@ -221,7 +223,7 @@ test('Agent and Model changed in the footer apply from the next agent call', asy
   await firstStarted;
   const press = (name) => input.emit('keypress', undefined, { name });
   press('escape');
-  press('left'); press('left'); // Accuracy -> Model -> Agent
+  press('left'); // Model -> Agent
   press('up');
   press('escape');
   const saved = parseYaml(readFileSync(configPath, 'utf8'));

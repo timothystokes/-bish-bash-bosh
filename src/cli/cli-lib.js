@@ -105,9 +105,10 @@ export function createTerminalFooter(input, output, initialDials, { command = 'b
   const rows = output.rows;
   let installed = false;
   let adjusting = false;
-  // Accuracy and curiosity steer bish's interview; bash and bosh have the number of retries instead.
-  const FIELDS = [['agent', 'Agent'], ['model', 'Model'], ...(command === 'bish' ? [['accuracy', 'Accuracy'], ['curiosity', 'Curiosity']] : [['retries', 'Retries']])];
-  let selected = FIELDS[2][0];
+  // Accuracy and curiosity steer bish's interview; only bosh retries (bash is a single planning call).
+  const EXTRA = { bish: [['accuracy', 'Accuracy'], ['curiosity', 'Curiosity']], bosh: [['retries', 'Retries']] };
+  const FIELDS = [['agent', 'Agent'], ['model', 'Model'], ...(EXTRA[command] ?? [])];
+  let selected = FIELDS[Math.min(2, FIELDS.length - 1)][0];
   let held = [];
   let own = [];
   let dials = initialDials;
