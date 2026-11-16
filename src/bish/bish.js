@@ -33,7 +33,7 @@ export async function runBish(argv, deps, out, err) {
     err(`${label}: ${README_FILE} not found in the project root; write one describing the project, then run bish again\n`);
     return 2;
   }
-  const { ask, close } = createAsker(deps.input ?? process.stdin, out);
+  const { ask, close } = createAsker(deps.input ?? process.stdin, out, deps.terminalOutput ?? process.stdout, deps.terminalFooter);
   try {
     if (!existsSync(CONFIG_FILE)) {
       const adapter = await askChoice(ask, out, 'adapter', ADAPTER_CHOICES);
@@ -59,6 +59,10 @@ export async function runBish(argv, deps, out, err) {
     }
     const project = loadRunProject(label, err);
     if (!project) return 2;
+    if (deps.terminalFooter?.settingsChanged()) {
+      Object.assign(project.config, deps.terminalFooter.getSettings());
+      writeFileSync(project.configPath, stringifyYaml(project.config));
+    }
     return await runConfiguredBish(project, { reverse, debug, parsed }, deps, out, err, ask);
   } catch (e) {
     if (debug) out(`[debug] ${e.stack}\n`);
@@ -76,11 +80,18 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
   // piece of its own output shown in the console gets appended there from then on, see bish-log.js),
   // then makes one agent call (src/bish/prompts/bish-analyst-init.js) that turns README.md into a baseline spec and
   // the first interview questions. The interview then carries straight on in the same run; the owner can stop at any question.
-  const firstRun = !reverse && !existsSync(join(repo, INTERVIEW_FILE));
+  const interviewPath = join(repo, INTERVIEW_FILE);
+  const specPath = join(repo, SPEC_FILE);
+  const interviewTemplate = readFileSync(join(templatesDir, 'bish-interview.md'), 'utf8');
+  const specTemplate = readFileSync(join(templatesDir, 'bish-specification.md'), 'utf8');
+  const interruptedBootstrap = existsSync(interviewPath) && existsSync(specPath)
+    && readFileSync(interviewPath, 'utf8') === interviewTemplate
+    && readFileSync(specPath, 'utf8') === specTemplate;
+  const firstRun = !reverse && (!existsSync(interviewPath) || interruptedBootstrap);
   // A restart after the first run: both files should already exist; self-heal spec.md alone if it
   // was somehow lost, rather than failing a run the owner can otherwise just continue.
   if (!reverse && !firstRun && !existsSync(join(repo, SPEC_FILE))) {
-    writeFileSync(join(repo, SPEC_FILE), readFileSync(join(templatesDir, 'bish-specification.md'), 'utf8'));
+    writeFileSync(join(repo, SPEC_FILE), specTemplate);
   }
   const lock = acquireRunLock(project.dir);
   if (!lock.ok) {
@@ -91,11 +102,10 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
     const label = reverse ? 'reverse' : 'interview';
     const adapter = debugAdapter(resolveAdapter(config, deps.registry ?? defaultRegistry), label, debug, out);
     if (firstRun) {
-      const specTemplate = readFileSync(join(templatesDir, 'bish-specification.md'), 'utf8');
       const seeded = [INTERVIEW_FILE, SPEC_FILE, LOG_FILE].map((f) => join(repo, f));
-      writeFileSync(seeded[0], readFileSync(join(templatesDir, 'bish-interview.md'), 'utf8'));
+      writeFileSync(seeded[0], interviewTemplate);
       writeFileSync(seeded[1], specTemplate);
-      writeFileSync(seeded[2], '');
+      if (!existsSync(seeded[2])) writeFileSync(seeded[2], '');
       try {
         await runBootstrap({
           adapter,
@@ -104,6 +114,7 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
           specPath: seeded[1],
           interviewPath: seeded[0],
           specTemplate,
+          interviewTemplate,
           settings: config,
           say: out,
           log: createLogger(seeded[2]),

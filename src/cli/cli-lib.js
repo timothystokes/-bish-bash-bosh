@@ -1,4 +1,4 @@
-import { createInterface } from 'node:readline';
+import { createInterface, emitKeypressEvents } from 'node:readline';
 import { loadProjectConfig, CONFIG_FILE } from '../shared/project-config.js';
 import { isGitRepo } from '../shared/git-commit.js';
 
@@ -6,7 +6,8 @@ export const LOGO = [
   ' \x1b[0;31m╷  .   ╷  \x1b[0m \x1b[0;32m╷        ╷  \x1b[0m \x1b[0;34m╷        ╷  \x1b[0m',
   ' \x1b[0;31m├─╮╷╭─╮├─╮\x1b[0m \x1b[0;32m├─╮╭─╮╭─╮├─╮\x1b[0m \x1b[0;34m├─╮╭─╮╭─╮├─╮\x1b[0m',
   '-\x1b[0;31m│ ││╰─╮│ │\x1b[0m-\x1b[0;32m│ │╭─┤╰─╮│ │\x1b[0m-\x1b[0;34m│ ││ │╰─╮│ │\x1b[0m',
-  ' \x1b[0;31m└─╯╵╰─╯╵ ╵\x1b[0m \x1b[0;32m└─╯╰─╯╰─╯╵ ╵\x1b[0m \x1b[0;34m└─╯╰─╯╰─╯╵ ╵\x1b[0m'
+  ' \x1b[0;31m└─╯╵╰─╯╵ ╵\x1b[0m \x1b[0;32m└─╯╰─╯╰─╯╵ ╵\x1b[0m \x1b[0;34m└─╯╰─╯╰─╯╵ ╵\x1b[0m',
+  'Version 1.0.1'
 ].join('\n');
 
 export function helpText() {
@@ -100,25 +101,50 @@ const GREY = '\x1b[90m';
 // the questions and answers scroll above it. [esc] enters adjust mode, where Left/Right pick a setting
 // and Up/Down change it, and [esc] again saves. In adjust mode readline's own key listeners are
 // detached so nothing can edit the answer being typed; they are put back on leaving it.
-function createFooter(input, output, dials) {
+export function createTerminalFooter(input, output, initialDials, { command = 'bish', mode = 'Interview' } = {}) {
   const rows = output.rows;
   let installed = false;
   let adjusting = false;
   let selected = 'accuracy';
   let held = [];
   let own = [];
+  let dials = initialDials;
+  const wasRaw = input.isRaw === true;
+  const wasPaused = input.isPaused?.() ?? false;
   const text = () => {
     const v = dials.get();
-    const item = (name) => (adjusting && selected === name ? `\x1b[7m ${name} ${v[name]} \x1b[27m` : ` ${name} ${v[name]} `);
-    const hint = adjusting ? '\u2190\u2192 select \u00b7 \u2191\u2193 change \u00b7 [esc] to save' : '[esc] to adjust';
-    return `\x1b[0m\x1b[1;31m-bish\x1b[32m-bash\x1b[34m-bosh\x1b[0m${GREY} \u2502${item('accuracy')}\u00b7${item('curiosity')}\u2502 ${hint}\x1b[0m`;
+    const item = (name, label) => (adjusting && selected === name ? `\x1b[7m${label}: ${v[name]}\x1b[27m` : `${label}: ${v[name]}`);
+    const brand = [
+      ['bish', 31],
+      ['bash', 32],
+      ['bosh', 34],
+    ].map(([name, color]) => `${command === name ? '\x1b[1m' : ''}\x1b[${color}m-${name}${command === name ? '\x1b[22m' : ''}\x1b[0m`).join('');
+    const hint = adjusting ? '\u2190\u2192 field \u2191\u2193 value Esc save' : 'Esc settings';
+    return `\x1b[0m${brand}${GREY} | Mode: ${mode} | ${item('accuracy', 'Accuracy')} | ${item('curiosity', 'Curiosity')} | ${hint}\x1b[0m`;
   };
   const draw = () => output.write(`\x1b7\x1b[${rows};1H\x1b[2K${text()}\x1b8`);
   const remove = () => {
     if (!installed) return;
+    if (adjusting) for (const listener of held) input.on('keypress', listener);
     installed = false;
+    adjusting = false;
+    held = [];
     input.removeListener('keypress', onKey);
     output.write(`\x1b7\x1b[r\x1b[${rows};1H\x1b[2K\x1b8`);
+    input.setRawMode?.(wasRaw);
+    if (wasPaused) input.pause();
+  };
+  const show = () => {
+    if (!installed) {
+      emitKeypressEvents(input);
+      input.prependListener('keypress', onKey);
+      output.write(`\n\x1b[A\x1b7\x1b[1;${rows - 1}r\x1b8`);
+      installed = true;
+      process.once('exit', remove);
+    }
+    input.setRawMode?.(true);
+    input.resume();
+    draw();
   };
   const onKey = (_ch, key) => {
     if (!key) return;
@@ -137,21 +163,22 @@ function createFooter(input, output, dials) {
     draw();
   };
   return {
+    getSettings: () => dials.getSettings?.() ?? dials.get(),
+    settingsChanged: () => dials.settingsChanged?.() ?? false,
+    refresh: () => { if (installed) draw(); },
+    setDials: (next) => {
+      dials = next;
+      if (installed) draw();
+    },
+    show,
     // True when the key belongs to the footer and must not be treated as typing.
     owns: (key) => adjusting || key?.name === 'escape',
     // `ownListeners` are the asker's own keypress listeners, which stay attached in adjust mode.
     attach(ownListeners) {
-      if (!installed) {
-        // Make sure the cursor is not on the last row, then reserve that row below the scroll region.
-        output.write(`\n\x1b[A\x1b7\x1b[1;${rows - 1}r\x1b8`);
-        installed = true;
-        process.once('exit', remove);
-      }
+      show();
       own = ownListeners;
-      input.prependListener('keypress', onKey);
-      draw();
     },
-    detach: () => input.removeListener('keypress', onKey),
+    detach: () => { own = []; },
     remove,
   };
 }
@@ -181,11 +208,11 @@ function lastColor(prompt) {
  * @param {(s: string) => void} out
  * @param {NodeJS.WritableStream} [output]
  */
-export function createAsker(input, out, output = process.stdout) {
+export function createAsker(input, out, output = process.stdout, terminalFooter = undefined) {
   const tty = input.isTTY === true;
   const shared = tty ? undefined : createInterface(readlineOptions(input));
   const sharedLines = shared?.[Symbol.asyncIterator]();
-  let shownFooter;
+  let shownFooter = terminalFooter;
   const ask = async (prompt, defaultValue, dials) => {
     if (sharedLines) {
       out(prompt);
@@ -194,7 +221,8 @@ export function createAsker(input, out, output = process.stdout) {
     }
     resetTty(input);
     const rl = createInterface(readlineOptions(input, output));
-    const footer = dials && output.rows ? (shownFooter ??= createFooter(input, output, dials)) : undefined;
+    const footer = dials && output.rows ? (shownFooter ??= createTerminalFooter(input, output, dials)) : undefined;
+    if (footer && dials) footer.setDials(dials);
     const ownListeners = [];
     footer?.attach(ownListeners);
     rl.setPrompt(prompt);
@@ -206,6 +234,7 @@ export function createAsker(input, out, output = process.stdout) {
       } finally {
         footer?.detach();
         rl.close();
+        footer?.show();
       }
     }
     let touched = false;
@@ -249,6 +278,7 @@ export function createAsker(input, out, output = process.stdout) {
       input.removeListener('keypress', onKeypress);
       footer?.detach();
       rl.close();
+      footer?.show();
     }
   };
   return { ask, close: () => { shownFooter?.remove(); shared?.close(); } };

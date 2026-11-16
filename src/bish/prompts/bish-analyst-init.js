@@ -20,7 +20,7 @@ ${dials(settings)}
 
 ## Working with the files
 
-Edit \`.bish-bash-bosh/specification.md\` and \`.bish-bash-bosh/interview.md\` directly, using your normal file read/edit tools. You may read the local README.md for the objective but edit only those two files; use no skills and no searching. Their entire format is the numbered checklist lines already in each file.
+Use \`read_file\` to read README.md and both seeded files. Use \`apply_patch\` to actually update both specification.md and interview.md. Do not merely describe planned edits or claim they are complete: the task is complete only after both files have been changed and you have read them back with \`read_file\` to verify the required formats and at least one unanswered question. You may read the local README.md for the objective but edit only those two files; use no skills and no searching.
 
 ## PRIME DIRECTIVE 
 

@@ -13,7 +13,7 @@ export function buildBootstrapPrompt(settings) {
 // Runs the agent once, then checks it actually did both jobs: the specification differs from its
 // template and the interview has at least one unprocessed question. Throws otherwise, so the caller
 // can discard the seeded files and the next `bish` run retries this step.
-export async function runBootstrap({ adapter, repoDir, readFile, specPath, interviewPath, specTemplate, settings, say = (/** @type {string} */ _s) => {}, log = (/** @type {string} */ _src, /** @type {string} */ _text) => {} }) {
+export async function runBootstrap({ adapter, repoDir, readFile, specPath, interviewPath, specTemplate, interviewTemplate, settings, say = (/** @type {string} */ _s) => {}, log = (/** @type {string} */ _src, /** @type {string} */ _text) => {} }) {
   const prompt = buildBootstrapPrompt(settings);
   log('bish/analyst prompt', prompt);
   say('\x1b[90mReading README.md to draft the baseline specification and first questions...\n');
@@ -28,14 +28,20 @@ export async function runBootstrap({ adapter, repoDir, readFile, specPath, inter
     },
   });
   say('\x1b[0m\n');
-  const response = reasoning || result?.transcript || '';
-  if (response) log('bish/analyst response', response);
-  // The agent's own account of what happened, so a failure says why rather than just what was missing.
+  const transcript = result?.transcript ?? '';
+  if (reasoning) log('bish/analyst reasoning', reasoning);
+  if (transcript) log('bish/analyst response', transcript);
+  // Keep the final response distinct from streamed reasoning so errors explain what the agent actually returned.
   const detail = () => {
     const status = result?.exitStatus ? ` (agent exit status ${result.exitStatus})` : '';
-    const tail = response.trim().slice(-1500);
-    return `${status}${tail ? `\nLast agent output:\n${tail}` : '\nThe agent produced no output.'}`;
+    const output = transcript.trim().slice(-1500);
+    const thoughts = reasoning.trim().slice(-1500);
+    const parts = [];
+    if (output) parts.push(`Last agent output:\n${output}`);
+    if (thoughts) parts.push(`Agent reasoning:\n${thoughts}`);
+    return `${status}${parts.length ? `\n${parts.join('\n')}` : '\nThe agent produced no output.'}`;
   };
   if (readFile(specPath) === specTemplate) throw new Error(`the agent left specification.md unchanged from its template${detail()}`);
+  if (readFile(interviewPath) === interviewTemplate) throw new Error(`the agent left interview.md unchanged from its template${detail()}`);
   if (!nextQuestion(parseInterview(readFile(interviewPath)))) throw new Error(`the agent wrote no unprocessed question to interview.md${detail()}`);
 }

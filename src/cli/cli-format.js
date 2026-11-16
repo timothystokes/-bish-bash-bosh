@@ -5,18 +5,25 @@
 
 const short = (sha) => (sha ? sha.slice(0, 7) : sha);
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const BANNER_RULE = '-'.repeat(48);
+
+function formatPhaseBanner(phase, summary) {
+  return `\n${BANNER_RULE}\n${phase}\n${summary.trimEnd()}\n${BANNER_RULE}\n`;
+}
 
 // `-bish`'s Interview Loop (runInterviewLoop): {status, answered, remaining?}.
 export function formatInterviewLoopResult(res) {
   const { status, answered } = res;
-  if (status === 'ok' && answered === 0) return 'No unanswered questions in .bish-bash-bosh/interview.md. Add questions to it (or edit specification.md), or run `-bash` next.\n';
-  if (status === 'ok') return `Interview complete: ${plural(answered, 'question')} answered this run.\n`;
-  return `Paused after ${plural(answered, 'question')}: ${plural(res.remaining, 'question')} left. Run \`-bish\` again to continue.\n`;
+  if (status === 'ok' && answered === 0) {
+    return formatPhaseBanner('-bish | Interview', 'No unanswered questions in .bish-bash-bosh/interview.md. Add questions to it (or edit specification.md), or run `-bash` next.');
+  }
+  if (status === 'ok') return formatPhaseBanner('-bish | Interview', `Interview complete: ${plural(answered, 'question')} answered this run.`);
+  return formatPhaseBanner('-bish | Interview', `Paused after ${plural(answered, 'question')}: ${plural(res.remaining, 'question')} left. Run \`-bish\` again to continue.`);
 }
 
 // `-bash`'s single planning pass (runPlanLoop): {status, items, open}.
 export function formatPlanLoopResult(res) {
-  return `Plan ready: ${plural(res.items, 'item')} in .bish-bash-bosh/plan.md, ${res.open} left to build. Run \`-bosh\` next.\n`;
+  return formatPhaseBanner('-bash | Plan', `Plan ready: ${plural(res.items, 'item')} in .bish-bash-bosh/plan.md, ${res.open} left to build. Run \`-bosh\` next.`);
 }
 
 // `-bosh`'s Build Loop (runBuildLoop): {status, processed}.
@@ -27,7 +34,7 @@ function formatSpecStatus(spec) {
 }
 
 export function formatBuildLoopResult(res) {
-  return formatBuildLoopMain(res) + formatSpecStatus(res.spec);
+  return formatPhaseBanner('-bosh | Build', formatBuildLoopMain(res) + formatSpecStatus(res.spec));
 }
 
 function formatBuildLoopMain(res) {
@@ -44,6 +51,6 @@ function formatBuildLoopMain(res) {
 // `-bish --reverse` (runReverse): {status, sha, reason?}.
 export function formatReverseResult(res) {
   const { status, sha, reason } = res;
-  if (status === 'ok') return `Reverse-engineered the specification (commit ${short(sha)}).\n`;
-  return `Reverse ${status}${reason ? `: ${reason}` : ''}.\n`;
+  if (status === 'ok') return formatPhaseBanner('-bish | Reverse', `Reverse-engineered the specification (commit ${short(sha)}).`);
+  return formatPhaseBanner('-bish | Reverse', `Reverse ${status}${reason ? `: ${reason}` : ''}.`);
 }

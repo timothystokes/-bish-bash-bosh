@@ -75,6 +75,30 @@ test('bish on a fresh project seeds interview.md, then the Interview Loop asks i
   assert.match(afterLoop, /1\. \[x\] Q: What is the objective\? A: Unknown\./m, 'Enter alone accepted the pre-filled default, and the line is checked once handed to and processed by the agent');
 });
 
+test('bish retries bootstrap when an interrupted run left both seeded templates untouched', async () => {
+  const { repo } = sandbox();
+  const harnessDir = join(repo, '.bish-bash-bosh');
+  const templatesDir = join(process.cwd(), 'src', 'bish', 'templates');
+  writeFileSync(join(harnessDir, 'specification.md'), readFileSync(join(templatesDir, 'bish-specification.md'), 'utf8'));
+  writeFileSync(join(harnessDir, 'interview.md'), readFileSync(join(templatesDir, 'bish-interview.md'), 'utf8'));
+  const inner = draftingAdapter();
+  let calls = 0;
+  const adapter = { run: async (req) => { calls++; return inner.run(req); } };
+  let out = '';
+  const code = await withCwd(repo, () => main(['bish'], {
+    registry: { 'agent-x': () => adapter },
+    input: Readable.from(['\n']),
+    stdout: (s) => { out += s; },
+    stderr: () => {},
+  }));
+
+  assert.equal(code, 0, out);
+  assert.equal(calls, 2, 'bootstrap is retried before the first interview round');
+  assert.match(out, /Starting the interview/);
+  assert.match(out, /Q1: What is the objective\?/);
+  assert.doesNotMatch(out, /Q1: TBC\?/);
+});
+
 test('objective seed package.json has a test script so the tests gate can run', () => {
   const { repo } = sandbox();
   const pkg = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'));

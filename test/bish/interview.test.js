@@ -304,10 +304,10 @@ test('createAsker: a fixed bottom line shows the settings; [esc] enters adjust m
   await wait();
   const all = () => chunks.join('');
   assert.match(all(), /\x1b\[1;23r/, 'the last row is reserved below a scroll region');
-  assert.match(all(), /-bish[^\n]*-bash[^\n]*-bosh[^\n]*accuracy 5[^\n]*curiosity 4[^\n]*\[esc\] to adjust/);
+  assert.match(all(), /\x1b\[1m\x1b\[31m-bish\x1b\[22m[^\n]*-bash[^\n]*-bosh[^\n]*Mode: Interview[^\n]*Accuracy: 5 \| Curiosity: 4[^\n]*Esc settings/);
   input.push('\x1b');
   await wait();
-  assert.match(all(), /\[esc\] to save/);
+  assert.match(all(), /Esc save/);
   input.push('\x1b[A');
   input.push('\x1b[C');
   input.push('\x1b[B');
@@ -317,7 +317,7 @@ test('createAsker: a fixed bottom line shows the settings; [esc] enters adjust m
   assert.deepEqual(values, { accuracy: 6, curiosity: 3 }, 'Up changes the selected setting, Right selects the next, Down changes it');
   input.push('\x1b');
   await wait();
-  assert.match(all(), /\[esc\] to adjust\x1b\[0m\x1b8$/, 'esc saves and returns to the normal line');
+  assert.match(all(), /Esc settings\x1b\[0m\x1b8$/, 'esc saves and returns to the normal line');
   input.push('\r');
   assert.equal(await reply, 'Developers', 'adjusting never touched the answer: typing and Enter in adjust mode were ignored');
   chunks = [];
