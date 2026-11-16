@@ -2,7 +2,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stringify as stringifyYaml } from 'yaml';
-import { resolveAdapter, defaultRegistry } from '../adapters/index.js';
+import { resolveLiveAdapter, defaultRegistry } from '../adapters/index.js';
 import { acquireRunLock } from '../shared/run-lock.js';
 import { runInterviewLoop } from './bish-analyst-loop.js';
 import { runBootstrap, README_FILE } from './bish-analyst-init.js';
@@ -100,7 +100,7 @@ async function runConfiguredBish(project, { reverse, debug, parsed }, deps, out,
   }
   try {
     const label = reverse ? 'reverse' : 'interview';
-    const adapter = debugAdapter(resolveAdapter(config, deps.registry ?? defaultRegistry), label, debug, out);
+    const adapter = debugAdapter(resolveLiveAdapter(project, deps.registry ?? defaultRegistry), label, debug, out);
     if (firstRun) {
       const seeded = [INTERVIEW_FILE, SPEC_FILE, LOG_FILE].map((f) => join(repo, f));
       writeFileSync(seeded[0], interviewTemplate);

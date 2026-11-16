@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveAdapter, defaultRegistry } from '../adapters/index.js';
+import { resolveLiveAdapter, defaultRegistry } from '../adapters/index.js';
 import { acquireRunLock } from '../shared/run-lock.js';
 import { runPlanLoop } from './bash-planner.js';
 import { createLogger } from '../bish/bish-log.js';
@@ -46,7 +46,7 @@ export async function runBash(cmd, argv, deps, out, err) {
     return 2;
   }
   try {
-    const adapter = debugAdapter(resolveAdapter(config, deps.registry ?? defaultRegistry), 'bash', debug, out);
+    const adapter = debugAdapter(resolveLiveAdapter(project, deps.registry ?? defaultRegistry), 'bash', debug, out);
     const res = await runPlanLoop({
       planPath: join(repo, PLAN_FILE),
       readFile: (p) => readFileSync(p, 'utf8'),

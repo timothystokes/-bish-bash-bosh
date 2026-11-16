@@ -7,7 +7,8 @@ Your job is to consider the following implementation item in relation to the cur
 
 1. Write ONLY the test file '${testfile}'. Do not create or edit any other file and never write the implementation, not even a stub: any change outside \`.bish-bash-bosh/tests/\` is reverted and the attempt is wasted.
 2. Code the item adds will not exist yet. Load it defensively and assert on it before use, for example \`assert.ok(typeof mod.parseThing === 'function', 'parseThing is exported')\`, so a missing item fails an assertion instead of crashing with "not a function" or "module not found". Load a module that may not exist with a dynamic \`import()\` inside the test, turning a load failure into a failed assertion, never with a static import.
-3. Test only what this item adds. Earlier items have their own test files: do not repeat them, and do not assert on internal names the item does not give.
+3. Before you finish, check the file against itself: every assertion must trace to one specification line, and no two assertions may expect different results for the same input and operation. Where specification lines overlap or conflict, follow the one that is more specific to the operation and test only that behaviour, never both.
+4. Test only what this item adds. Earlier items have their own test files: do not repeat them, and do not assert on internal names the item does not give.
 
 # Item
 ${item}
@@ -40,6 +41,8 @@ Test the project's code by loading and running it. Do not extract code from sour
 
 ${!feedback 
     ? `There is an expectation that your test scenarios should initially fail following the principles of TDD. If the project's files already implement the item, keep tests that pass and end your reply with a line starting with \`ALREADY IMPLEMENTED:\` saying where.`
-    : `The current test file is not right. Consider the feedback above and update the test file '${testfile}' based on the current state of the implementation, in the main project folder, to ensure it doesn't have errors or false positives.`
+    : `The current test file is not right. Consider the feedback above and update the test file '${testfile}' based on the current state of the implementation, in the main project folder, to ensure it doesn't have errors or false positives.
+
+If, after checking, you are sure the test file is already correct and the feedback is mistaken (or there is nothing left to change), leave it unchanged and end your reply with a line starting with \`TEST OK:\` giving the reason, citing the specification line that supports the test.`
 }
 `

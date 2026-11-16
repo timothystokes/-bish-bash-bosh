@@ -1,4 +1,8 @@
 #!/usr/bin/env node
 import { main } from '../src/cli/cli.js';
 
-process.exitCode = await main(['bosh', ...process.argv.slice(2)]);
+const code = await main(['bosh', ...process.argv.slice(2)]);
+// Exit explicitly once output is flushed so a lingering handle (e.g. a stray agent child process
+// or stdin) can never leave the command hanging after it has finished.
+process.exitCode = code;
+process.stdout.write('', () => process.stderr.write('', () => process.exit(code)));

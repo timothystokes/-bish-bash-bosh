@@ -98,7 +98,7 @@ for (const [name, build, mode] of [
     assert.doesNotMatch(p, /# Feedback/);
     const long = build({ task: 'T' }, `${'x'.repeat(10000)}END`);
     assert.match(long, /xEND\n/);
-    assert.ok(long.length < p.length + 4200);
+    assert.ok(long.length < p.length + 4600);
   });
 }
 
@@ -132,7 +132,8 @@ test('a test step that adds or changes no test file is retried with that feedbac
   const res = await run(path, dir, adapter, { listTests: () => new Map([['/t/a.test.js', '1']]) });
   assert.equal(res.status, 'failed');
   assert.match(res.output, /No test file .* was added or changed/);
-  assert.equal(adapter.calls.length, MAX_ATTEMPTS, 'only the test step ran, retried up to the cap');
+  assert.equal(adapter.calls.length, MAX_ATTEMPTS + 2, 'the test step ran up to the cap, then two Repairer calls');
+  assert.ok(adapter.calls.at(-1).prompt.trimStart().startsWith('You are a Repairer'));
   assert.match(adapter.calls[1].prompt, /No test file/);
   assert.equal(parsePlanItems(readFileSync(path, 'utf8'))[0].checked, false);
 });
@@ -158,10 +159,10 @@ test('a red implement step is retried with the failing output, then the item fai
     runTests: ({ files }) => (files ? { ok: false, output: 'red' } : { ok: false, output: `boom ${++full}` }),
   });
   assert.equal(res.status, 'failed');
-  assert.equal(res.output, `boom ${MAX_ATTEMPTS}`);
-  assert.equal(adapter.calls.length, 1 + MAX_ATTEMPTS);
+  assert.match(res.output, new RegExp(`^boom ${MAX_ATTEMPTS}\\n\\nThe Repairer also tried`));
+  assert.equal(adapter.calls.length, 3 + MAX_ATTEMPTS, 'the Builder up to the cap, then two Repairer calls');
   assert.match(adapter.calls[2].prompt, /boom 1/);
-  assert.ok(adapter.calls.every((c, i) => i === 0 || c.prompt.trimStart().startsWith(head('builder'))));
+  assert.ok(adapter.calls.every((c, i) => i === 0 || i > MAX_ATTEMPTS || c.prompt.trimStart().startsWith(head('builder'))));
   assert.equal(parsePlanItems(readFileSync(path, 'utf8'))[0].checked, false);
 });
 
@@ -208,7 +209,7 @@ test('each role may only change its own files: anything else is reverted and sen
   const wrote = (rel, text) => { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), text); };
   wrote('keep.txt', 'original');
 
-  const tester = await run(path, dir, fakeAdapter((req) => (req.prompt.includes('Test Writer') ? wrote('sneaky.js', 'x') : {})));
+  const tester = await run(path, dir, fakeAdapter((req) => (req.prompt.includes('You are a Test Writer') ? wrote('sneaky.js', 'x') : {})));
   assert.equal(tester.status, 'failed');
   assert.equal(tester.persona, 'Test Writer');
   assert.match(tester.output, /sneaky\.js/);
@@ -301,6 +302,38 @@ test('tests that still pass on the retry are accepted (the item was implemented 
   assert.equal(res.status, 'ok');
   assert.equal(adapter.calls.filter((c) => c.prompt.trimStart().startsWith(head('test-writer'))).length, 2);
   assert.ok(adapter.calls.some((c) => c.prompt.trimStart().startsWith(head('builder'))));
+});
+
+test('a Test Writer that changes nothing is accepted when the item\'s own, already-written test file passes', async () => {
+  const { path, dir } = makeFile('1. [ ] T: a\n');
+  const file = join(dir, testFileFor({ id: 1, task: 'a', specs: [] }));
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, "import { test } from 'node:test';\ntest('real', () => {});\n");
+  const adapter = fakeAdapter();
+  const res = await run(path, dir, adapter, { listTests: () => new Map([[file, '1']]), runTests: () => ({ ok: true, output: 'green' }) });
+  assert.equal(res.status, 'ok');
+  assert.equal(adapter.calls.filter((c) => c.prompt.trimStart().startsWith(head('test-writer'))).length, 1, 'no retry');
+  writeFileSync(path, '1. [ ] T: a\n');
+  const stuck = await run(path, dir, fakeAdapter(), { listTests: () => new Map([[file, '1']]), runTests: () => ({ ok: false, output: 'red' }) });
+  assert.notEqual(stuck.status, 'ok', 'a failing untouched test file is still sent back');
+});
+
+test('a Test Writer that stands by an unchanged test with TEST OK: is heard by the Builder, and a repeated complaint stops the item with both positions', async () => {
+  const { path, dir } = makeFile('1. [ ] T: a\n');
+  let listed = 0;
+  const adapter = fakeAdapter((req) => {
+    if (req.prompt.includes('You are a Test Writer')) return { transcript: 'TEST OK: S51 says concat coerces' };
+    if (req.prompt.includes('You are a software Builder')) return { transcript: 'TEST FEEDBACK: expectations contradict' };
+    return {};
+  });
+  // The first Test Writer call writes the file; later ones leave it untouched.
+  const listTests = () => new Map([['/t/a.test.js', String(Math.min(listed++, 1))]]);
+  const res = await run(path, dir, adapter, { listTests });
+  assert.equal(res.status, 'failed');
+  assert.match(res.output, /disagree[\s\S]*Builder: expectations contradict[\s\S]*Test Writer: S51 says concat coerces/);
+  const builderCalls = adapter.calls.filter((c) => c.prompt.trimStart().startsWith(head('builder')));
+  assert.equal(builderCalls.length, 2);
+  assert.match(builderCalls[1].prompt, /rejected your TEST FEEDBACK[\s\S]*S51 says concat coerces/);
 });
 
 test('a Test Writer reply ending ALREADY IMPLEMENTED: is accepted on the first attempt, and the Inspector is told which plan items are still to come', async () => {
@@ -451,6 +484,82 @@ test('failures only in earlier items\' test files go to a test-repair pass after
   const repair = adapter.calls.find((c) => c.prompt.includes('repair one test file'));
   assert.ok(repair, 'a repair pass ran');
   assert.match(repair.prompt, /\.bish-bash-bosh\/tests\/00-old\.test\.js/);
+});
+
+test('earlier test files the Test Writer already reviewed are not reviewed again, and the Builder is told it broke them', async () => {
+  const { path, dir } = makeFile('1. [ ] T: first\n');
+  const adapter = fakeAdapter();
+  const res = await run(path, dir, adapter, {
+    runTests: ({ files }) => files ? { ok: false, output: 'red' } : { ok: false, output: 'test at .bish-bash-bosh/tests/00-old.test.js:1:1\n✖ old (1ms)\n  AssertionError [ERR_ASSERTION]: x' },
+  });
+  assert.equal(res.status, 'failed');
+  assert.equal(adapter.calls.filter((c) => c.prompt.includes('repair one test file')).length, 1);
+  assert.match(res.output, /broke earlier items.*00-old\.test\.js/s);
+});
+
+test('when the Builder is stuck a Repairer may change anything; the item then goes on to the Inspector', async () => {
+  const { path, dir } = makeFile('1. [ ] T: first\n');
+  mkdirSync(join(dir, '.bish-bash-bosh'), { recursive: true });
+  writeFileSync(join(dir, '.bish-bash-bosh', 'plan.md'), 'plan');
+  const adapter = fakeAdapter((req) => {
+    if (!req.prompt.includes('You are a Repairer')) return {};
+    writeFileSync(join(dir, '.bish-bash-bosh', 'specification.md'), 'fixed');
+    return { transcript: 'REPAIRED: fixed' };
+  });
+  const res = await run(path, dir, adapter, {
+    runTests: ({ files }) => files ? { ok: false, output: 'red' } : (existsSync(join(dir, '.bish-bash-bosh', 'specification.md')) ? { ok: true, output: '' } : { ok: false, output: 'boom' }),
+    readFile: (p) => (p.endsWith('.test.js') ? '// real tests' : readFileSync(p, 'utf8')),
+  });
+  assert.equal(res.status, 'ok');
+  assert.equal(adapter.calls.filter((c) => c.prompt.includes('You are a Repairer')).length, 1, 'one Repairer call per item');
+  assert.ok(adapter.calls.at(-1).prompt.trimStart().startsWith(head('inspector')));
+  assert.equal(readFileSync(join(dir, '.bish-bash-bosh', 'specification.md'), 'utf8'), 'fixed');
+});
+
+test('`attempts` sets how many times a step is tried', async () => {
+  const { path, dir } = makeFile('1. [ ] T: first\n');
+  const adapter = fakeAdapter();
+  const res = await run(path, dir, adapter, { attempts: () => 2, listTests: () => new Map([['/t/a.test.js', '1']]) });
+  assert.equal(res.status, 'failed');
+  assert.equal(adapter.calls.length, 4, 'two Test Writer attempts, then two Repairer calls');
+});
+
+test('a Repairer may reword the item\'s plan line; the loop follows the new text, and stops if the item is removed', async () => {
+  const { path, dir } = makeFile('1. [ ] T: first - old S: 1\n');
+  const rewrite = (text) => fakeAdapter((req) => {
+    if (req.prompt.includes('You are a Repairer')) writeFileSync(path, text);
+    return {};
+  });
+  const reworded = await run(path, dir, rewrite('1. [ ] T: first - new S: 2\n'), {
+    runTests: ({ files }) => (files ? { ok: false, output: 'red' } : { ok: true, output: '' }),
+    readFile: (p) => (p.endsWith('.test.js') ? '// real tests' : readFileSync(p, 'utf8')),
+    listTests: () => new Map([['/t/a.test.js', '1']]),
+  });
+  assert.equal(reworded.status, 'ok');
+  assert.equal(readFileSync(path, 'utf8'), '1. [x] T: first - new S: 2\n');
+  writeFileSync(path, '1. [ ] T: first\n');
+  const removed = await run(path, dir, rewrite('# nothing left\n'), { listTests: () => new Map([['/t/a.test.js', '1']]) });
+  assert.equal(removed.status, 'failed');
+  assert.match(removed.output, /gone or already ticked/);
+});
+
+test('a Repairer may reword the item\'s plan line; the loop follows the new text, and stops if the item is removed', async () => {
+  const { path, dir } = makeFile('1. [ ] T: first - old S: 1\n');
+  const rewrite = (text) => fakeAdapter((req) => {
+    if (req.prompt.includes('You are a Repairer')) writeFileSync(path, text);
+    return {};
+  });
+  const opts = {
+    readFile: (p) => (p.endsWith('.test.js') ? '// real tests' : readFileSync(p, 'utf8')),
+    listTests: () => new Map([['/t/a.test.js', '1']]),
+  };
+  const reworded = await run(path, dir, rewrite('1. [ ] T: first - new S: 2\n'), opts);
+  assert.equal(reworded.status, 'ok');
+  assert.equal(readFileSync(path, 'utf8'), '1. [x] T: first - new S: 2\n');
+  writeFileSync(path, '1. [ ] T: first\n');
+  const removed = await run(path, dir, rewrite('# nothing left\n'), opts);
+  assert.equal(removed.status, 'failed');
+  assert.match(removed.output, /gone or already ticked/);
 });
 
 test('a role model from `models` is passed to that role\'s agent calls only', async () => {

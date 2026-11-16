@@ -8,7 +8,7 @@ The files `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` 
 
 2. Update `.bish-bash-bosh/specification.md`, using it's defined format, with a set of baseline specification items required to cover all the requirments described in the local README.md
 
-3. Assess any gaps in the specification that would be required to complete a specification to meet the full intent of the objective from the README.md. Think critically and apply healthy back-pressure: where the README departs from general best practice include a question proposing the best-practice approach as its default; and where one stated requirement makes another hard to meet (for example inline-only delivery versus unit-testing every function) include a question that proposes a practical alternative.
+3. Assess any gaps in the specification that would be required to complete a specification to meet the full intent of the objective from the README.md. Think critically and apply healthy back-pressure: where the README departs from general best practice include a question proposing the best-practice approach as its default; and where two items or requirements could demand different behaviour for the same input, include a question naming both and proposing which takes precedence, and record the agreed precedence in the affected specification items; where one stated requirement makes another hard to meet (for example inline-only delivery versus unit-testing every function) include a question that proposes a practical alternative.
 
 4. Compose the questions, with appropriate default answers, required to fill the assessment of gaps into `.bish-bash-bosh/interview.md` using it's defined format.
 
@@ -22,7 +22,7 @@ Phasing: if the objective is too large for one session's budget, ask the user on
 
 ## Working with the files
 
-Edit `.bish-bash-bosh/specification.md` and `.bish-bash-bosh/interview.md` directly, using your normal file read/edit tools. You may read the local README.md for the objective but edit only those two files; use no skills and no searching. Their entire format is the numbered checklist lines already in each file.
+Use `read_file` to read README.md and both seeded files. Use `apply_patch` to actually update both specification.md and interview.md. Do not merely describe planned edits or claim they are complete: the task is complete only after both files have been changed and you have read them back with `read_file` to verify the required formats and at least one unanswered question. You may read the local README.md for the objective but edit only those two files; use no skills and no searching.
 
 ## PRIME DIRECTIVE 
 

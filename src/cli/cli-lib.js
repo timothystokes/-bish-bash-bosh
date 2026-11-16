@@ -101,28 +101,37 @@ const GREY = '\x1b[90m';
 // the questions and answers scroll above it. [esc] enters adjust mode, where Left/Right pick a setting
 // and Up/Down change it, and [esc] again saves. In adjust mode readline's own key listeners are
 // detached so nothing can edit the answer being typed; they are put back on leaving it.
-export function createTerminalFooter(input, output, initialDials, { command = 'bish', mode = 'Interview' } = {}) {
+export function createTerminalFooter(input, output, initialDials, { command = 'bish' } = {}) {
   const rows = output.rows;
   let installed = false;
   let adjusting = false;
-  let selected = 'accuracy';
+  // Accuracy and curiosity steer bish's interview; bash and bosh have the number of retries instead.
+  const FIELDS = [['agent', 'Agent'], ['model', 'Model'], ...(command === 'bish' ? [['accuracy', 'Accuracy'], ['curiosity', 'Curiosity']] : [['retries', 'Retries']])];
+  let selected = FIELDS[2][0];
   let held = [];
   let own = [];
   let dials = initialDials;
   const wasRaw = input.isRaw === true;
-  const wasPaused = input.isPaused?.() ?? false;
+  // A stdin nobody has read yet is neither flowing nor explicitly paused; it must still be paused again
+  // on removal or it keeps the process alive after the command finishes.
+  const wasPaused = input.readableFlowing !== true;
   const text = () => {
     const v = dials.get();
-    const item = (name, label) => (adjusting && selected === name ? `\x1b[7m${label}: ${v[name]}\x1b[27m` : `${label}: ${v[name]}`);
+    const item = (name, label) => {
+      const shown = `${label}: ${v[name] ?? '-'}`;
+      return adjusting && selected === name ? `\x1b[7m${shown}\x1b[27m` : shown;
+    };
+    // Only the running command keeps its own color; the others stay grey.
     const brand = [
       ['bish', 31],
       ['bash', 32],
       ['bosh', 34],
-    ].map(([name, color]) => `${command === name ? '\x1b[1m' : ''}\x1b[${color}m-${name}${command === name ? '\x1b[22m' : ''}\x1b[0m`).join('');
+    ].map(([name, color]) => `\x1b[${command === name ? color : 90}m-${name}\x1b[0m`).join('');
     const hint = adjusting ? '\u2190\u2192 field \u2191\u2193 value Esc save' : 'Esc settings';
-    return `\x1b[0m${brand}${GREY} | Mode: ${mode} | ${item('accuracy', 'Accuracy')} | ${item('curiosity', 'Curiosity')} | ${hint}\x1b[0m`;
+    return `\x1b[0m${brand}${GREY} | ${FIELDS.map(([n, l]) => item(n, l)).join(' | ')} | ${hint}\x1b[0m`;
   };
-  const draw = () => output.write(`\x1b7\x1b[${rows};1H\x1b[2K${text()}\x1b8`);
+  const rule = () => `${GREY}${'\u2500'.repeat(output.columns || 80)}\x1b[0m`;
+  const draw = () => output.write(`\x1b7\x1b[${rows - 1};1H\x1b[2K${rule()}\x1b[${rows};1H\x1b[2K${text()}\x1b8`);
   const remove = () => {
     if (!installed) return;
     if (adjusting) for (const listener of held) input.on('keypress', listener);
@@ -130,7 +139,7 @@ export function createTerminalFooter(input, output, initialDials, { command = 'b
     adjusting = false;
     held = [];
     input.removeListener('keypress', onKey);
-    output.write(`\x1b7\x1b[r\x1b[${rows};1H\x1b[2K\x1b8`);
+    output.write(`\x1b7\x1b[r\x1b[${rows - 1};1H\x1b[2K\x1b[${rows};1H\x1b[2K\x1b8`);
     input.setRawMode?.(wasRaw);
     if (wasPaused) input.pause();
   };
@@ -138,7 +147,7 @@ export function createTerminalFooter(input, output, initialDials, { command = 'b
     if (!installed) {
       emitKeypressEvents(input);
       input.prependListener('keypress', onKey);
-      output.write(`\n\x1b[A\x1b7\x1b[1;${rows - 1}r\x1b8`);
+      output.write(`\n\n\x1b[2A\x1b7\x1b[1;${rows - 2}r\x1b8`);
       installed = true;
       process.once('exit', remove);
     }
@@ -157,7 +166,10 @@ export function createTerminalFooter(input, output, initialDials, { command = 'b
       adjusting = false;
       for (const l of held) input.on('keypress', l);
       held = [];
-    } else if (key.name === 'left' || key.name === 'right') selected = selected === 'accuracy' ? 'curiosity' : 'accuracy';
+    } else if (key.name === 'left' || key.name === 'right') {
+      const i = FIELDS.findIndex(([n]) => n === selected);
+      selected = FIELDS[(i + (key.name === 'right' ? 1 : FIELDS.length - 1)) % FIELDS.length][0];
+    }
     else if (key.name === 'up') dials.adjust(selected, 1);
     else if (key.name === 'down') dials.adjust(selected, -1);
     draw();

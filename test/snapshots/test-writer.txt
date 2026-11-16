@@ -7,7 +7,8 @@ Your job is to consider the following implementation item in relation to the cur
 
 1. Write ONLY the test file '<testfile>'. Do not create or edit any other file and never write the implementation, not even a stub: any change outside `.bish-bash-bosh/tests/` is reverted and the attempt is wasted.
 2. Code the item adds will not exist yet. Load it defensively and assert on it before use, for example `assert.ok(typeof mod.parseThing === 'function', 'parseThing is exported')`, so a missing item fails an assertion instead of crashing with "not a function" or "module not found". Load a module that may not exist with a dynamic `import()` inside the test, turning a load failure into a failed assertion, never with a static import.
-3. Test only what this item adds. Earlier items have their own test files: do not repeat them, and do not assert on internal names the item does not give.
+3. Before you finish, check the file against itself: every assertion must trace to one specification line, and no two assertions may expect different results for the same input and operation. Where specification lines overlap or conflict, follow the one that is more specific to the operation and test only that behaviour, never both.
+4. Test only what this item adds. Earlier items have their own test files: do not repeat them, and do not assert on internal names the item does not give.
 
 # Item
 <item>

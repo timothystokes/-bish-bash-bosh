@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import { parse as parseYaml } from 'yaml';
 import { main, parseStepArgs } from '../../src/cli/cli.js';
-import { resolveAdapter } from '../../src/adapters/index.js';
+import { resolveAdapter, resolveLiveAdapter } from '../../src/adapters/index.js';
 import { createFakeAdapter } from '../../src/adapters/adapter.js';
 import { freshDir, initGitRepo, commitProjectConfig, withCwd } from '../support/project.js';
 import { createTerminalFooter } from '../../src/cli/cli-lib.js';
@@ -67,13 +67,20 @@ test('main pins the branded settings footer for every phase command', async () =
     }));
     assert.equal(code, 2);
     const text = screen.join('');
-    assert.ok(text.includes(`\x1b[1m\x1b[${color}m-${command}\x1b[22m`), `${command} is bold`);
-    assert.ok(text.includes(`Mode: ${mode}`), `${mode} mode is visible`);
-    assert.match(text, /Accuracy: 5 \| Curiosity: 4/);
+    assert.ok(text.includes(`\x1b[${color}m-${command}\x1b[0m`), `${command} is in its own color`);
+    for (const other of ['bish', 'bash', 'bosh'].filter((n) => n !== command)) {
+      assert.ok(text.includes(`\x1b[90m-${other}\x1b[0m`), `${other} is grey`);
+    }
+    assert.match(text, /Agent: f \| Model: m/);
+    if (command === 'bish') assert.match(text, /Accuracy: 5 \| Curiosity: 4/);
+    else {
+      assert.match(text, /Retries: 5/);
+      assert.doesNotMatch(text, /Accuracy|Curiosity/, `${command} has no interview settings`);
+    }
     assert.match(text, /Esc settings/);
     const errorIndex = text.indexOf('unknown argument');
-    if (command === 'bish') assert.ok(text.lastIndexOf(`Mode: ${mode}`) > errorIndex, 'footer redraws after the bish error');
-    assert.match(text, /\x1b\[r\x1b\[24;1H\x1b\[2K/, `${command} removes the footer before returning`);
+    if (command === 'bish') assert.ok(text.lastIndexOf('Agent: f') > errorIndex, 'footer redraws after the bish error');
+    assert.match(text, /\x1b\[r\x1b\[23;1H\x1b\[2K\x1b\[24;1H\x1b\[2K/, `${command} removes the footer before returning`);
   }
 });
 
@@ -85,7 +92,7 @@ test('the footer accepts Escape and setting keys outside a readline prompt', () 
   });
   const screen = [];
   const output = Object.assign(new Writable({ write(chunk, _encoding, callback) { screen.push(String(chunk)); callback(); } }), { rows: 24, columns: 80 });
-  const settings = { accuracy: 5, curiosity: 4 };
+  const settings = { retries: 5 };
   const footer = createTerminalFooter(input, output, {
     get: () => settings,
     adjust: (name, delta) => { settings[name] += delta; },
@@ -96,8 +103,8 @@ test('the footer accepts Escape and setting keys outside a readline prompt', () 
   input.emit('keypress', undefined, { name: 'up' });
   input.emit('keypress', undefined, { name: 'escape' });
 
-  assert.deepEqual(settings, { accuracy: 6, curiosity: 4 });
-  assert.match(screen.join(''), /Mode: Plan/);
+  assert.deepEqual(settings, { retries: 6 });
+  assert.match(screen.join(''), /Agent: /);
   footer.remove();
   assert.equal(input.isRaw, false, 'terminal input mode is restored');
 });
@@ -135,7 +142,7 @@ test('settings adjusted from the footer persist while another phase is running',
   input.emit('keypress', undefined, { name: 'escape' });
   input.emit('keypress', undefined, { name: 'up' });
   input.emit('keypress', undefined, { name: 'escape' });
-  assert.equal(parseYaml(readFileSync(configPath, 'utf8')).accuracy, 6);
+  assert.equal(parseYaml(readFileSync(configPath, 'utf8')).retries, 6);
   releaseAgent();
   assert.equal(await run, 0);
 });
@@ -185,4 +192,62 @@ test('debugAdapter wraps run() with prompt/exit/transcript logging when debug is
   assert.match(text, /\[debug\] build: transcript begin\ndone\n\[debug\] build: transcript end/);
 
   assert.equal(debugAdapter(inner, 'build', false, capture(out)), inner, 'debug off: the adapter is returned unwrapped');
+});
+
+test('Agent and Model changed in the footer apply from the next agent call', async () => {
+  const dir = initGitRepo(freshDir('cli-agent-model-'));
+  commitProjectConfig(dir, { adapter: 'copilot', model: 'auto' });
+  const configPath = join(dir, '.bish-bash-bosh', 'config.yml');
+  const planPath = join(dir, '.bish-bash-bosh', 'plan.md');
+  writeFileSync(join(dir, '.bish-bash-bosh', 'specification.md'), '# Specification\n\n1. [ ] C: Work. B: Useful.\n');
+  const input = Object.assign(new Readable({ read() {} }), { isTTY: true });
+  const terminalOutput = Object.assign(new Writable({ write(_c, _e, cb) { cb(); } }), { isTTY: true, rows: 24, columns: 80 });
+  const used = [];
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let firstCall;
+  const firstStarted = new Promise((resolve) => { firstCall = resolve; });
+  const make = (name) => ({ model }) => ({
+    run: async () => {
+      used.push(`${name}/${model}`);
+      firstCall();
+      await gate;
+      writeFileSync(planPath, '# Plan\n\n1. [ ] T: Do work - useful S: 1\n');
+      return { exitStatus: 0, transcript: '', changedFiles: [] };
+    },
+  });
+  const registry = { copilot: make('copilot'), 'claude-code': make('claude-code'), codex: make('codex'), 'openai-http': make('openai-http') };
+  const run = withCwd(dir, () => main(['bash'], { registry, input, terminalOutput, stdout: () => {}, stderr: () => {} }));
+  await firstStarted;
+  const press = (name) => input.emit('keypress', undefined, { name });
+  press('escape');
+  press('left'); press('left'); // Accuracy -> Model -> Agent
+  press('up');
+  press('escape');
+  const saved = parseYaml(readFileSync(configPath, 'utf8'));
+  assert.equal(saved.adapter, 'claude-code');
+  assert.notEqual(saved.model, 'auto', 'model follows the new agent');
+  release();
+  await run;
+  assert.deepEqual(used, ['copilot/auto'], 'the call already running was not changed');
+});
+
+test('resolveLiveAdapter uses the adapter and model in config.yml at each call, keeping sessions per pair', async () => {
+  const dir = initGitRepo(freshDir('cli-live-'));
+  commitProjectConfig(dir, { adapter: 'a', model: 'm1' });
+  const configPath = join(dir, '.bish-bash-bosh', 'config.yml');
+  const made = [];
+  const registry = {
+    a: ({ model }) => { made.push(`a/${model}`); return { run: async () => `a/${model}` }; },
+    b: ({ model }) => { made.push(`b/${model}`); return { run: async () => `b/${model}` }; },
+  };
+  const project = { dir, config: { adapter: 'a', model: 'm1' } };
+  const live = resolveLiveAdapter(project, registry);
+  assert.equal(await live.run({}), 'a/m1');
+  writeFileSync(configPath, 'adapter: b\nmodel: m2\n');
+  assert.equal(await live.run({}), 'b/m2');
+  assert.deepEqual(project.config, { adapter: 'b', model: 'm2' });
+  writeFileSync(configPath, 'adapter: a\nmodel: m1\n');
+  assert.equal(await live.run({}), 'a/m1');
+  assert.deepEqual(made, ['a/m1', 'b/m2'], 'adapters are created once per adapter+model pair');
 });

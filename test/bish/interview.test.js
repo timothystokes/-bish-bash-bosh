@@ -303,8 +303,8 @@ test('createAsker: a fixed bottom line shows the settings; [esc] enters adjust m
   const reply = ask('\x1b[33m', 'Developers', dials);
   await wait();
   const all = () => chunks.join('');
-  assert.match(all(), /\x1b\[1;23r/, 'the last row is reserved below a scroll region');
-  assert.match(all(), /\x1b\[1m\x1b\[31m-bish\x1b\[22m[^\n]*-bash[^\n]*-bosh[^\n]*Mode: Interview[^\n]*Accuracy: 5 \| Curiosity: 4[^\n]*Esc settings/);
+  assert.match(all(), /\x1b\[1;22r/, 'the last two rows (rule and footer) are reserved below a scroll region');
+  assert.match(all(), /\x1b\[31m-bish\x1b\[0m\x1b\[90m-bash[^\n]*-bosh[^\n]*Agent: [^\n]*Accuracy: 5 \| Curiosity: 4[^\n]*Esc settings/);
   input.push('\x1b');
   await wait();
   assert.match(all(), /Esc save/);

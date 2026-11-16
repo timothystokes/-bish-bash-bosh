@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveAdapter, defaultRegistry } from '../adapters/index.js';
+import { resolveLiveAdapter, liveConfig, defaultRegistry } from '../adapters/index.js';
 import { acquireRunLock } from '../shared/run-lock.js';
+import { retriesOf } from '../bish/prompts/interview-dials.js';
 import { runBuildLoop } from './bosh-build-loop.js';
 import { runTestSuite, listTestFiles } from './bosh-test-runner.js';
 import { createLogger } from '../bish/bish-log.js';
@@ -48,7 +49,7 @@ export async function runBosh(cmd, argv, deps, out, err) {
     return 2;
   }
   try {
-    const adapter = debugAdapter(resolveAdapter(config, deps.registry ?? defaultRegistry), 'bosh', debug, out);
+    const adapter = debugAdapter(resolveLiveAdapter(project, deps.registry ?? defaultRegistry), 'bosh', debug, out);
     const res = await runBuildLoop({
       planPath: join(repo, PLAN_FILE),
       commit: (message) => commitAll(repo, message),
@@ -59,6 +60,7 @@ export async function runBosh(cmd, argv, deps, out, err) {
       adapter,
       repoDir: repo,
       models: config.roleModels,
+      attempts: () => retriesOf(liveConfig(project)),
       runTests: ({ cwd, files }) => runTestSuite(cwd, files),
       listTests: ({ cwd }) => listTestFiles(cwd),
       log: createLogger(join(repo, LOG_FILE)),

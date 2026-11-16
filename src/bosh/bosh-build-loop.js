@@ -9,6 +9,7 @@
 import { describeTestErrors, failingTestFiles, summarizeTestOutput } from './bosh-test-runner.js';
 import testRepairPrompt from './prompts/bosh-test-repair.js';
 import testWriterPrompt from './prompts/bosh-test-writer.js';
+import repairerPrompt from './prompts/bosh-repairer.js';
 import builderPrompt from './prompts/bosh-builder.js';
 import { join } from 'node:path';
 import testFileTemplate from './templates/bosh-test-file.js';
@@ -28,6 +29,7 @@ const RESET = '\x1b[0m';
 export const MAX_ATTEMPTS = 5;
 const MAX_TEST_ROUNDS = 3;
 const MAX_INSPECTION_ROUNDS = 3;
+const PLAN_NAME = '.bish-bash-bosh/plan.md';
 const MAX_FAILURE_CHARS = 4000;
 
 const LINE = /^(\d+)\.\s*\[([ x])\]\s*T:\s*(.*?)(?:\s+S:\s*(.*))?$/;
@@ -145,7 +147,7 @@ function markProcessed(planPath, readFile, writeFile, lineIndex) {
 
 // Runs one agent call under its role's write zone: whatever it changed outside the zone is reverted and reported.
 // Returns { reply, changed, violations }.
-async function callAgent(adapter, repoDir, prompt, log, persona, role, model = undefined, say = () => {}) {
+async function callAgent(adapter, repoDir, prompt, log, persona, role, model = undefined, say = () => {}, trail = []) {
   log(`${persona} prompt`, prompt);
   let reasoning = '';
   // No `session` key: every call (build or QA) is opted out of session tracking, so each one is a
@@ -155,12 +157,16 @@ async function callAgent(adapter, repoDir, prompt, log, persona, role, model = u
   const checking = () => say(`${GREY}Harness: Checking that the ${persona.replace('bosh/', '').replace('-', ' ')} only changed its own files...${RESET}\n`);
   const res = await adapter.run({ prompt, cwd: repoDir, limits: {}, ...(model ? { model } : {}), onReasoning: (chunk) => { reasoning += chunk; } });
   if (reasoning) log(`${persona} response`, reasoning);
+  if (res?.transcript && res.transcript !== reasoning) log(`${persona} reply`, res.transcript);
   checking();
   const { changed, violations } = enforce(repoDir, before, role);
-  return { reply: `${res?.transcript ?? ''}\n${reasoning}`, changed, violations };
+  const reply = `${res?.transcript ?? ''}\n${reasoning}`;
+  trail.push({ persona: persona.replace('bosh/', ''), reply: reply.trim(), violations });
+  return { reply, changed, violations };
 }
 
 const ALREADY_IMPLEMENTED = /^[ \t>*-]*ALREADY IMPLEMENTED:/m;
+const TEST_OK = /^[ \t>*-]*TEST OK:[ \t]*(.*)$/m;
 
 // The Builder reports a defective test by ending its reply with a `TEST FEEDBACK: <what is wrong>` line (it never edits tests).
 export function testFeedbackFrom(reply) {
@@ -197,6 +203,7 @@ export function testFeedbackFrom(reply) {
  *   adapter: { run: (req: object) => Promise<object> },
  *   repoDir?: string,
  *   models?: Record<string, string>,
+ *   attempts?: () => number,
  *   runTests: (opts: { cwd: string, files?: string[] }) => { ok: boolean, output: string },
  *   listTests: (opts: { cwd: string }) => Map<string, string>,
  *   log?: (source: string, text: string) => void,
@@ -212,6 +219,7 @@ export async function runBuildLoop({
   adapter,
   repoDir,
   models = {},
+  attempts = () => MAX_ATTEMPTS,
   runTests,
   listTests,
   log = (/** @type {string} */ _source, /** @type {string} */ _text) => {},
@@ -221,7 +229,8 @@ export async function runBuildLoop({
   // Runs one step up to MAX_ATTEMPTS times; `attempt(previousFailure)` returns '' on success or the failure text.
   async function step(label, attempt, seed = '', note = '') {
     let previous = seed;
-    for (let n = 1; n <= MAX_ATTEMPTS; n++) {
+    const max = attempts();
+    for (let n = 1; n <= max; n++) {
       say(`${GREY}${label}${n > 1 ? ' (trying again with feedback)' : note ? ` (${note})` : ''}...${RESET}\n`);
       let failure;
       try {
@@ -231,7 +240,7 @@ export async function runBuildLoop({
       }
       if (!failure) return '';
       log('bosh/harness', `${label} attempt ${n} got feedback:\n${failure}`);
-      if (n < MAX_ATTEMPTS) harness(`Sending ${label} back to try again because: ${failure.split('\n').find((l) => l.trim())?.trim().slice(0, 200)}`);
+      if (n < max) harness(`Sending ${label} back to try again because: ${failure.split('\n').find((l) => l.trim())?.trim().slice(0, 200)}`);
       previous = failure;
     }
     return previous;
@@ -271,6 +280,8 @@ export async function runBuildLoop({
     harness('Preparing the test file');
     ensureTestFile(repoDir, next, readFile, writeFile);
     let testFeedback = '';
+    // The Test Writer's reasoned `TEST OK:` reply to the Builder's complaint about a test, until the Builder answers it.
+    let dispute;
     let inspection = '';
     let latestResults = '';
     let needTests = true;
@@ -279,18 +290,84 @@ export async function runBuildLoop({
     let implementedAlready = false;
     const projectFiles = new Set();
     let earlierFailures = 0;
+    let repairTried = false;
+    // What each role last said this item, for the Repairer.
+    const trail = [];
+    let skipBuilder = false;
+    // When a role gives up, one Repairer (allowed to change anything but the plan) gets a go at the stuck item.
+    // Returns '' once the whole suite passes again, otherwise the original failure plus what the Repairer left behind.
+    const repair = async (persona, failure) => {
+      if (repairTried) return failure;
+      repairTried = true;
+      harness(`${persona} is stuck, calling in the Repairer`);
+      let outcome = failure;
+      let lastTry = '';
+      for (let n = 1; n <= 2; n++) {
+        if (n > 1) harness('The Repairer did not finish the job, giving it one more go');
+        const [specrows, questions] = contextFor(next, { repoDir, specPath, readFile });
+        const said = trail.slice(-6).map((t) => `## ${t.persona}${t.violations.length ? ` (changes outside its files were reverted: ${t.violations.join(', ')})` : ''}\n${clip(t.reply || '(no reply)').slice(-1500)}`).join('\n\n');
+        const { reply, changed } = await callAgent(adapter, repoDir, repairerPrompt(describeItem(next), persona, clip(failure), testFileFor(next), specrows, questions, said, lastTry), log, 'bosh/repairer', 'repairer', models?.repairer ?? models?.builder, say, trail);
+        // The Repairer may have reworded the plan line (the test file's name follows it) or removed the item.
+        const now = parsePlanItems(readFile(planPath)).find((i) => i.id === next.id);
+        if (!now || now.checked) return `${failure}\n\nThe Repairer changed ${PLAN_NAME} so this item is gone or already ticked; run the command again to continue with the updated plan.`;
+        Object.assign(next, now);
+        changed.filter((f) => !f.startsWith('.bish-bash-bosh/')).forEach((f) => projectFiles.add(f));
+        harness('Running the whole test suite');
+        const result = runTests({ cwd: repoDir });
+        latestResults = result.output;
+        let problem = '';
+        if (!result.ok) {
+          problem = `the suite still fails:\n${describeTestErrors(result.output)}${summarizeTestOutput(result.output)}`;
+        } else {
+          // A green suite only counts when the item really has tests of its own.
+          let own;
+          try { own = readFile(join(repoDir, testFileFor(next))); } catch { own = undefined; }
+          if (own === undefined || own === testFileTemplate(next.task.split(' - ')[0])) problem = `the suite is green but ${testFileFor(next)} still has no tests for this item (it is still the empty starter file). Write real tests there that check the item's specification rows.`;
+        }
+        if (!problem) {
+          implementedAlready = true;
+          testFeedback = '';
+          dispute = undefined;
+          log('bosh/harness', `The Repairer fixed the stuck ${persona}; the whole suite passes:\n${reply.trim().split('\n').slice(-3).join('\n')}`);
+          return '';
+        }
+        lastTry = `Your last attempt was checked by the harness and ${problem}`;
+        outcome = `${failure}\n\nThe Repairer also tried and ${problem}`;
+      }
+      return outcome;
+    };
+    // Earlier items' test files the Test Writer has already reviewed this item: not worth another pass.
+    const reviewed = new Set();
     for (;;) {
       if (needTests) {
         const before = listTests({ cwd: repoDir });
         // An item whose implementation survived an interrupted earlier run can never go red. So tests that still
         // pass on the retry are accepted (the Inspector then checks the work) instead of failing the item.
         let alreadyGreen = 0;
-        const redFailure = await step('Test Writer', async (previous) => {
-          const { reply, violations } = await callAgent(adapter, repoDir, buildTestLoopPrompt(next, previous, ...contextFor(next, { repoDir, specPath, readFile })), log, 'bosh/test-writer', 'test-writer', models?.['test-writer'], say);
+        let redFailure = await step('Test Writer', async (previous) => {
+          const { reply, violations } = await callAgent(adapter, repoDir, buildTestLoopPrompt(next, previous, ...contextFor(next, { repoDir, specPath, readFile })), log, 'bosh/test-writer', 'test-writer', models?.['test-writer'], say, trail);
           if (violations.length) return describeViolations('test-writer', violations);
           const after = listTests({ cwd: repoDir });
           const touched = [...after].filter(([path, stamp]) => before.get(path) !== stamp).map(([path]) => path);
-          if (touched.length === 0) return 'No test file under .bish-bash-bosh/tests/ was added or changed: write or fix at least one test for this item.';
+          if (touched.length === 0) {
+            // A passing test file from an earlier run (or one already fixed) needs no change: accept it as it stands.
+            const own = testFileFor(next);
+            let current;
+            try { current = readFile(join(repoDir, own)); } catch { current = undefined; }
+            if (current !== undefined && current !== testFileTemplate(next.task.split(' - ')[0]) && runTests({ cwd: repoDir, files: [...after.keys()].filter((k) => k.split('\\').join('/').endsWith(own)) }).ok) {
+              implementedAlready = true;
+              log('bosh/harness', `The Test Writer left ${own} unchanged and it passes as it stands; accepting it, the item may already be implemented from an earlier run.`);
+              return '';
+            }
+            // The Test Writer may stand by an unchanged test with a reasoned `TEST OK:`, which the Builder is then asked to accept.
+            const stood = TEST_OK.exec(reply);
+            if (stood && testFeedback) {
+              dispute = { builder: testFeedback, writer: stood[1].trim() || 'the test is correct as written' };
+              log('bosh/harness', `The Test Writer disputes the Builder's feedback and keeps ${own} unchanged:\n${dispute.writer}`);
+              return '';
+            }
+            return 'No test file under .bish-bash-bosh/tests/ was added or changed: write or fix at least one test for this item, or if it is already correct and the feedback is mistaken, leave it and end your reply with a line starting with TEST OK: giving the reason.';
+          }
           harness('Running the new tests, expecting them to fail');
           const red = runTests({ cwd: repoDir, files: touched });
           const broken = red.ok ? '' : describeTestErrors(red.output);
@@ -309,17 +386,22 @@ export async function runBuildLoop({
           if (red.ok) return `The new tests (${touched.join(', ')}) already pass before any implementation, so they prove nothing: make them fail for the right reason (the item's behaviour missing). If the project's files already implement this item, keep the tests as they are and end your reply with a line starting with ALREADY IMPLEMENTED: saying where.\n${red.output}`;
           return '';
         }, testFeedback, testFeedback ? 'with feedback from the Builder' : '');
-        if (redFailure) return fail(redFailure, 'Test Writer');
+        if (redFailure) {
+          redFailure = await repair('Test Writer', redFailure);
+          if (redFailure) return fail(redFailure, 'Test Writer');
+          skipBuilder = true;
+        }
         testFeedback = '';
         needTests = false;
       }
 
-      const greenFailure = await step('Builder', async (previous) => {
-        const built = await callAgent(adapter, repoDir, buildBuildLoopPrompt(next, previous, ...contextFor(next, { repoDir, specPath, readFile }), inspection), log, 'bosh/builder', 'builder', models?.builder, say);
+      let greenFailure = skipBuilder ? '' : await step('Builder', async (previous) => {
+        const built = await callAgent(adapter, repoDir, buildBuildLoopPrompt(next, previous, ...contextFor(next, { repoDir, specPath, readFile }), [inspection, dispute && `The Test Writer rejected your TEST FEEDBACK and kept the test unchanged, because: ${dispute.writer}\nBuild to the test as written. Only repeat your TEST FEEDBACK if you can show the Test Writer's reason is wrong.`].filter(Boolean).join('\n\n')), log, 'bosh/builder', 'builder', models?.builder, say, trail);
         built.changed.forEach((file) => projectFiles.add(file));
         if (built.violations.length) return `${describeViolations('builder', built.violations)} If a test is defective, end your reply with a line starting with TEST FEEDBACK: instead of editing it.`;
         testFeedback = testFeedbackFrom(built.reply);
         if (testFeedback) return '';
+        dispute = undefined;
         harness('Running the whole test suite');
         let result = runTests({ cwd: repoDir });
         latestResults = result.output;
@@ -327,24 +409,45 @@ export async function runBuildLoop({
           // Failures confined to earlier items' test files that the Builder cannot touch would otherwise stall the item for good.
           const own = join(repoDir, testFileFor(next)).split('\\').join('/');
           const stale = [...failingTestFiles(result.output)].filter((f) => join(repoDir, f).split('\\').join('/') !== own);
-          if (stale.length > 0 && stale.length === failingTestFiles(result.output).size && ++earlierFailures >= 2) {
-            const repaired = await repairEarlierTests(stale, result.output, next);
+          const unreviewed = stale.filter((f) => !reviewed.has(f));
+          if (unreviewed.length > 0 && stale.length === failingTestFiles(result.output).size && ++earlierFailures >= 2) {
+            const repaired = await repairEarlierTests(unreviewed, result.output, next);
+            unreviewed.forEach((f) => reviewed.add(f));
             if (repaired) return repaired;
             result = runTests({ cwd: repoDir });
             latestResults = result.output;
           }
-          if (!result.ok) return `${describeTestErrors(result.output)}${summarizeTestOutput(result.output)}`;
+          if (!result.ok) {
+            const failing = [...failingTestFiles(result.output)];
+            // Still failing after the Test Writer reviewed them: these are the Builder's regressions, so say so plainly.
+            if (failing.length > 0 && failing.every((f) => reviewed.has(f))) return `This change broke earlier items: the Test Writer reviewed ${failing.join(', ')} and they are still valid, so fix the implementation until they pass again (do not edit tests, and undo or adjust your own change that broke them).\n${describeTestErrors(result.output)}${summarizeTestOutput(result.output)}`;
+            return `${describeTestErrors(result.output)}${summarizeTestOutput(result.output)}`;
+          }
         }
         // The deliverable is the project itself, so an item can't pass on harness files alone.
         return projectFiles.size === 0 && !implementedAlready ? 'None of the project\'s own files was added or changed. The item\'s deliverables live in the project folder, outside .bish-bash-bosh/: implement the item there.' : '';
       }, '', inspection ? 'with feedback from the Inspector' : '');
-      if (greenFailure) return fail(greenFailure, 'Builder');
+      skipBuilder = false;
+      if (greenFailure) {
+        greenFailure = await repair('Builder', greenFailure);
+        if (greenFailure) return fail(greenFailure, 'Builder');
+      }
+      if (testFeedback && dispute && testFeedback === dispute.builder) {
+        // Neither side moved: another round would repeat this exchange, so stop and say exactly what is disputed.
+        log('bosh/harness', `Builder and Test Writer disagree about the test and neither will change:\nBuilder: ${testFeedback}\nTest Writer: ${dispute.writer}`);
+        const left = await repair('Builder', `The Builder and the Test Writer disagree about ${testFileFor(next)} and neither will change position. Decide which is right and either fix the test file or the specification.\nBuilder: ${testFeedback}\nTest Writer: ${dispute.writer}`);
+        if (left) return fail(left, 'Builder');
+      }
       if (testFeedback) {
         log('bosh/harness', `Builder sent feedback on the tests (round ${++testRounds} of ${MAX_TEST_ROUNDS}):\n${testFeedback}`);
-        if (testRounds >= MAX_TEST_ROUNDS) return fail(`The Builder still reports a defective test after ${MAX_TEST_ROUNDS} fixes: ${testFeedback}`, 'Builder');
-        harness('The Builder reports a defective test, sending it back to the Test Writer');
-        needTests = true;
-        continue;
+        if (testRounds >= MAX_TEST_ROUNDS) {
+          const left = await repair('Builder', `The Builder still reports a defective test after ${MAX_TEST_ROUNDS} fixes: ${testFeedback}`);
+          if (left) return fail(left, 'Builder');
+        } else {
+          harness('The Builder reports a defective test, sending it back to the Test Writer');
+          needTests = true;
+          continue;
+        }
       }
 
       let verdict = { approved: false, feedback: '', verified: [] };
@@ -352,12 +455,16 @@ export async function runBuildLoop({
         // The Inspector reads the latest full-suite output from a results file the harness writes before it runs.
         harness('Writing the test results for the Inspector');
         writeFile(join(repoDir, TEST_RESULTS_FILE), latestResults);
-        const inspected = await callAgent(adapter, repoDir, buildQaLoopPrompt(next, previous, ...contextFor(next, { repoDir, specPath, readFile }), [...projectFiles], items.filter((i) => !i.checked && i.id !== next.id)), log, 'bosh/inspector', 'inspector', models?.inspector, say);
+        const inspected = await callAgent(adapter, repoDir, buildQaLoopPrompt(next, previous, ...contextFor(next, { repoDir, specPath, readFile }), [...projectFiles], items.filter((i) => !i.checked && i.id !== next.id)), log, 'bosh/inspector', 'inspector', models?.inspector, say, trail);
         if (inspected.violations.length) return describeViolations('inspector', inspected.violations);
         verdict = parseVerdict(inspected.reply);
         return verdict.approved || verdict.feedback ? '' : 'End your reply with APPROVED (and a VERIFIED: line) or with a line starting with FEEDBACK: describing what must change.';
       });
-      if (qaFailure) return fail(qaFailure, 'Inspector');
+      if (qaFailure) {
+        const left = await repair('Inspector', qaFailure);
+        if (left) return fail(left, 'Inspector');
+        verdict = { approved: true, feedback: '', verified: [] };
+      }
       if (verdict.approved) {
         if (specPath) spec = tickSpecs(specPath, readFile, writeFile, verdict.verified.filter((id) => next.specs.includes(id)));
         break;
@@ -365,7 +472,11 @@ export async function runBuildLoop({
       inspection = verdict.feedback;
       harness('The Inspector has feedback, sending it back to the Builder');
       log('bosh/harness', `Inspector sent feedback (round ${++inspectionRounds} of ${MAX_INSPECTION_ROUNDS}):\n${inspection}`);
-      if (inspectionRounds >= MAX_INSPECTION_ROUNDS) return fail(`The Inspector still had feedback after ${MAX_INSPECTION_ROUNDS} rounds: ${inspection}`, 'Inspector');
+      if (inspectionRounds >= MAX_INSPECTION_ROUNDS) {
+        const left = await repair('Inspector', `The Inspector still had feedback after ${MAX_INSPECTION_ROUNDS} rounds: ${inspection}`);
+        if (left) return fail(left, 'Inspector');
+        break;
+      }
     }
 
     const [name, ...detail] = next.task.split(' - ');

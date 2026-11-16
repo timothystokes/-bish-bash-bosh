@@ -107,7 +107,7 @@ test('bosh stops and leaves the item unticked when its own test gate fails, repo
   const code = await withCwd(dir, () =>
     main(['bosh'], { registry: { bl: () => adapter }, stdout: (s) => out.push(s), stderr: () => {} }));
   assert.equal(code, 1, 'the agent never added a test, so the red gate fails');
-  assert.equal(adapter.calls.length, MAX_ATTEMPTS, 'only the test-writing step runs, retried up to the cap');
+  assert.equal(adapter.calls.length, MAX_ATTEMPTS + 2, 'the test-writing step is retried up to the cap, then two Repairer calls');
   assert.match(out.join(''), /Build stopped after 0 items/);
   const planAfter = readFileSync(join(dir, '.bish-bash-bosh', 'plan.md'), 'utf8');
   assert.match(planAfter, /1\. \[ \] T: Implement the login screen/, 'left unticked so a later `bosh` run retries it');

@@ -1,11 +1,14 @@
 export const DEFAULT_CURIOSITY = 4;
 export const DEFAULT_ACCURACY = 5;
 export const DEFAULT_SPEC_BUDGET = 60;
+export const DEFAULT_RETRIES = 5;
 
 const clamp = (v, fallback) => Math.min(10, Math.max(1, Math.round(Number(v) || fallback)));
 
 // The two settings as the interview will use them, defaults filled in.
 export const effectiveSettings = ({ curiosity, accuracy } = {}) => ({ accuracy: clamp(accuracy, DEFAULT_ACCURACY), curiosity: clamp(curiosity, DEFAULT_CURIOSITY) });
+// How many times each build step may be tried (config `retries`, 1-10).
+export const retriesOf = ({ retries } = {}) => clamp(retries, DEFAULT_RETRIES);
 // The most specification items one session may add (config `specBudget`).
 export const specBudget = ({ specBudget: b } = {}) => (Number.isInteger(b) && b >= 1 ? b : DEFAULT_SPEC_BUDGET);
 

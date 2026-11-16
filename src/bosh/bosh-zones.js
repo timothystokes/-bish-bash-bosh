@@ -15,6 +15,7 @@ const harnessOwned = (path) => path === `${HARNESS_DIR}lock` || path === `${HARN
 export const ZONES = {
   'test-writer': { allows: (path) => path.startsWith(TESTS_DIR), describe: `only the tests under ${TESTS_DIR}` },
   builder: { allows: (path) => !path.startsWith(HARNESS_DIR), describe: `only the project's own files, never anything under ${HARNESS_DIR}` },
+  repairer: { allows: () => true, describe: 'anything: the Repairer may fix whatever is wrong' },
   inspector: { allows: () => false, describe: 'nothing: the Inspector only reads and reports' },
 };
 
