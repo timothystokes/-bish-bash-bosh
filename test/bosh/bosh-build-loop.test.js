@@ -506,12 +506,15 @@ test('when the Builder is stuck a Repairer may change anything; the item then go
     writeFileSync(join(dir, '.bish-bash-bosh', 'specification.md'), 'fixed');
     return { transcript: 'REPAIRED: fixed' };
   });
+  const said = [];
   const res = await run(path, dir, adapter, {
+    say: (t) => said.push(t),
     runTests: ({ files }) => files ? { ok: false, output: 'red' } : (existsSync(join(dir, '.bish-bash-bosh', 'specification.md')) ? { ok: true, output: '' } : { ok: false, output: 'boom' }),
     readFile: (p) => (p.endsWith('.test.js') ? '// real tests' : readFileSync(p, 'utf8')),
   });
   assert.equal(res.status, 'ok');
   assert.equal(adapter.calls.filter((c) => c.prompt.includes('You are a Repairer')).length, 1, 'one Repairer call per item');
+  assert.match(said.join(''), /the Builder is stuck after 5 tries, calling in the Repairer[\s\S]*Repairer \(taking over from the Builder\)/, 'the Repairer is announced on screen');
   assert.ok(adapter.calls.at(-1).prompt.trimStart().startsWith(head('inspector')));
   assert.equal(readFileSync(join(dir, '.bish-bash-bosh', 'specification.md'), 'utf8'), 'fixed');
 });

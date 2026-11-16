@@ -22,6 +22,7 @@ import { takeSnapshot, enforce, describeViolations } from './bosh-zones.js';
 
 const CYAN = '\x1b[1;36m';
 const GREY = '\x1b[90m';
+const YELLOW = '\x1b[33m';
 const RESET = '\x1b[0m';
 
 // Every step (write tests, implement, verify) that fails its gate or throws is retried, in a fresh agent
@@ -299,11 +300,11 @@ export async function runBuildLoop({
     const repair = async (persona, failure) => {
       if (repairTried) return failure;
       repairTried = true;
-      harness(`${persona} is stuck, calling in the Repairer`);
+      say(`${YELLOW}Harness: the ${persona} is stuck after ${attempts()} tries, calling in the Repairer...${RESET}\n`);
       let outcome = failure;
       let lastTry = '';
       for (let n = 1; n <= 2; n++) {
-        if (n > 1) harness('The Repairer did not finish the job, giving it one more go');
+        say(`${YELLOW}Repairer${n > 1 ? ' (trying again with feedback)' : ` (taking over from the ${persona})`}...${RESET}\n`);
         const [specrows, questions] = contextFor(next, { repoDir, specPath, readFile });
         const said = trail.slice(-6).map((t) => `## ${t.persona}${t.violations.length ? ` (changes outside its files were reverted: ${t.violations.join(', ')})` : ''}\n${clip(t.reply || '(no reply)').slice(-1500)}`).join('\n\n');
         const { reply, changed } = await callAgent(adapter, repoDir, repairerPrompt(describeItem(next), persona, clip(failure), testFileFor(next), specrows, questions, said, lastTry), log, 'bosh/repairer', 'repairer', models?.repairer ?? models?.builder, say, trail);
